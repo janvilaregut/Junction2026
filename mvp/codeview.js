@@ -72,17 +72,75 @@ const heatTag = (c) => {
   const m = c.model ? `${c.model.choice} ${Math.round(c.model.confidence * 100)}%` : 'signals only';
   return `${LEVEL_WORD[c.level]} · ${m}${c.why?.length ? ' · ' + c.why.join(', ') : ''}`;
 };
-function chunkHTML(sec, c) {
-  const rows = c.lines.map((l) => `<div class="cv-line${l.changed ? ' add' : ''}"><i>${l.n}</i><b>${l.changed ? '+' : ''}</b><code>${esc(l.text.replace(/\t/g, '  ')) || ' '}</code></div>`).join('');
-  return `<div class="cv-chunk h${c.level}" data-heat="${c.heat}" title="${esc(heatTag(c))}"><div class="cv-head"><span>${LEVEL_WORD[c.level]}</span>${c.why?.length ? `<em>${esc(c.why.slice(0, 3).join(' · '))}</em>` : ''}</div>${rows}</div>`;
+
+/* ── Word heat: inside a chunk, how much each word carries. Mathematics only, no model:
+   control flow and comparisons weigh most; an identifier weighs by how rare it is across the chunks (idf),
+   more when it links two hot chunks (data flowing between the parts worth reading), and more again when it
+   names an error or a report. The weight is scaled by the chunk's own heat and drawn as a soft underline. ── */
+const KW_CTRL = new Set(['if', 'else', 'switch', 'case', 'for', 'foreach', 'while', 'do', 'try', 'catch', 'finally', 'throw', 'return', 'break', 'continue', 'yield', 'await', 'goto', 'when', 'match', 'raise', 'except', 'elif']);
+const KW_DULL = new Set(['var', 'let', 'const', 'bool', 'int', 'long', 'string', 'object', 'void', 'new', 'null', 'true', 'false', 'public', 'private', 'protected', 'internal', 'static', 'readonly', 'this', 'base', 'class', 'struct', 'using', 'import', 'from', 'export', 'function', 'async', 'in', 'is', 'as', 'out', 'ref', 'default', 'typeof', 'nameof', 'get', 'set', 'value', 'self', 'def', 'None', 'True', 'False', 'undefined', 'not', 'and', 'or']);
+const TOKEN = /(\s+)|("(?:\\.|[^"\\])*"?|'(?:\\.|[^'\\])*'?|`[^`]*`?)|(\/\/.*$)|([A-Za-z_$][\w$]*)|(\d+(?:\.\d+)?)|(\?\?=?|[!=<>]=|&&|\|\||=>|[!?])|(\S)/g;
+const IDENT = /[A-Za-z_$][\w$]*/g;
+function wordModel(data) {
+  const chunks = (data.sections || []).flatMap((s) => s.chunks), df = new Map(), hot = new Map();
+  for (const c of chunks) {
+    const seen = new Set(c.lines.flatMap((l) => l.text.replace(/\/\/.*$/, '').match(IDENT) || []));
+    for (const w of seen) { df.set(w, (df.get(w) || 0) + 1); if (c.level === 3) hot.set(w, (hot.get(w) || 0) + 1); }
+  }
+  const N = chunks.length || 1, max = Math.log((N + 1) / 0.5);
+  return { idf: (w) => Math.log((N + 1) / ((df.get(w) || 0) + 0.5)) / max, links: (w) => (hot.get(w) || 0) >= 2 };
 }
-function sectionHTML(sec, many) {
-  const parts = codeChunks(sec).map((p) => p.c ? chunkHTML(sec, p.c)
-    : `<button class="cv-fold" data-k="${esc(p.fold.map((c) => sec.node + '@' + c.start).join('|'))}">⋯ ${p.fold.reduce((n, c) => n + c.end - c.start + 1, 0)} lines of filler <small>${p.fold[0].start}–${p.fold[p.fold.length - 1].end}</small></button>`).join('');
-  const head = many ? `<div class="csec"><button data-node="${esc(sec.node)}">${esc(sec.name)}</button><small>:${sec.start}</small><i style="background:${PAL[VTONE[nodeState({ ...sec, id: sec.node })]] || PAL.no}"></i></div>` : '';
-  return `<section class="cs">${head}${parts}</section>`;
+function wordWeight(tok, kind, W) {
+  if (kind === 'ws' || kind === 'punct' || kind === 'comment') return 0;
+  if (kind === 'str' || kind === 'num') return 0.35;
+  if (kind === 'op') return 0.6;
+  if (KW_CTRL.has(tok)) return 0.85;
+  if (KW_DULL.has(tok)) return 0.08;
+  let w = 0.2 + 0.45 * W.idf(tok);
+  if (W.links(tok)) w += 0.25;
+  if (/^(Report|Throw|Assert|Ensure|Fail|Diagnostic)|(Exception|Error|Diagnostic)$/.test(tok)) w += 0.2;
+  return Math.min(1, w);
+}
+function heatLine(text, heat, W) {
+  let out = '';
+  for (const m of String(text).replace(/\t/g, '  ').matchAll(TOKEN)) {
+    const kind = m[1] ? 'ws' : m[2] ? 'str' : m[3] ? 'comment' : m[4] ? 'id' : m[5] ? 'num' : m[6] ? 'op' : 'punct';
+    const a = W ? wordWeight(m[0], kind, W) * (0.15 + 0.85 * heat) * 0.5 : 0;
+    out += a >= 0.04 ? `<span class="tk" style="--a:${a.toFixed(2)}">${esc(m[0])}</span>` : esc(m[0]);
+  }
+  return out || ' ';
 }
 
+function chunkHTML(sec, c, W) {
+  const rows = c.lines.map((l) => `<div class="cv-line${l.changed ? ' add' : ''}"><i>${l.n}</i><b>${l.changed ? '+' : ''}</b><code>${heatLine(l.text, c.heat, W)}</code></div>`).join('');
+  const ai = c.model ? `<b class="cv-ai" title="gemini-decision-1">${esc(c.model.choice)} ${Math.round(c.model.confidence * 100)}%</b>` : '';
+  return `<div class="cv-chunk h${c.level}" data-heat="${c.heat}" title="${esc(heatTag(c))}"><div class="cv-head"><span>${LEVEL_WORD[c.level]}</span>${ai}${c.why?.length ? `<em>${esc(c.why.slice(0, 3).join(' · '))}</em>` : ''}</div>${rows}</div>`;
+}
+const secHead = (sec) => `<div class="csec"><button data-node="${esc(sec.node)}">${esc(sec.name)}</button><small>:${sec.start}</small><i style="background:${PAL[VTONE[nodeState({ ...sec, id: sec.node })]] || PAL.no}"></i></div>`;
+function sectionHTML(sec, many, W) {
+  const parts = codeChunks(sec).map((p) => p.c ? chunkHTML(sec, p.c, W)
+    : `<button class="cv-fold" data-k="${esc(p.fold.map((c) => sec.node + '@' + c.start).join('|'))}">⋯ ${p.fold.reduce((n, c) => n + c.end - c.start + 1, 0)} lines of filler <small>${p.fold[0].start}–${p.fold[p.fold.length - 1].end}</small></button>`).join('');
+  return `<section class="cs">${many ? secHead(sec) : ''}${parts}</section>`;
+}
+/* "All code": the whole file, top to bottom. The scored chunks keep their heat; the rest of the file is context. */
+function fileHTML(data, W) {
+  return Object.entries(data.files || {}).map(([path, f]) => {
+    const at = new Map(), changed = new Set(f.changed || []);
+    for (const s of data.sections || []) if (s.file === path) s.chunks.forEach((c, i) => at.set(c.start, { s, c, first: i === 0 }));
+    let html = '', ctx = '';
+    const flush = () => { if (ctx) { html += `<div class="cv-ctx">${ctx}</div>`; ctx = ''; } };
+    for (let ln = 1; ln <= f.lines.length; ln++) {
+      const hit = at.get(ln);
+      if (hit) { flush(); if (hit.first) html += secHead(hit.s); html += chunkHTML(hit.s, hit.c, W); ln = hit.c.end; continue; }
+      ctx += `<div class="cv-line${changed.has(ln) ? ' add' : ''}"><i>${ln}</i><b>${changed.has(ln) ? '+' : ''}</b><code>${heatLine(f.lines[ln - 1], 0.04, W)}</code></div>`;
+    }
+    flush();
+    return `<section class="cs">${html}${f.truncated ? '<p class="cempty">The file goes on; only its first 4000 lines are shown.</p>' : ''}</section>`;
+  }).join('');
+}
+
+const WORDS = new WeakMap(); // one word model per attention answer
+const cvWords = (data) => { if (!WORDS.has(data)) WORDS.set(data, wordModel(data)); return WORDS.get(data); };
 function paintCode(n, data) {
   const isFile = n.kind === 'file', d = n.m, v = d ? nodeState(d) : null, mark = d ? S.marks?.[d.id] : null;
   const kind = d ? ({ function: 'function', method: 'method', ctor: 'constructor', property: 'property', type: 'declarations', test: 'test' }[d.kind] || d.kind) : 'file';
@@ -98,7 +156,8 @@ function paintCode(n, data) {
   const body = data?.error ? `<p class="cempty">Could not read the code: ${esc(data.error)}</p>`
     : !data ? '<div class="cload"><i></i><i></i><i></i><span>Weighing every chunk…</span></div>'
     : !secs.length ? '<p class="cempty">No code to show for this spot.</p>'
-    : secs.map((s) => sectionHTML(s, isFile || secs.length > 1)).join('');
+    : cvAll && data.files && Object.keys(data.files).length ? fileHTML(data, cvWords(data))
+    : secs.map((s) => sectionHTML(s, isFile || secs.length > 1, cvWords(data))).join('');
   CV.innerHTML = `<div class="chd">
       <div class="nk">${esc(where)} · ${esc(kind)}${status ? ' · ' + status : ''}</div>
       <div class="nt"><span>${esc(isFile ? base(where) : d.qname || d.name)}</span>${d ? `<em class="fchip" style="background:${PAL[VTONE[v]]}">${VWORD[v]}</em>` : ''}</div>
@@ -112,7 +171,10 @@ function paintCode(n, data) {
       ${d ? '<button class="cta ghost" id="cvEvidence">Evidence</button>' : ''}
       ${d && open ? '<button class="cta ghost" id="cvRead">I read it</button>' : d && mark?.state === 'read' ? '<button class="cta ghost" id="cvUnread">Undo</button>' : ''}
     </div></div>`;
-  CV.querySelectorAll('.seg button').forEach((b) => (b.onclick = () => { cvAll = b.dataset.all === '1'; paintCode(n, cvData); }));
+  CV.querySelectorAll('.seg button').forEach((b) => (b.onclick = () => {
+    cvAll = b.dataset.all === '1'; paintCode(n, cvData);
+    if (cvAll) CV.querySelector('.cv-chunk')?.scrollIntoView({ block: 'start' }); // the whole file, opened where the function is
+  }));
   CV.querySelectorAll('.cv-fold').forEach((b) => (b.onclick = () => { for (const k of b.dataset.k.split('|')) cvOpen.add(k); paintCode(n, cvData); }));
   CV.querySelectorAll('.csec button').forEach((b) => (b.onclick = () => { const t = G.nodes.get(b.dataset.node); if (t) showCode(t); }));
   if ($('cvReview')) $('cvReview').onclick = () => openReview({ node: n });

@@ -497,3 +497,8 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 .cload i{width:7px;height:7px;border-radius:50%;background:var(--heat);animation:pulse 1.2s ease-in-out infinite}.cload i:nth-child(2){animation-delay:.2s}.cload i:nth-child(3){animation-delay:.4s}.cload span{margin-left:6px}
 @media (max-width:900px){.cview{left:16px;right:16px;width:auto;top:auto;height:56vh;bottom:108px}}
 @media (prefers-reduced-motion:reduce){.cview{transition:none}.cload i{animation:none}}
+/* Word heat inside the code view: a soft underline, darker for words that carry more (codeview.js heatLine). */
+.cview .tk{background:linear-gradient(transparent 58%,rgba(255,179,122,var(--a)) 58%,rgba(255,179,122,var(--a)) 92%,transparent 92%);border-radius:2px}
+.cview .cv-ai{font:600 10px var(--mono);color:var(--fg2);background:var(--card3);border-radius:5px;padding:1px 6px}
+.cv-chunk.h3 .cv-ai{color:var(--heat);background:rgba(255,179,122,.12)}
+.cv-ctx{margin:2px 0;padding:2px 0;font:400 11.5px/1.55 var(--mono);opacity:.5;border-left:3px solid transparent}

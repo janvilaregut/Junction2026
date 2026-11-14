@@ -14,7 +14,8 @@ import { diff as gitDiff } from '../git.js';
 import { analyze, nodeSource } from './index.js';
 import { lexicon } from './sensitivity.js';
 
-export const ATTENTION_VERSION = 1;
+export const ATTENTION_VERSION = 2; // 2: the whole file comes along, for "All code"
+const MAX_FILE_LINES = 4000;
 const MODEL = 'gemini-decision-1';
 const MAX_CHUNK = 14, MAX_CHUNKS = 40, MAX_NODES = 12;
 const CRITERIA = {
@@ -142,11 +143,13 @@ export async function attention(project, pr, id, { force = false, fetcher = fetc
     for (const h of f.hunks) for (let i = 0; i < h.added.length; i++) set.add(h.newStart + i);
     added.set(f.path, set);
   }
-  const sections = [], ask = [];
+  const sections = [], ask = [], fileText = {};
   for (const n of targets) {
     const src = await nodeSource(project, pr, n.id);
     if (!src.fileHead) continue;
     const lines = src.fileHead.split('\n'), changedSet = added.get(n.file) || new Set();
+    // The whole file, for "All code": its lines and which of them the pull request changed.
+    if (!fileText[n.file]) fileText[n.file] = { lines: lines.slice(0, MAX_FILE_LINES), changed: [...changedSet].filter((l) => l <= MAX_FILE_LINES).sort((a, b) => a - b), truncated: lines.length > MAX_FILE_LINES };
     const total = [...changedSet].filter((l) => l >= n.start && l <= n.end).length;
     const allNew = n.status === 'added' || total >= 0.85 * (n.end - n.start + 1);
     const chunks = chunksOf(lines, n.start, n.end).slice(0, MAX_CHUNKS).map((c) => {
@@ -164,7 +167,7 @@ export async function attention(project, pr, id, { force = false, fetcher = fetc
   for (const s of sections) for (const c of s.chunks) { Object.assign(c, settle(c, answer.answers[c.key])); delete c.marked; delete c.name; }
   ration(sections.flatMap((s) => s.chunks));
   for (const s of sections) { s.heat = Math.max(0, ...s.chunks.map((c) => c.heat)); s.shown = s.chunks.filter((c) => c.level >= 2).length; }
-  const result = { version: ATTENTION_VERSION, id, head: r.head, model: { model: MODEL, status: answer.status, reason: answer.reason || null, ms: answer.ms, tokens: answer.tokens ?? null, asked: Math.min(ask.length, 48), authority: 'orders and filters what a person reads; cannot colour a node, approve or skip a check' }, sections };
+  const result = { version: ATTENTION_VERSION, id, head: r.head, model: { model: MODEL, status: answer.status, reason: answer.reason || null, ms: answer.ms, tokens: answer.tokens ?? null, asked: Math.min(ask.length, 48), authority: 'orders and filters what a person reads; cannot colour a node, approve or skip a check' }, sections, files: fileText };
   // A fallback is not cached: the next open may reach the model.
   if (answer.status === 'used' || answer.status === 'skipped') try { writeJSON(file, result); } catch { /* the cache is a convenience */ }
   return result;
