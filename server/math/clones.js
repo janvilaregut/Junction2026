@@ -35,13 +35,19 @@
 // the members a template stamps out) matches in dozens of places, and reporting a new function as a copy of one
 // of them misleads. The paper names the problem (section 5.2: "a very significant issue in a practical
 // copy-detection system is the ability to ignore boiler-plate") and MOSS, the system it describes, answers it
-// with a frequency rule: its -m option ignores a passage that appears in more than m programs, and its clients
-// ship m = 10. The same rule is applied here, per token and on verified matches only: a query token is COMMON
-// when at least `commonAt` indexed sequences each share with the query a run of k tokens or more that contains
-// it. Nothing is hidden: `common` is a count next to `tokens`, and tokens - common is the part of a match that
-// is not house style. The count is a lower bound (see query()), so code is never called common without that
-// many verified occurrences. What it cannot see: an idiom that is rare in the indexed repository (a framework
-// pattern used twice) is not common here, and stays a plain match.
+// with a frequency rule: its -m option never reports a passage that appears in more than m programs, and the
+// default is m = 10 (usage notes of the MOSS submission script). The same rule is applied here, per token and
+// on verified matches only: a query token is COMMON when at least `commonAt` indexed sequences each share with
+// the query a run of k tokens or more that contains it. Nothing is hidden: `common` is a count next to `tokens`,
+// and tokens − common is the part of a match that is not house style. The count is a lower bound (see query()),
+// so code is never called common without that many verified occurrences. Measured on a C# repository where
+// each of 1 252 function bodies with a clone was queried against all the others: for 685 of them at least half
+// of the best match is common. What frequency cannot see: an idiom that is rare in the indexed repository (an
+// Equals preamble written twice, a test scaffold used once before) is not common here and stays a plain match.
+//
+// Tokens are not text. A span counts normalised tokens, and one token can be a 30-line string literal: two tests
+// with the same scaffolding and different inputs match in every token. `sameText` says how much of a match is
+// literally the same characters, so that "100% of the tokens" is never read as "the same code".
 //
 // What a reported span IS: a proof, by token-by-token comparison, that two ranges have the same normalised
 // token sequence. Hashes only find candidates; no span is reported on the strength of a hash.
@@ -66,7 +72,8 @@ export const DEFAULTS = { k: 20, w: 21 };
 const MAX_WORK = 2_000_000;
 
 // A passage shared with this many indexed sequences is common (see "Idioms" above). 10 is the MOSS default for
-// its -m option. With the query itself that is 11 occurrences; MOSS counts "more than m programs", the same line.
+// its -m option: with the query itself that is 11 occurrences, and MOSS draws the line at "more than m programs".
+// It is a convention, not a derived constant: callers with a small repository may want it lower.
 const COMMON_AT = 10;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -115,7 +122,7 @@ class Coder {
       const t = tokens[i], kind = t.k;
       if (kind === 'nl') continue;
       codes[n] = kind === 'id' ? 0 : kind === 'num' ? 1 : kind === 'str' ? 2 : this.code(String(t.v));
-      if (keep) texts[n] = t.v;
+      if (keep) texts[n] = typeof t.v === 'string' ? t.v : String(t.v);
       lines[n++] = t.l;
     }
     if (n === m) return { n, codes, lines, texts };
@@ -314,10 +321,10 @@ function cover(spans, side, count, sum, any, com) {
  */
 function sameText(qt, dt, a, e, b) {
   let same = 0, all = 0;
-  for (let z = a; z < e; z++) {
-    const v = String(qt[z]), len = v.length;
+  for (let z = a, y = b; z < e; z++, y++) {
+    const v = qt[z], len = v.length;
     all += len;
-    if (v === String(dt[b + z - a])) same += len;
+    if (v === dt[y]) same += len;
   }
   return [same, all];
 }
@@ -332,14 +339,18 @@ function commonSums(cands, n, at) {
   let matched = 0;
   for (const c of cands) if (c.spans.length || c.rest) matched++;
   if (matched < at) return sum; // fewer candidates than the threshold: no token can reach it
-  const shared = new Int32Array(n), stamp = new Int32Array(n);
-  let nth = 0;
+  const step = new Int32Array(n + 1); // difference array: +1 where a candidate starts covering, −1 where it stops
   for (const c of cands) {
     if (!c.spans.length && !c.rest) continue;
-    nth++;
-    for (const list of c.rest ? [c.spans, c.rest] : [c.spans]) for (const s of list) for (let z = s[0]; z < s[1]; z++) if (stamp[z] !== nth) { stamp[z] = nth; shared[z]++; }
+    const list = c.rest ? c.spans.concat(c.rest) : c.spans;
+    if (list.length > 1) list.sort((x, y) => x[0] - y[0]); // by start, so that the union is one sweep (cover() re-sorts)
+    let end = 0;
+    for (const s of list) {
+      const lo = s[0] > end ? s[0] : end;
+      if (s[1] > lo) { step[lo]++; step[s[1]]--; end = s[1]; }
+    }
   }
-  for (let z = 0; z < n; z++) sum[z + 1] = sum[z] + (shared[z] >= at ? 1 : 0);
+  for (let z = 0, shared = 0; z < n; z++) { shared += step[z]; sum[z + 1] = sum[z] + (shared >= at ? 1 : 0); }
   return sum;
 }
 
@@ -487,7 +498,7 @@ export class CloneIndex {
           const d = list[j], doc = docs[d];
           let c;
           if (slot[d]) c = cands[slot[d] - 1];
-          else { cands.push(c = { d, base: cands.length * room + doc.n, off: skip.size > 0 && skip.has(doc.id), spans: [], rest: null, best: null, result: null }); slot[d] = cands.length; }
+          else { cands.push(c = { d, base: cands.length * room + doc.n, off: skip.size > 0 && skip.has(doc.id), spans: [], rest: null, best: null, kept: null, result: null }); slot[d] = cands.length; }
           if (c.off) continue;
           const p = list[j + 1], dc = doc.codes, best = c.best;
           if (best !== null && i >= best[0] && i + k <= best[1]) {
@@ -513,18 +524,23 @@ export class CloneIndex {
     for (const c of found) {
       const doc = this.docs[c.d], { kept, covered, repetitive, common } = cover(c.spans, 0, count, sum, any, com);
       kept.sort((x, y) => x[0] - y[0] || x[2] - y[2]);
-      let same = 0, all = 0;
-      const spans = kept.map((s) => {
-        const [sm, al] = sameText(q.texts, doc.texts, s[0], s[1], s[2]);
-        same += sm; all += al;
-        return { ...span(s, q.lines, doc.lines, sum, 0), common: com[s[1]] - com[s[0]], sameText: al ? sm / al : 1 };
-      });
-      c.result = { id: doc.id, meta: doc.meta, tokens: covered, coverage: covered / n, repetitive, common, sameText: all ? same / all : 1, spans };
+      c.kept = kept;
+      c.result = { id: doc.id, meta: doc.meta, tokens: covered, coverage: covered / n, repetitive, common, sameText: 1, spans: null };
     }
     found.sort((x, y) => y.result.tokens - x.result.tokens || x.d - y.d);
     out.distinct = found.length;
     for (let z = 0; z < n; z++) if (any[z]) { out.covered++; out.common += com[z + 1] - com[z]; }
-    for (let j = 0; j < found.length && j < limit; j++) out.push(found[j].result);
+    for (let j = 0; j < found.length && j < limit; j++) { // spans are spelled out only for the results that are returned
+      const c = found[j], doc = this.docs[c.d];
+      let same = 0, all = 0;
+      c.result.spans = c.kept.map((s) => {
+        const [sm, al] = sameText(q.texts, doc.texts, s[0], s[1], s[2]);
+        same += sm; all += al;
+        return { ...span(s, q.lines, doc.lines, sum, 0), common: com[s[1]] - com[s[0]], sameText: al ? sm / al : 1 };
+      });
+      if (all) c.result.sameText = same / all;
+      out.push(c.result);
+    }
     return out;
   }
 }
@@ -533,7 +549,7 @@ export class CloneIndex {
 // Two versions of one function, and one function against itself
 
 /**
- * similarity(a, b, k = 5) → { jaccard, containmentA, containmentB, identical, shared, sizeA, sizeB }
+ * similarity(a, b, k = 5) → { jaccard, containmentA, containmentB, identical, sameShape, shared, sizeA, sizeB }
  * Resemblance and containment of Broder, "On the resemblance and containment of documents", Compression and
  * Complexity of Sequences 1997, computed exactly (no sampling) over the SETS of normalised k-shingles
  * (k consecutive normalised tokens) of two token arrays:
@@ -541,25 +557,32 @@ export class CloneIndex {
  * sizeA, sizeB and shared are |A|, |B| and |A ∩ B|. A sequence shorter than k counts as one shingle, itself,
  * so two tiny functions still compare; an empty one has no shingles (two empty sequences: jaccard 1; the empty
  * set is contained in anything: containment 1).
- * identical is true exactly when the two normalised token SEQUENCES are equal: the two versions differ at most
- * in comments, layout, identifier names and literal values. It is not a proof of equal behaviour (a renamed
- * variable or a changed constant leaves it true), and jaccard = 1 does not imply it (sets ignore order and
- * repetition).
+ * sameShape is true exactly when the two normalised token SEQUENCES are equal: the two versions differ at most
+ * in comments, layout, identifier names and literal values (a type-2 clone of the whole). It says nothing about
+ * behaviour: `return a - b` and `return b - a` have the same shape, and so do a timeout of 10 and one of 1000.
+ * identical is true exactly when the token texts themselves are equal, one by one (a type-1 clone of the whole):
+ * the two versions differ at most in comments, whitespace and line breaks. That is as close to "the same code"
+ * as tokens can say, and still not a proof of equal behaviour where a line break is syntax (JavaScript inserts
+ * a semicolon after a `return` at the end of a line; the lexer does not keep line breaks).
+ * identical implies sameShape; jaccard = 1 implies neither (sets ignore order and repetition).
+ * Until this field was split, `identical` meant what sameShape means now, and a caller read it as "equivalent".
  */
 export function similarity(a, b, k = 5) {
   posInt(k, 'k');
-  const coder = new Coder(), A = coder.encode(a), B = coder.encode(b);
+  const coder = new Coder(), A = coder.encode(a, true), B = coder.encode(b, true);
   const wide = coder.hash.length > 0xffff, sa = shingles(A, k, wide), sb = shingles(B, k, wide);
   let shared = 0;
   for (const s of sa) if (sb.has(s)) shared++;
   const union = sa.size + sb.size - shared;
-  let identical = A.n === B.n;
-  for (let i = 0; identical && i < A.n; i++) identical = A.codes[i] === B.codes[i];
+  let sameShape = A.n === B.n;
+  for (let i = 0; sameShape && i < A.n; i++) sameShape = A.codes[i] === B.codes[i];
+  let identical = sameShape;
+  for (let i = 0; identical && i < A.n; i++) identical = A.texts[i] === B.texts[i];
   return {
     jaccard: union ? shared / union : 1,
     containmentA: sa.size ? shared / sa.size : 1,
     containmentB: sb.size ? shared / sb.size : 1,
-    identical, shared, sizeA: sa.size, sizeB: sb.size,
+    identical, sameShape, shared, sizeA: sa.size, sizeB: sb.size,
   };
 }
 

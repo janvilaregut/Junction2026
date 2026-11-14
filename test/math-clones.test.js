@@ -420,31 +420,42 @@ test('work budget: a query that runs out says truncated and reports only verifie
 test('similarity: hand-checked Jaccard and containment over 2-shingles', () => {
   const a = ops(['(', '+', ')', '*', '[', ']']), b = ops(['(', '+', ')', '*', '[', '-', '{']);
   // A = {(+, +), )*, *[, []}  B = {(+, +), )*, *[, [-, -{}  shared 4, union 7
-  assert.deepEqual(similarity(a, b, 2), { jaccard: 4 / 7, containmentA: 4 / 5, containmentB: 4 / 6, identical: false, shared: 4, sizeA: 5, sizeB: 6 });
-  assert.deepEqual(similarity(b, a, 2), { jaccard: 4 / 7, containmentA: 4 / 6, containmentB: 4 / 5, identical: false, shared: 4, sizeA: 6, sizeB: 5 });
-  assert.deepEqual(similarity(a, a, 2), { jaccard: 1, containmentA: 1, containmentB: 1, identical: true, shared: 5, sizeA: 5, sizeB: 5 });
+  assert.deepEqual(similarity(a, b, 2), { jaccard: 4 / 7, containmentA: 4 / 5, containmentB: 4 / 6, identical: false, sameShape: false, shared: 4, sizeA: 5, sizeB: 6 });
+  assert.deepEqual(similarity(b, a, 2), { jaccard: 4 / 7, containmentA: 4 / 6, containmentB: 4 / 5, identical: false, sameShape: false, shared: 4, sizeA: 6, sizeB: 5 });
+  assert.deepEqual(similarity(a, a, 2), { jaccard: 1, containmentA: 1, containmentB: 1, identical: true, sameShape: true, shared: 5, sizeA: 5, sizeB: 5 });
 });
 
-test('similarity: identical means equal normalised sequences, nothing more and nothing less', () => {
+test('similarity: sameShape means equal normalised sequences, identical means equal token texts, nothing more and nothing less', () => {
   const a = tokenize(ORIGINAL, 'js'), b = tokenize(RENAMED, 'js');
   const s = similarity(a, b);
-  assert.equal(s.identical, true); // renamed and re-laid-out: same normalised sequence
+  assert.equal(s.sameShape, true);  // renamed and re-laid-out: same normalised sequence
+  assert.equal(s.identical, false); // but not the same code: names and literals differ
   assert.equal(s.jaccard, 1);
-  // Sets ignore order and repetition: jaccard 1 without being identical.
+  // Comments and layout are all that identical ignores.
+  assert.equal(similarity(a, tokenize(ORIGINAL.replace(/\n/g, ' // why\n   '), 'js')).identical, true);
+  // The counterexamples that made the split necessary: same shape, different behaviour. A caller that read the
+  // old `identical` as "equivalent, no review needed" accepted both.
+  const swap = similarity(tokenize('return a - b;', 'js'), tokenize('return b - a;', 'js'));
+  assert.deepEqual([swap.sameShape, swap.identical, swap.jaccard], [true, false, 1]);
+  const constant = similarity(tokenize('if (n > 10) retry(3);', 'js'), tokenize('if (n > 1000) retry(0);', 'js'));
+  assert.deepEqual([constant.sameShape, constant.identical], [true, false]);
+  assert.equal(similarity(tokenize('return a - b;', 'js'), tokenize('return   a-b; /* same */', 'js')).identical, true);
+  // Sets ignore order and repetition: jaccard 1 without the same shape.
   const x = ops(['+', '-', '+', '-', '+']), y = ops(['+', '-', '+', '-', '+', '-', '+']);
-  assert.deepEqual(similarity(x, y, 2), { jaccard: 1, containmentA: 1, containmentB: 1, identical: false, shared: 2, sizeA: 2, sizeB: 2 });
+  assert.deepEqual(similarity(x, y, 2), { jaccard: 1, containmentA: 1, containmentB: 1, identical: false, sameShape: false, shared: 2, sizeA: 2, sizeB: 2 });
   // One changed operator in the middle touches k shingles.
   const c = tokenize(RENAMED.replace('acc - tare', 'acc + tare'), 'js'), t = similarity(a, c);
+  assert.equal(t.sameShape, false);
   assert.equal(t.identical, false);
   assert.equal(t.sizeA - t.shared, 5);
   assert.ok(t.jaccard < 1 && t.jaccard > 0.8);
 });
 
 test('similarity: empty and tiny sequences', () => {
-  assert.deepEqual(similarity([], []), { jaccard: 1, containmentA: 1, containmentB: 1, identical: true, shared: 0, sizeA: 0, sizeB: 0 });
-  assert.deepEqual(similarity([], ops(['+', '-'])), { jaccard: 0, containmentA: 1, containmentB: 0, identical: false, shared: 0, sizeA: 0, sizeB: 1 });
+  assert.deepEqual(similarity([], []), { jaccard: 1, containmentA: 1, containmentB: 1, identical: true, sameShape: true, shared: 0, sizeA: 0, sizeB: 0 });
+  assert.deepEqual(similarity([], ops(['+', '-'])), { jaccard: 0, containmentA: 1, containmentB: 0, identical: false, sameShape: false, shared: 0, sizeA: 0, sizeB: 1 });
   // Shorter than k: the whole sequence is its one shingle.
-  assert.deepEqual(similarity(ops(['+', '-']), ops(['+', '-'])), { jaccard: 1, containmentA: 1, containmentB: 1, identical: true, shared: 1, sizeA: 1, sizeB: 1 });
+  assert.deepEqual(similarity(ops(['+', '-']), ops(['+', '-'])), { jaccard: 1, containmentA: 1, containmentB: 1, identical: true, sameShape: true, shared: 1, sizeA: 1, sizeB: 1 });
   assert.equal(similarity(ops(['+', '-']), ops(['+', '*'])).jaccard, 0);
   assert.equal(similarity(ops(['+', '-']), ops(['+', '-', '+', '-', '+', '-'])).jaccard, 0); // a short whole is not a 5-shingle of a longer one
   assert.equal(similarity([{ k: 'nl', v: '\n', l: 1 }], []).identical, true);
