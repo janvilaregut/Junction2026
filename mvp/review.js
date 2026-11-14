@@ -679,7 +679,7 @@
   }
   async function openNode(node, force) {
     const seq = ++F.seq; clearTimeout(F.hideT);
-    F.origin = toScreen(node.x, node.y);
+    F.origin = toScreen(node.px ?? node.x, node.py ?? node.y);
     Object.assign(F, { mode: 'node', nodeName: node.label, nodeT0: Date.now(), zone: null, vers: null, code: '', fix: null, card: 'verdict', answers: {}, stat: '', spotRaw: null, live: true, open: true });
     G.pin = null; G.hover = null; $('tip').classList.remove('on');
     $('g').style.transformOrigin = `${F.origin[0]}px ${F.origin[1]}px`;
@@ -709,7 +709,7 @@
     const seq = ++F.seq; clearTimeout(F.hideT); F.mode = 'full';
     const zone = target.node?.kind === 'zone' ? target.node : findZone(target.query);
     const n = zone || target.node || G.nodes.get('pr');
-    F.origin = n ? toScreen(n.x, n.y) : [innerWidth / 2, innerHeight / 2];
+    F.origin = n ? toScreen(n.px ?? n.x, n.py ?? n.y) : [innerWidth / 2, innerHeight / 2];
     Object.assign(F, { zone, vers: null, code: '', fix: null, card: 'verdict', signMode: 'aprobar', answers: {}, stat: '', story: null, tl: null });
     const b = S.run?.brief, stale = !!(b && S.cur.sha && b.pr?.head && !b.pr.head.startsWith(S.cur.sha));
     const real = b?.version >= 2 && !stale && !S.es && !focusNodes && !target.force;

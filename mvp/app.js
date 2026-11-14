@@ -759,7 +759,30 @@ function layout({ N, L }, W, H) {
   const s = Math.min(fx, fy, 1.5), sx = Math.min(fx, s * 1.5, 1.6), sy = Math.min(fy, s * 1.5, 1.6);
   const ox = (L0 + R0) / 2 - ((minX + maxX) / 2) * sx, oy = (T0 + B0) / 2 - ((minY + maxY) / 2) * sy;
   P.forEach((n) => { n.x = n.x * sx + ox; n.y = n.y * sy + oy; n.bx = n.x; n.by = n.y; });
-  return { P, links };
+  const span = Math.max(R0 - L0, B0 - T0);
+  depthOf(P, links, span);
+  return { P, links, pivot: [(L0 + R0) / 2, (T0 + B0) / 2], span };
+}
+/* Depth for turning the graph in 3D. The flat picture is not touched: x and y stay as laid out. Nodes that sit
+   close together on screen are pushed apart in depth and linked ones stay near each other, so turning the graph
+   unfolds its clusters and the links read as going into the screen. Deterministic: the same branch, the same depth. */
+function depthOf(P, links, span) {
+  const h = (s) => { let x = 2166136261; for (let i = 0; i < s.length; i++) x = Math.imul(x ^ s.charCodeAt(i), 16777619); return ((x >>> 0) % 1000) / 1000 - 0.5; };
+  P.forEach((n) => { n.z = n.kind === 'core' ? 0 : h(n.id) * span * 0.3; n.vz = 0; });
+  const far = (span * 0.35) ** 2;
+  for (let it = 0; it < 160; it++) {
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const a = P[i], b = P[j], dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, d2 = dx * dx + dy * dy + dz * dz + 400;
+      if (d2 > far) continue;
+      const f = (dz / Math.sqrt(d2)) * 3000 / d2; a.vz -= f; b.vz += f;
+    }
+    links.forEach((l) => { const f = (l.b.z - l.a.z) * 0.015; l.a.vz += f; l.b.vz -= f; });
+    P.forEach((n) => { if (n.kind === 'core') { n.z = 0; n.vz = 0; return; } n.vz -= n.z * 0.005; n.z += n.vz; n.vz *= 0.6; });
+  }
+  // Spread evenly by rank (the relaxation keeps hubs near the core's plane): the order it found, the depth of a stack.
+  const m = Math.max(1, ...P.map((n) => Math.abs(n.z))), Z = span * 0.26, rest = P.filter((n) => n.kind !== 'core').sort((a, b) => a.z - b.z);
+  rest.forEach((n, i) => { n.z = 0.75 * Z * (rest.length > 1 ? (2 * i) / (rest.length - 1) - 1 : 0) + 0.25 * Z * (n.z / m); });
+  P.forEach((n) => delete n.vz);
 }
 
 /* ── Full-screen graph: one camera over a living layout ──────────────────
@@ -767,7 +790,7 @@ function layout({ N, L }, W, H) {
    centre while the tree zooms away behind it, and the rest of the graph grows out of that core.
    Closing plays it backwards. Inside, a camera can fly to any node (the voice assistant uses it). */
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const G = { nodes: new Map(), links: [], cam: { x: 0, y: 0, k: 1, tx: 0, ty: 0, tk: 1 }, focus: null, pin: null, hover: null, drag: null, pan: null, t: 0, raf: 0 };
+const G = { nodes: new Map(), links: [], cam: { x: 0, y: 0, k: 1, tx: 0, ty: 0, tk: 1 }, rot: { yaw: 0, pitch: 0, tyaw: 0, tpitch: 0 }, pivot: null, span: 600, focus: null, pin: null, hover: null, drag: null, pan: null, t: 0, raf: 0 };
 const CORE_R = 22, TIP_S = 6.5 / CORE_R;
 /* A damped spring: starts and stops at rest. z = 1 never overshoots; a little under 1 gives a soft settle. */
 function spring(o, key, target, K, dt, z = 1) {
@@ -779,6 +802,31 @@ function spring(o, key, target, K, dt, z = 1) {
 const radius = (n) => (n.kind === 'core' ? CORE_R : n.kind === 'sym' ? 5 + 15 * Math.sqrt(n.impact || 0) : n.kind === 'ctx' ? 3.5 + 8 * Math.sqrt(n.impact || 0) : n.kind === 'grp' ? 8 : n.kind === 'zone' ? 6 : n.kind === 'file' ? (S.math ? 4 : 9 + Math.min(n.deg || 0, 6) * 0.8) : 10);
 const toScreen = (x, y) => [x * G.cam.k + G.cam.x, y * G.cam.k + G.cam.y];
 const toWorld = (x, y) => [(x - G.cam.x) / G.cam.k, (y - G.cam.y) / G.cam.k];
+/* ── The turn in 3D ──────────────────────────────────────────────────────
+   The drawing stays flat (dots and labels always face you), but every node also has a depth (depthOf). Dragging
+   the graph, or the voice flying to a spot, turns it (yaw, pitch) around its middle: near and far dots move
+   differently, so the links read as 3D. At rest the view is exactly the flat graph: perspective only fades in
+   as the graph turns. n.x/y/z are the node in the world; n.px/py are where it is drawn, n.pf how much nearer. */
+const PERSP = 900, YAW_MAX = 1.1, PITCH_MAX = 0.8;
+const rotated = () => Math.abs(G.rot.tyaw) > 0.005 || Math.abs(G.rot.tpitch) > 0.005 || Math.abs(G.rot.yaw) > 0.005 || Math.abs(G.rot.pitch) > 0.005;
+function projector() {
+  const r = G.rot;
+  return { cy: Math.cos(r.yaw), sy: Math.sin(r.yaw), cp: Math.cos(r.pitch), sp: Math.sin(r.pitch), a: Math.min(1, Math.hypot(r.yaw, r.pitch) / 0.35), P: G.pivot || [0, 0] };
+}
+function project(n, T) {
+  const dx = n.x - T.P[0], dy = n.y - T.P[1], dz = n.z || 0;
+  const x1 = dx * T.cy + dz * T.sy, z1 = dz * T.cy - dx * T.sy;
+  const y2 = dy * T.cp - z1 * T.sp, z2 = dy * T.sp + z1 * T.cp;
+  const f = PERSP / (PERSP - Math.min(PERSP * 0.6, z2 * T.a));
+  n.px = T.P[0] + x1 * f; n.py = T.P[1] + y2 * f; n.pf = f; n.pz = z2;
+}
+/* A hand drags a node in the plane of the screen, at the depth it has now. */
+function unproject(n, wx, wy) {
+  const T = projector(), f = n.pf || 1, z2 = n.pz || 0;
+  const x1 = (wx - T.P[0]) / f, y2 = (wy - T.P[1]) / f;
+  const z1 = z2 * T.cp - y2 * T.sp;
+  n.bx = T.P[0] + x1 * T.cy - z1 * T.sy; n.by = T.P[1] + y2 * T.cp + z2 * T.sp; n.bz = x1 * T.sy + z1 * T.cy;
+}
 /* The middle of the free area, between the header and the bar.
    It reads layout, so it is remembered for a moment: the camera loop asks for it every frame. */
 function focusPoint() {
@@ -795,6 +843,7 @@ function resetGraph() {
   const svg = $('g'); svg.innerHTML = ''; svg.classList.remove('hl', 'panning');
   Object.assign(G, { nodes: new Map(), links: [], focus: null, pin: null, hover: null, drag: null, pan: null });
   Object.assign(G.cam, { x: 0, y: 0, k: 1, tx: 0, ty: 0, tk: 1, vx: 0, vy: 0, vk: 0 });
+  Object.assign(G.rot, { yaw: 0, pitch: 0, tyaw: 0, tpitch: 0, vyaw: 0, vpitch: 0 }); G.pivot = null;
   const defs = mk('defs', {}, svg); // arrow head of a dependency edge: it points at what is used
   mk('path', { d: 'M0 0L6 3L0 6z', fill: 'rgba(255,255,255,.42)' }, mk('marker', { id: 'arr', viewBox: '0 0 6 6', refX: 5.4, refY: 3, markerWidth: 5, markerHeight: 5, orient: 'auto' }, defs));
   G.camEl = mk('g', {}, svg); G.gl = mk('g', {}, G.camEl); G.gn = mk('g', {}, G.camEl);
@@ -821,13 +870,13 @@ function nodeEl(n) {
   n.el = g; n.lab = false;
   return g;
 }
-const place = (n) => { setA(n.el, 'transform', `translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`); setA(n.sh, 'transform', `scale(${Math.max(0.001, n.s).toFixed(3)})`); };
+const place = (n, T = projector()) => { project(n, T); setA(n.el, 'transform', `translate(${n.px.toFixed(1)},${n.py.toFixed(1)})`); setA(n.sh, 'transform', `scale(${Math.max(0.001, n.s * n.pf).toFixed(3)})`); };
 
 /* The branch's dot, already in the graph before anything has loaded: it is what the person clicked. */
 function seedGraph(x, y, tone) {
   resetGraph(); G.paused = false; G.fp = null;
   const [cx, cy] = focusPoint();
-  const n = { id: 'pr', label: 'PR', kind: 'core', tone: 'core', info: 'The whole change', depth: 0, i: 0, x, y, bx: cx, by: cy, s: TIP_S, ts: 1, at: 0, K: 0.016 };
+  const n = { id: 'pr', label: 'PR', kind: 'core', tone: 'core', info: 'The whole change', depth: 0, i: 0, x, y, z: 0, bx: cx, by: cy, bz: 0, s: TIP_S, ts: 1, at: 0, K: 0.016 };
   G.gn.appendChild(nodeEl(n)); n.body.style.fill = PAL[tone] || PAL.core;
   G.nodes.set('pr', n); place(n);
   requestAnimationFrame(() => requestAnimationFrame(() => { n.body.style.fill = PAL.core; })); // its colour melts into the core's white on the way
@@ -837,7 +886,8 @@ function seedGraph(x, y, tone) {
 function renderGraph(m) {
   S.model = m;
   const svg = $('g'); if (!G.camEl) resetGraph();
-  const { P, links } = layout(m, svg.clientWidth, svg.clientHeight);
+  const { P, links, pivot, span } = layout(m, svg.clientWidth, svg.clientHeight);
+  G.pivot = pivot; G.span = span;
   const prev = G.nodes, core0 = prev.get('pr'), now = performance.now();
   const first = prev.size <= 1; // only the seeded core so far: the whole graph grows out of it
   const crowded = P.length > 26; // many nodes: the settled, unimportant ones keep their names for hover
@@ -849,14 +899,14 @@ function renderGraph(m) {
   P.forEach((p, i) => {
     const o = prev.get(p.id);
     const n = p.id === 'pr' && core0 ? core0 : { s: 0 };
-    Object.assign(n, { id: p.id, label: p.label, kind: p.kind, tone: p.tone, info: p.info, file: p.file, start: p.start, depth: p.depth, parent: p.parent, deg: deg[p.id] || 0, i, bx: p.x, by: p.y, ts: 1, follow: null, K: 0.02,
+    Object.assign(n, { id: p.id, label: p.label, kind: p.kind, tone: p.tone, info: p.info, file: p.file, start: p.start, depth: p.depth, parent: p.parent, deg: deg[p.id] || 0, i, bx: p.x, by: p.y, bz: p.z, ts: 1, follow: null, K: 0.02,
       verdict: p.verdict, mark: p.mark, impact: p.impact, test: p.test, path: p.path, end: p.end, m: p.m, quiet: (p.kind === 'ctx' && crowded) || (p.kind === 'sym' && crowded && (p.impact || 0) < 0.3 && !['risky', 'uncertain'].includes(p.verdict)) });
     if (o) { // already on screen: keep where it is and move smoothly to its new place
-      if (n !== o) Object.assign(n, { x: o.x, y: o.y, s: o.s, vx: o.vx, vy: o.vy, vs: o.vs });
+      if (n !== o) Object.assign(n, { x: o.x, y: o.y, z: o.z || 0, s: o.s, vx: o.vx, vy: o.vy, vz: o.vz, vs: o.vs });
       n.at = 0;
     } else { // new: grows out of its parent (or the core), outer rings a little later
       const from = prev.get(p.parent) || core0;
-      Object.assign(n, { x: from ? from.x : p.x, y: from ? from.y : p.y, s: 0, vx: 0, vy: 0, vs: 0, at: now + (first ? p.depth * 130 + (i % 7) * 28 : 160) });
+      Object.assign(n, { x: from ? from.x : p.x, y: from ? from.y : p.y, z: from ? from.z || 0 : p.z, s: 0, vx: 0, vy: 0, vz: 0, vs: 0, at: now + (first ? p.depth * 130 + (i % 7) * 28 : 160) });
     }
     if (n !== core0) G.gn.appendChild(nodeEl(n));
     G.nodes.set(n.id, n); place(n);
@@ -888,27 +938,41 @@ function frame(now) {
   const ts = now / 1000;
   const fp = G.focus ? focusPoint() : null; // layout is read before anything is written this frame
   let moving = false;
+  const r = G.rot;
+  if (G.pan?.spin && G.pan.moved) moving = true; // the hand turns it directly
+  else if (RM) { r.yaw = r.tyaw; r.pitch = r.tpitch; }
+  else {
+    const K = G.focus?.K || 0.02; spring(r, 'yaw', r.tyaw, K, dt); spring(r, 'pitch', r.tpitch, K, dt);
+    if (Math.abs(r.vyaw) > 0.0003 || Math.abs(r.vpitch) > 0.0003 || Math.abs(r.tyaw - r.yaw) > 0.001 || Math.abs(r.tpitch - r.pitch) > 0.001) moving = true;
+  }
+  const T = projector();
   for (const n of G.nodes.values()) {
     if (now >= n.at) {
       const w = n.kind === 'core' || n.follow || RM ? 0 : 1.6; // a slow breathing so the graph feels alive
       const gx = n.follow ? n.follow.x : n.bx + Math.sin(ts * 0.7 + n.i * 1.3) * w;
       const gy = n.follow ? n.follow.y : n.by + Math.cos(ts * 0.6 + n.i * 0.9) * w;
-      if (RM) { n.x = gx; n.y = gy; n.s = n.ts; }
+      const gz = n.follow ? n.follow.z || 0 : n.bz || 0;
+      if (RM) { n.x = gx; n.y = gy; n.z = gz; n.s = n.ts; }
       else {
-        spring(n, 'x', gx, n.K, dt); spring(n, 'y', gy, n.K, dt); spring(n, 's', n.ts, n.K * 1.7, dt, 0.82);
+        spring(n, 'x', gx, n.K, dt); spring(n, 'y', gy, n.K, dt); spring(n, 'z', gz, n.K, dt); spring(n, 's', n.ts, n.K * 1.7, dt, 0.82);
         if (!moving && (Math.abs(n.vx) > 0.06 || Math.abs(n.vy) > 0.06 || Math.abs(n.vs) > 0.002 || Math.abs(n.ts - n.s) > 0.004 || Math.abs(gx - n.x) > 3 || Math.abs(gy - n.y) > 3)) moving = true;
       }
     } else moving = true; // still waiting to grow
-    place(n);
+    place(n, T);
     if (!n.lab && n.ts === 1 && n.s > 0.85) { n.lab = true; n.el.classList.add('lab'); }
     else if (n.lab && n.ts !== 1) { n.lab = false; n.el.classList.remove('lab'); }
   }
+  // Turned, the nearer dots are drawn over the farther ones (re-ordered a few times a second, only if needed).
+  if (T.a > 0.01 && (G.zf = (G.zf || 0) + 1) % 6 === 0) {
+    const order = [...G.nodes.values()].sort((a, b) => a.pz - b.pz), kids = G.gn.children;
+    if (order.some((n, i) => kids[i] !== n.el)) order.forEach((n) => G.gn.appendChild(n.el));
+  }
   for (const l of G.links) {
-    setA(l.el, 'x1', l.a.x.toFixed(1)); setA(l.el, 'y1', l.a.y.toFixed(1));
+    setA(l.el, 'x1', l.a.px.toFixed(1)); setA(l.el, 'y1', l.a.py.toFixed(1));
     if (l.dep) { // stops at the rim of what it points at, so the arrow head shows
-      const dx = l.b.x - l.a.x, dy = l.b.y - l.a.y, d = Math.hypot(dx, dy) || 1, cut = Math.min(d * 0.5, radius(l.b) * l.b.s + 3);
-      setA(l.el, 'x2', (l.b.x - (dx / d) * cut).toFixed(1)); setA(l.el, 'y2', (l.b.y - (dy / d) * cut).toFixed(1));
-    } else { setA(l.el, 'x2', l.b.x.toFixed(1)); setA(l.el, 'y2', l.b.y.toFixed(1)); }
+      const dx = l.b.px - l.a.px, dy = l.b.py - l.a.py, d = Math.hypot(dx, dy) || 1, cut = Math.min(d * 0.5, radius(l.b) * l.b.s * l.b.pf + 3);
+      setA(l.el, 'x2', (l.b.px - (dx / d) * cut).toFixed(1)); setA(l.el, 'y2', (l.b.py - (dy / d) * cut).toFixed(1));
+    } else { setA(l.el, 'x2', l.b.px.toFixed(1)); setA(l.el, 'y2', l.b.py.toFixed(1)); }
     const o = Math.max(0, Math.min(1, l.a.s, l.b.s));
     setS(l.el, 'opacity', o > 0.98 ? '' : o.toFixed(2));
   }
@@ -916,7 +980,7 @@ function frame(now) {
   if (G.focus) {
     const list = G.focus.ids.map((id) => G.nodes.get(id)).filter(Boolean);
     if (list.length) {
-      const xs = list.map((n) => n.x), ys = list.map((n) => n.y);
+      const xs = list.map((n) => n.px), ys = list.map((n) => n.py);
       const fx = (Math.min(...xs) + Math.max(...xs)) / 2, fy = (Math.min(...ys) + Math.max(...ys)) / 2;
       // While something is being talked about, the camera keeps drifting in, slowly.
       const drift = RM || G.focus.still ? 1 : 1 + 0.06 * Math.min(1, (now - G.focus.t0) / 9000);
@@ -937,10 +1001,10 @@ function frame(now) {
   else G.nap = setTimeout(() => { G.nap = 0; G.raf = requestAnimationFrame(frame); }, RM ? 400 : NAP_MS);
 }
 function tipAt(n) {
-  const tip = $('tip'); const [sx, sy] = toScreen(n.x, n.y);
+  const tip = $('tip'); const [sx, sy] = toScreen(n.px ?? n.x, n.py ?? n.y);
   if (tip.dataset.id !== n.id) { tip.dataset.id = n.id; tip.innerHTML = `${esc(n.label)}<small>${esc(n.info)}</small>`; }
   // Moved with a transform, not left/top: no layout, and the compositor can do it.
-  setS(tip, 'transform', `translate(${sx.toFixed(1)}px,${(sy - radius(n) * n.s * G.cam.k).toFixed(1)}px) translate(-50%,calc(-100% - 18px))`);
+  setS(tip, 'transform', `translate(${sx.toFixed(1)}px,${(sy - radius(n) * n.s * (n.pf || 1) * G.cam.k).toFixed(1)}px) translate(-50%,calc(-100% - 18px))`);
   if (!tip.classList.contains('on')) tip.classList.add('on');
 }
 function hoverNode(n) {
@@ -972,6 +1036,13 @@ function focusOn(ids, opts = {}) {
     k = Math.max(0.9, Math.min(2.3, Math.min((px * 2 * 0.85) / w, (py * 2 * 0.8) / h)));
   }
   G.focus = { ids: list.map((n) => n.id), k, t0: performance.now(), K: opts.K, still: opts.still };
+  // Flying to a spot also turns the graph a little toward it, so the camera arrives at an angle, in depth.
+  if (!opts.still && G.pivot) {
+    const cx = list.reduce((s, n) => s + n.bx, 0) / list.length, cy = list.reduce((s, n) => s + n.by, 0) / list.length;
+    let yaw = (-(cx - G.pivot[0]) / G.span) * 1.1, pitch = ((cy - G.pivot[1]) / G.span) * 0.9;
+    if (Math.hypot(yaw, pitch) < 0.22) yaw = (yaw < 0 || (!yaw && G.rot.yaw < 0) ? -1 : 1) * 0.24; // the middle still turns
+    G.rot.tyaw = Math.max(-0.55, Math.min(0.55, yaw)); G.rot.tpitch = Math.max(-0.4, Math.min(0.4, pitch));
+  }
   G.pin = list.length === 1 && !opts.noTip ? list[0].id : null;
   if (!G.pin) $('tip').classList.remove('on');
   paintHL(); startLoop();
@@ -985,7 +1056,7 @@ function zoomGraph(action) {
     const [px, py] = focusPoint(); zoomAt(px, py, f); return true;
   }
   G.focus = null; G.pin = null; G.hover = null; paintHL(); $('tip').classList.remove('on');
-  Object.assign(c, { tx: 0, ty: 0, tk: 1 }); startLoop();
+  Object.assign(c, { tx: 0, ty: 0, tk: 1 }); Object.assign(G.rot, { tyaw: 0, tpitch: 0 }); startLoop();
   return true;
 }
 function zoomAt(sx, sy, f) {
@@ -1031,12 +1102,29 @@ function focusGraph(q) { const list = findNodes(q); return list.length ? focusOn
 
 (() => {
   const svg = $('g');
-  svg.onpointerdown = (e) => { if (e.button === 0) { G.pan = { x: e.clientX, y: e.clientY, cx: G.cam.tx, cy: G.cam.ty, moved: false }; svg.setPointerCapture(e.pointerId); } };
+  // Dragging empty space turns the graph in 3D; with Shift, or the right or middle button, it moves it.
+  svg.oncontextmenu = (e) => e.preventDefault();
+  svg.onpointerdown = (e) => {
+    if (e.button > 2) return;
+    const spin = e.button === 0 && !e.shiftKey && !RM;
+    G.pan = { spin, x: e.clientX, y: e.clientY, cx: G.cam.tx, cy: G.cam.ty, yaw: G.rot.yaw, pitch: G.rot.pitch, moved: false, t: performance.now(), wy: 0, wp: 0 };
+    svg.setPointerCapture(e.pointerId);
+  };
   svg.onpointermove = (e) => {
-    if (G.drag) { const [wx, wy] = toWorld(e.clientX, e.clientY); G.drag.bx = wx; G.drag.by = wy; startLoop(); return; }
+    if (G.drag) { const [wx, wy] = toWorld(e.clientX, e.clientY); unproject(G.drag, wx, wy); startLoop(); return; }
     if (!G.pan) return;
     const dx = e.clientX - G.pan.x, dy = e.clientY - G.pan.y;
     if (!G.pan.moved && Math.hypot(dx, dy) < 5) return;
+    if (G.pan.spin) {
+      if (!G.pan.moved) { G.pan.moved = true; G.hover = null; paintHL(); if (!G.pin) $('tip').classList.remove('on'); svg.classList.add('panning'); }
+      const r = G.rot, y0 = r.yaw, p0 = r.pitch, now = performance.now(), ms = Math.max(1, now - G.pan.t);
+      r.yaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, G.pan.yaw + dx * 0.0042));
+      r.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, G.pan.pitch - dy * 0.0042));
+      // How fast the hand turns it (per frame), so letting go glides on a little.
+      G.pan.wy = G.pan.wy * 0.6 + ((r.yaw - y0) / ms) * 16.7 * 0.4; G.pan.wp = G.pan.wp * 0.6 + ((r.pitch - p0) / ms) * 16.7 * 0.4; G.pan.t = now;
+      Object.assign(r, { tyaw: r.yaw, tpitch: r.pitch, vyaw: 0, vpitch: 0 });
+      startLoop(); return;
+    }
     if (!G.pan.moved) { G.pan.moved = true; G.focus = null; G.pin = null; G.hover = null; paintHL(); $('tip').classList.remove('on'); svg.classList.add('panning'); }
     Object.assign(G.cam, { tx: G.pan.cx + dx, ty: G.pan.cy + dy });
     Object.assign(G.cam, { x: G.cam.tx, y: G.cam.ty, vx: 0, vy: 0 }); // the hand moves the world directly
@@ -1045,9 +1133,15 @@ function focusGraph(q) { const list = findNodes(q); return list.length ? focusOn
   svg.onpointerup = svg.onpointercancel = (e) => {
     const click = G.pan && !G.pan.moved && e.type === 'pointerup' && e.target === svg;
     const tap = G.drag && G.down && e.type === 'pointerup' && Math.hypot(e.clientX - G.down.x, e.clientY - G.down.y) < 6 ? G.drag : null;
-    G.drag = null; G.down = null; G.pan = null; svg.classList.remove('panning');
+    const spun = G.pan?.spin && G.pan.moved ? G.pan : null;
+    if (spun && performance.now() - spun.t < 80) { // let go while moving: it glides on and settles
+      const r = G.rot;
+      r.tyaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, r.yaw + Math.max(-0.25, Math.min(0.25, spun.wy * 8))));
+      r.tpitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, r.pitch + Math.max(-0.2, Math.min(0.2, spun.wp * 8))));
+    }
+    G.drag = null; G.down = null; G.pan = null; svg.classList.remove('panning'); startLoop();
     if (tap) { nodeTap(tap); return; }
-    if (click && (G.focus || G.cam.tk !== 1)) zoomGraph('fit'); // a click on empty space steps back out
+    if (click && (G.focus || G.cam.tk !== 1 || rotated())) zoomGraph('fit'); // a click on empty space steps back out
   };
   svg.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-Math.max(-120, Math.min(120, e.deltaY)) * (e.ctrlKey ? 0.01 : 0.0011))); }, { passive: false });
 })();
@@ -1061,13 +1155,13 @@ function dive(x, y) {
 function collapseGraph([x, y], tone) {
   const core = G.nodes.get('pr');
   G.focus = null; G.pin = null; G.hover = null; paintHL();
-  Object.assign(G.cam, { tx: 0, ty: 0, tk: 1 });
+  Object.assign(G.cam, { tx: 0, ty: 0, tk: 1 }); Object.assign(G.rot, { tyaw: 0, tpitch: 0 });
   for (const n of G.nodes.values()) {
     n.at = 0;
     if (n === core) continue;
     Object.assign(n, { follow: core, ts: 0, K: 0.05 });
   }
-  if (core) { Object.assign(core, { bx: x, by: y, ts: TIP_S, K: 0.03 }); if (core.body) core.body.style.fill = PAL[tone] || PAL.core; }
+  if (core) { Object.assign(core, { bx: x, by: y, bz: 0, ts: TIP_S, K: 0.03 }); if (core.body) core.body.style.fill = PAL[tone] || PAL.core; }
   G.paused = false; startLoop();
 }
 
@@ -1303,7 +1397,7 @@ addEventListener('keydown', (e) => {
   else if (typing) e.target.blur(); // first Esc leaves the field; what you typed is not lost
   else if (typeof treeEscape === 'function' && treeEscape()) { /* the review, back to the graph */ }
   else if (typeof debateEscape === 'function' && debateEscape()) { /* the agent, then the debate */ }
-  else if (!$('full').hidden) { if ((G.focus || Math.abs(G.cam.tk - 1) > 0.01 || G.cam.tx || G.cam.ty)) zoomGraph('fit'); else closeGraph(); } // step back out, then leave
+  else if (!$('full').hidden) { if ((G.focus || Math.abs(G.cam.tk - 1) > 0.01 || G.cam.tx || G.cam.ty || rotated())) zoomGraph('fit'); else closeGraph(); } // step back out, then leave
   else if (S.focus || S.zoom) hideCommits();
 });
 
