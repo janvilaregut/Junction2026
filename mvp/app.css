@@ -508,3 +508,20 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 .cview .cv-ai{font:600 10px var(--mono);color:var(--fg2);background:var(--card3);border-radius:5px;padding:1px 6px}
 .cv-chunk.h3 .cv-ai{color:var(--heat);background:rgba(255,179,122,.12)}
 .cv-ctx{margin:2px 0;padding:2px 0;font:400 11.5px/1.55 var(--mono);opacity:.5;border-left:3px solid transparent}
+/* Dependencies tab (codeview.js depsHTML): chunk × chunk matrix on top, names → chunks links below. */
+.cview .cbar{flex-wrap:wrap}
+.cview .seg button.sub{color:var(--fg2);border-left:1px solid var(--line2);border-radius:0 999px 999px 0;margin-left:-3px}
+.cview .seg button.sub.on{color:var(--fg)}
+.deps{padding:6px 6px 10px;display:flex;flex-direction:column;gap:12px}
+.dm{display:flex;flex-direction:column;gap:2px;align-self:center}
+.dm-row{display:flex;gap:2px;align-items:center}
+.dm-headrow{align-items:flex-end;margin-bottom:4px}
+.dm-lab{width:96px;flex:0 0 auto;font:500 9.5px var(--mono);color:var(--fg2);text-align:right;padding-right:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dm-col{font:500 9px var(--mono);color:var(--fg2);writing-mode:vertical-rl;transform:rotate(180deg);height:78px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center}
+.dm-cell{border-radius:4px;display:flex;align-items:center;justify-content:center;font:500 8.5px var(--mono);cursor:help}
+.dm-scale{display:flex;align-items:center;gap:8px;margin:8px 0 0 98px;font:500 10px var(--mono);color:var(--fg3)}
+.dm-scale i{width:180px;height:6px;border-radius:3px;background:linear-gradient(90deg,#16141f,#3b1d6e,#9b2f7d,#ff7a3d,#ffd36b)}
+.dn{font:400 11.5px/1.5 var(--body);color:var(--fg2)}.dn b{color:var(--fg);font-weight:600}.dn.dim{font:400 10.5px var(--mono);color:var(--fg3)}
+.dsub{font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg3);margin-top:4px}
+.dl{border-radius:14px;background:var(--card2);border:1px solid var(--line);padding:8px 4px}
+.dl text{font:600 11px var(--mono)}
