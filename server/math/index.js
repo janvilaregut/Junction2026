@@ -21,7 +21,7 @@ const part = async (file, fallback) => { try { return await import(file); } catc
 const { metrics, rate } = await part('./complexity.js', { metrics: () => null, rate: () => [] });
 const { CloneIndex } = await part('./clones.js', { CloneIndex: null });
 const { NgramModel, lexemes, baselineOf, surprise } = await part('./entropy.js', { NgramModel: null });
-const { proveEquivalent, classifyChange, sameUsingSet } = await part('./proof.js', { proveEquivalent: () => null, classifyChange: () => ({ kind: 'logic' }), sameUsingSet: () => null });
+const { proveEquivalent, classifyChange, sameUsingSet, doubts, directivesDiffer } = await part('./proof.js', { proveEquivalent: () => null, classifyChange: () => ({ kind: 'logic' }), sameUsingSet: () => null, doubts: () => 'the proof module is unavailable', directivesDiffer: () => true });
 const { buildGraph, centrality, forwardReach, neighbourhood } = await part('./graph.js', { buildGraph: null });
 const { runChecks } = await part('./checks.js', { runChecks: () => [] });
 const { principles, gate: principleGate, applyGate, PRINCIPLES } = await part('./principles.js', { principles: () => null, gate: () => null, applyGate: () => {}, PRINCIPLES: [] });
@@ -36,7 +36,7 @@ function historyOf(repo, base) {
 import { verdict, summarize, POLICY, WEIGHTS } from './risk.js';
 import { lexicon, decide, merge } from './sensitivity.js';
 
-export const VERSION = 12; // part of the cache key: raise it whenever a measurement or the model changes
+export const VERSION = 13; // part of the cache key: raise it whenever a measurement or the model changes
 const MAX_UNITS = 44, MAX_CONTEXT = 22;
 // A call that can fail a test: assert/expect/should/verify/ensure/check families, and the Roslyn verifier runs (VerifyCS.Test.RunDefaultAsync).
 // Things a function can do that no static graph can follow, per language. A changed function that does one of
@@ -45,7 +45,8 @@ const DYNAMIC_LOOKUP = /\b(eval\s*\(|new\s+Function\s*\(|Reflect\.|require\s*\(\
 // A line that exists to stop bad input or a broken state. Losing one is exactly what an approver must see.
 const GUARD = /\b(throw\b|raise\b|assert\w*\s*[(.]|ArgumentNullException|ArgumentException|ArgumentOutOfRange|ThrowIf\w*\s*\(|invariant\s*\(|Guard\.|Debug\.Assert|Contract\.Requires|panic\s*\(|Objects\.requireNonNull)/;
 // Files that decide how the same source text is compiled.
-const BUILD_CONFIG = { cs: /(\.csproj|\.props|\.targets|(^|\/)Directory\.Build\.[a-z]+|(^|\/)global\.json)$/i, js: /(^|\/)(tsconfig[^/]*\.json|jsconfig\.json|babel\.config\.[cm]?js|\.babelrc(\.json)?|\.swcrc|webpack\.config\.[cm]?[jt]s|vite\.config\.[cm]?[jt]s|rollup\.config\.[cm]?[jt]s)$/i };
+// Files that decide how the same source text is compiled or run. When one changes, no proof of that language stands.
+const BUILD_CONFIG = { cs: /(\.csproj|\.props|\.targets|\.editorconfig|\.globalconfig|\.ruleset|(^|\/)Directory\.[A-Za-z]+\.[a-z]+|(^|\/)global\.json|(^|\/)nuget\.config)$/i, js: /(^|\/)(package\.json|tsconfig[^/]*\.json|jsconfig\.json|deno\.jsonc?|bunfig\.toml|babel\.config\.(json|[cm]?[jt]s)|\.babelrc(\.json|\.[cm]?js)?|\.swcrc|\.browserslistrc|[\w.-]+\.config\.[cm]?[jt]s)$/i };
 const ASSERT = /^(assert|expect|should|verify|ensure|check|must|throws|rejects|is|ok|equal|deepequal|strictequal|tobe|toequal|rundefaultasync|runasync|verifyanalyzerasync|verifycodefixasync)/i;
 
 /** The methods behind the colours, for the interface's legend and the report. */
@@ -156,6 +157,17 @@ export async function analyze(project, pr, { force = false, decisions = true } =
   for (const f of code) {
     const H = f.status === 'deleted' ? null : headFiles.get(f.path), B = f.status === 'added' ? null : baseFiles.get(f.status === 'renamed' && f.oldPath ? f.oldPath : f.path);
     const { added, removed } = changedLines(f), lang = langOf(f.path), isTestFile = kindOf(f.path) === 'test' || isTestPath(f.path);
+    if (!H && !B) { // too large, or in a folder the reader skips: it changed and nothing below looked at it
+      units.push({ id: `${f.path}::(file)`, name: path.basename(f.path), qname: `${path.basename(f.path)} · not analysed`, kind: 'type', file: f.path, lang, start: 1, end: 1, status: f.status === 'deleted' ? 'removed' : f.status === 'added' ? 'added' : 'modified', isTest: isTestFile, helper: isTestFile, exported: false, lines: { added: f.add || 0, removed: f.del || 0 }, declarations: true, change: { kind: 'logic' },
+        findings: [{ id: 'not-analysed', severity: 'warn', title: 'Changed, not analysed', detail: 'This file changed, but it is too large or sits in a folder the engine does not read (build output, vendored code): nothing here was measured or checked.', line: 1, basis: 'A file that is not read gets no verdict from the mathematics.' }] });
+      continue;
+    }
+    // A proof about a function's text holds in its surroundings. It is issued only when nothing outside the
+    // function bodies of this file changed (imports, constants, signatures, the order and nesting of
+    // declarations), the file kept its path (a path decides the module kind and what a relative import means),
+    // and the raw text has nothing the tokens hide (conditional compilation, a changed directive comment).
+    const shell = H && B ? { a: skeleton(B), b: skeleton(H) } : null;
+    const provable = !!shell && f.status !== 'renamed' && shell.a === shell.b && !guard('proofs', () => doubts(B.text, H.text, lang), 'the raw text could not be checked');
     const baseByKey = new Map((B?.symbols || []).map((s) => [s.key, s]));
     const touched = new Map(); // head symbol → { head, base, added, removed }
     const loose = { added: 0, removed: 0 };
@@ -176,7 +188,7 @@ export async function analyze(project, pr, { force = false, decisions = true } =
       };
       const headText = t.head ? linesOf(H.text, t.head.start, t.head.end) : '', baseText = t.base ? linesOf(B.text, t.base.start, t.base.end) : '';
       if (t.head && t.base) {
-        u.proof = guard('proofs', () => proveEquivalent(baseText, headText, lang));
+        u.proof = provable ? guard('proofs', () => proveEquivalent(baseText, headText, lang)) : null;
         u.change = u.proof?.proved ? { kind: u.proof.level } : guard('proofs', () => classifyChange(baseText, headText, lang), { kind: 'logic' });
       } else u.change = { kind: 'logic' };
       if (t.head) {
@@ -211,14 +223,22 @@ export async function analyze(project, pr, { force = false, decisions = true } =
     }
     // What changed outside every function: imports, fields, signatures of types.
     if ((loose.added || loose.removed) && H && B) {
-      const a = skeleton(B), b = skeleton(H);
-      if (a !== b) {
+      const a = shell.a, b = shell.b;
+      // The skeleton is rebuilt from tokens, so comments, inert directives and odd line ends are already gone
+      // from it: the raw file texts are asked what the tokens hide, and a directive that changed outside every
+      // function is a change even when the tokens are equal.
+      const doubt = f.status === 'renamed' ? 'the file was renamed' : guard('proofs', () => doubts(B.text, H.text, lang), 'the raw text could not be checked');
+      const unseen = a === b && guard('proofs', () => directivesDiffer(B.text, H.text), true);
+      if (a !== b || unseen) {
         const u = { id: `${f.path}::(declarations)`, name: 'declarations', qname: `${path.basename(f.path)} · declarations`, kind: 'type', file: f.path, lang, start: 1, end: 1, status: 'modified', isTest: isTestFile, helper: isTestFile, exported: false, lines: loose, findings: [], declarations: true };
-        u.proof = lang === 'cs' ? guard('proofs', () => { const r = sameUsingSet(B.text, H.text); return r?.proved ? { ...r, level: 'identical' } : null; }) : null;
-        if (!u.proof) u.proof = guard('proofs', () => proveEquivalent(a, b, lang, { alpha: false })); // a skeleton is not a function: only token equality applies
-        u.change = u.proof?.proved ? { kind: 'identical' } : guard('proofs', () => classifyChange(a, b, lang), { kind: 'logic' });
+        u.proof = doubt ? null : lang === 'cs' ? guard('proofs', () => { const r = sameUsingSet(B.text, H.text); return r?.proved ? { ...r, level: 'identical' } : null; }) : null;
+        if (!u.proof && !doubt) u.proof = guard('proofs', () => proveEquivalent(a, b, lang, { alpha: false })); // a skeleton is not a function: only token equality applies
+        u.change = u.proof?.proved ? { kind: 'identical' } : unseen ? { kind: 'logic' } : guard('proofs', () => classifyChange(a, b, lang), { kind: 'logic' });
+        if (unseen) u.findings.push({ id: 'directive-changed', severity: 'warn', title: 'A directive changed', detail: 'Outside every function the code tokens are the same, but a comment or directive that a tool reads (a compiler directive, a JSX or bundler pragma, a generated-code marker) was added, removed or changed.', line: 1, basis: 'Comments are not tokens, but build tools and compilers read some of them.' });
         units.push(u);
       }
+    } else if (loose.removed && B && !H && !touched.size) { // a deleted file with no function in it: its top-level code went too
+      units.push({ id: `${f.path}::(declarations)`, name: 'declarations', qname: `${path.basename(f.path)} · declarations`, kind: 'type', file: f.path, lang, start: 1, end: 1, status: 'removed', isTest: isTestFile, helper: isTestFile, exported: false, lines: loose, findings: [], declarations: true, change: { kind: 'logic' } });
     } else if ((loose.added || loose.removed) && H && !B && !touched.size) {
       units.push({ id: `${f.path}::(declarations)`, name: 'declarations', qname: `${path.basename(f.path)} · declarations`, kind: 'type', file: f.path, lang, start: 1, end: 1, status: 'added', isTest: isTestFile, helper: isTestFile, exported: false, lines: loose, findings: [], declarations: true, change: { kind: 'logic' } });
     }
@@ -242,10 +262,10 @@ export async function analyze(project, pr, { force = false, decisions = true } =
   const csBuild = buildChanged(BUILD_CONFIG.cs), jsBuild = buildChanged(BUILD_CONFIG.js);
   for (const u of units) {
     if (!u.proof?.proved) continue;
-    const why = u.lang === 'cs' && csBuild.length && u._H?.tokens.some((t) => t.k === 'pp') ? csBuild : (u.lang === 'js' || u.lang === 'ts') && jsBuild.length ? jsBuild : null;
+    const why = u.lang === 'cs' && csBuild.length ? csBuild : (u.lang === 'js' || u.lang === 'ts') && jsBuild.length ? jsBuild : null;
     if (!why) continue;
     u.proof = null; u.change = { kind: 'logic' };
-    u.findings.push({ id: 'proof-withdrawn', severity: 'warn', title: 'Proof withdrawn', detail: `The text of this function did not change in a way that matters, but ${why.slice(0, 2).join(' and ')} did: the same text may now compile differently${u.lang === 'cs' ? ' (this file has preprocessor conditions)' : ''}.`, line: u.start, basis: 'A token-equality proof assumes the same build configuration.' });
+    u.findings.push({ id: 'proof-withdrawn', severity: 'warn', title: 'Proof withdrawn', detail: `The text of this function did not change in a way that matters, but ${why.slice(0, 2).join(' and ')} did: the same text may now compile or run differently (language version, compiler options, defined symbols, module kind).`, line: u.start, basis: 'A token-equality proof assumes the same build configuration.' });
   }
   if (csBuild.length || jsBuild.length) limits.push(`This pull request changes build configuration (${[...csBuild, ...jsBuild].slice(0, 3).join(', ')}): its effect on the program is not modelled.`);
   const live = units.filter((u) => !u.moved);
@@ -362,7 +382,7 @@ export async function analyze(project, pr, { force = false, decisions = true } =
   const extra = [];
   const group = (id, name, kind, files, v, claim, detail) => extra.push({ id, name, qname: name, kind, file: files[0].path, files: files.map((f) => f.path), start: 0, end: 0, status: 'modified', verdict: v, tone: { proved: 'ok', cleared: 'ok', uncertain: 'warn', risky: 'bad' }[v], claim, likelihood: v === 'proved' ? 0 : v === 'cleared' ? 0.05 : 0.3, impact: 0.1, impactWhy: detail, priority: v === 'uncertain' ? 0.03 : 0, lines: { added: files.reduce((n, f) => n + f.add, 0), removed: files.reduce((n, f) => n + f.del, 0) }, evidence: [{ id: 'kind', label: 'Kind', value: detail, tone: v === 'uncertain' ? 'warn' : 'ok', detail: claim }], findings: [], parts: [] });
   const docs = diffFiles.filter((f) => kindOf(f.path) === 'doc');
-  if (docs.length) group('doc', docs.length === 1 ? path.basename(docs[0].path) : `${docs.length} docs`, 'doc', docs, 'proved', 'Documentation is not compiled: it cannot change what the program does.', 'documentation');
+  if (docs.length) group('doc', docs.length === 1 ? path.basename(docs[0].path) : `${docs.length} docs`, 'doc', docs, 'cleared', 'Documentation or plain text: no compiler reads it, so nothing here was analysed. Not a proof: a text file can still be read at run time or by a build step.', 'documentation');
   const groups = guard('generated', () => mechanicalGroups(diffFiles), []) || [];
   const grouped = new Set();
   for (const g of groups) {

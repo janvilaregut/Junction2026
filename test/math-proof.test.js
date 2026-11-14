@@ -44,50 +44,52 @@ test('JavaScript: a line break that can end a statement is part of the program (
   refused('func f() int {\n  return 1\n}', 'func f() int {\n  return\n  1\n}', 'go');
 });
 
-test('alpha: a consistent renaming of locals is proved, and it really behaves the same', () => {
+test('a renaming of locals is not certified, in any language (scope cannot be decided soundly on tokens)', () => {
   const a = 'function total(items) {\n  let sum = 0;\n  for (const it of items) { sum += it.price * it.qty; }\n  return sum;\n}';
   const b = 'function total(items) {\n  let acc = 0;\n  for (const line of items) { acc += line.price * line.qty; }\n  return acc;\n}';
-  const r = proved(a, b, 'js', 'alpha');
-  assert.deepEqual(r.renames, [['sum', 'acc'], ['it', 'line']]);
+  // These two do behave the same; the module still refuses, because it cannot tell them from the renamings a
+  // review got certified that do not (see test/math-proof-review.test.js).
+  const r = refused(a, b, 'js');
+  assert.equal(r.renames, null);
   for (const args of [[[]], [[{ price: 2, qty: 3 }]], [[{ price: 1.5, qty: 2 }, { price: 4, qty: 1 }]]]) assert.equal(run(a, args), run(b, args));
-  proved('function f(a, b) { return a + b; }', 'function f(x, y) { return x + y; }', 'js', 'alpha'); // JS parameters cannot be named by callers
-  proved('const f = (xs) => xs.map((x) => x * 2);', 'const f = (xs) => xs.map((v) => v * 2);', 'js', 'alpha');
-  proved('const f = (xs) => xs.map(x => { const d = x * 2; return d; });', 'const f = (xs) => xs.map(y => { const e = y * 2; return e; });', 'js', 'alpha');
+  refused('function f(a, b) { return a + b; }', 'function f(x, y) { return x + y; }', 'js'); // JS parameters cannot be named by callers
+  refused('const f = (xs) => xs.map((x) => x * 2);', 'const f = (xs) => xs.map((v) => v * 2);', 'js');
+  refused('const f = (xs) => xs.map(x => { const d = x * 2; return d; });', 'const f = (xs) => xs.map(y => { const e = y * 2; return e; });', 'js');
   // Not in C#: a local's name reaches run time there with no reflection in sight (see the next tests).
   refused('int F(List<int> xs) { var total = 0; foreach (var x in xs) { total += x; } return total; }', 'int F(List<int> xs) { var sum = 0; foreach (var item in xs) { sum += item; } return sum; }', 'cs');
   refused('string F(int a) { var s = a.ToString(); return $"v={s}"; }', 'string F(int a) { var text = a.ToString(); return $"v={text}"; }', 'cs');
-  proved('function f(a: number): number { const t: number = a * 2; return t; }', 'function f(a: number): number { const twice: number = a * 2; return twice; }', 'ts', 'alpha');
+  refused('function f(a: number): number { const t: number = a * 2; return t; }', 'function f(a: number): number { const twice: number = a * 2; return twice; }', 'ts');
 });
 
-test('alpha is refused whenever a name could be seen from outside or captured', () => {
+test('renamings where a name could be seen from outside or captured stay refused', () => {
   // shorthand property: the name becomes the key
   const a1 = 'function f(a) { const total = a * 2; return { total }; }', b1 = 'function f(a) { const sum = a * 2; return { sum }; }';
-  refused(a1, b1, 'js', /shorthand/); assert.notEqual(run(a1, [2]), run(b1, [2]));
+  refused(a1, b1, 'js'); assert.notEqual(run(a1, [2]), run(b1, [2]));
   // capture: the new name already means something else
   const a2 = 'function f(a) { const t = a + 1; return t + g; }', b2 = 'function f(a) { const g = a + 1; return g + g; }';
-  refused(a2, b2, 'js', /already exists/); assert.notEqual(run(a2, [1], { g: 10 }), run(b2, [1], { g: 10 }));
+  refused(a2, b2, 'js'); assert.notEqual(run(a2, [1], { g: 10 }), run(b2, [1], { g: 10 }));
   // a renamed name that is not bound in the function is a global or a field
-  refused('function f(a) { return a + limit; }', 'function f(a) { return a + bound; }', 'js', /not declared inside/);
+  refused('function f(a) { return a + limit; }', 'function f(a) { return a + bound; }', 'js');
   // a use outside the scope of the declaration refers to something else
   const a3 = 'function f(c) { if (c) { let x = 1; g(x); } return x; }', b3 = 'function f(c) { if (c) { let y = 1; g(y); } return y; }';
-  refused(a3, b3, 'js', /outside the scope/);
-  refused('function f(n) { for (let i = 0; i < n; i++) { g(i); } return i; }', 'function f(n) { for (let j = 0; j < n; j++) { g(j); } return j; }', 'js', /outside the scope/);
+  refused(a3, b3, 'js');
+  refused('function f(n) { for (let i = 0; i < n; i++) { g(i); } return i; }', 'function f(n) { for (let j = 0; j < n; j++) { g(j); } return j; }', 'js');
   // swapping two names is not fresh
   refused('function f(a, b) { return a - b; }', 'function f(b, a) { return b - a; }', 'js');
-  refused('function f() { let a = 1, b = 2; return a - b; }', 'function f() { let b = 1, a = 2; return b - a; }', 'js', /already exists|still exists/);
+  refused('function f() { let a = 1, b = 2; return a - b; }', 'function f() { let b = 1, a = 2; return b - a; }', 'js');
   // member with the same name; destructuring; label; object key
-  refused('function f(o) { const size = o.size; return size; }', 'function f(o) { const len = o.len; return len; }', 'js', /member/);
+  refused('function f(o) { const size = o.size; return size; }', 'function f(o) { const len = o.len; return len; }', 'js');
   refused('function f(o) { const { size } = o; return size; }', 'function f(o) { const { len } = o; return len; }', 'js');
-  refused('function f(o) { const size = 1; return { size: size }; }', 'function f(o) { const len = 1; return { len: len }; }', 'js', /colon/);
+  refused('function f(o) { const size = 1; return { size: size }; }', 'function f(o) { const len = 1; return { len: len }; }', 'js');
   // two names collapsed into one, one name split in two
-  refused('function f(a) { const x = a; const y = a + 1; return x + y; }', 'function f(a) { const z = a; const z = a + 1; return z + z; }', 'js', /two names/);
-  refused('function f(a) { const x = a; return x + x; }', 'function f(a) { const y = a; return y + z; }', 'js', /two different names/);
+  refused('function f(a) { const x = a; const y = a + 1; return x + y; }', 'function f(a) { const z = a; const z = a + 1; return z + z; }', 'js');
+  refused('function f(a) { const x = a; return x + x; }', 'function f(a) { const y = a; return y + z; }', 'js');
   // dynamic lookup
-  refused('function f(a) { const x = a; return eval("x"); }', 'function f(a) { const y = a; return eval("x"); }', 'js', /eval/);
+  refused('function f(a) { const x = a; return eval("x"); }', 'function f(a) { const y = a; return eval("x"); }', 'js');
   // template text is not code: the string token changes, so it is not even a renaming
   refused('function f(a) { const x = a; return "x=" + x; }', 'function f(a) { const y = a; return "y=" + y; }', 'js');
   // a template HOLE is code and follows the rename
-  proved('function f(a) { const x = a; return `v=${x}`; }', 'function f(a) { const y = a; return `v=${y}`; }', 'js', 'alpha');
+  refused('function f(a) { const x = a; return `v=${x}`; }', 'function f(a) { const y = a; return `v=${y}`; }', 'js');
 });
 
 test('no renaming is certified in C#: names there are part of the contract and reach run time', () => {
@@ -108,16 +110,16 @@ test('holes found while attacking the module stay closed', () => {
   refused('int F() { List<int> xs = Make(); return xs.Count; }', 'int F() { List<int> items = Make(); return items.Count; }', 'cs');
   refused('int F() { int? v = Get(); return v ?? 0; }', 'int F() { int? value = Get(); return value ?? 0; }', 'cs');
   // a call or a condition at the start of a snippet is not a parameter list
-  refused('foo(a, b);', 'foo(c, b);', 'js', /not declared inside/);
-  refused('if (ready) { go(ready); }', 'if (done) { go(done); }', 'js', /not declared inside/);
+  refused('foo(a, b);', 'foo(c, b);', 'js');
+  refused('if (ready) { go(ready); }', 'if (done) { go(done); }', 'js');
   refused('helper(x)\n{ use(x); }', 'helper(y)\n{ use(y); }', 'js');
   // array literals and call arguments are fine; object shorthand inside a call is not
-  proved('function f(a) { const x = a + 1; return [a, x, g(a, x, 1)]; }', 'function f(a) { const y = a + 1; return [a, y, g(a, y, 1)]; }', 'js', 'alpha');
-  refused('function f(a) { const x = a + 1; return g({ x }); }', 'function f(a) { const y = a + 1; return g({ y }); }', 'js', /shorthand/);
+  refused('function f(a) { const x = a + 1; return [a, x, g(a, x, 1)]; }', 'function f(a) { const y = a + 1; return [a, y, g(a, y, 1)]; }', 'js');
+  refused('function f(a) { const x = a + 1; return g({ x }); }', 'function f(a) { const y = a + 1; return g({ y }); }', 'js');
   // the renaming proof can be switched off for text that is not a function
   assert.equal(proveEquivalent('function f(a) { let x = a; return x; }', 'function f(a) { let y = a; return y; }', 'js', { alpha: false }).proved, false);
   // var is function-scoped: a use after its block is the same variable, but the block-scope model refuses (safe side)
-  refused('function f() { { var x = 1; } return x; }', 'function f() { { var y = 1; } return y; }', 'js', /outside the scope/);
+  refused('function f() { { var x = 1; } return x; }', 'function f() { { var y = 1; } return y; }', 'js');
   // Java parameters cannot be named by callers; C# ones can
   refused('int f(int count) { return count + 1; }', 'int f(int n) { return n + 1; }', 'java', /only/); // -parameters, records and anonymous classes expose names
 });
@@ -146,12 +148,13 @@ test('differential check: every renaming or re-layout the module certifies behav
       for (const args of [[0, 0], [3, 2], [5, 9], [12, -4]]) assert.equal(run(variant, args), run(src, args), `UNSOUND (${r.level}): ${from} → ${to}\n${src}\n${variant}`);
     }
   }
-  assert.ok(tried > 60 && certified > 20, `${certified} certified of ${tried} renamings`);
+  assert.ok(tried > 60, `${tried} renamings tried`);
+  assert.equal(certified, 0, 'no renaming is certified at present; if one ever is again, the loop above checks it by running both versions');
 });
 
 test('classifyChange labels what kind of edit it was; literals are a label, not a proof', () => {
   assert.equal(classifyChange('function f(){ return 1; } // a', 'function f(){ return 1; }', 'js').kind, 'identical');
-  assert.equal(classifyChange('function f(){ let a = 1; return a; }', 'function f(){ let b = 1; return b; }', 'js').kind, 'alpha');
+  assert.equal(classifyChange('function f(){ let a = 1; return a; }', 'function f(){ let b = 1; return b; }', 'js').kind, 'logic'); // a renaming is not certified
   const s = classifyChange('function f(){ throw new Error("bad"); }', 'function f(){ throw new Error("worse"); }', 'js');
   assert.deepEqual([s.kind, s.onlyStrings, s.onlyNumbers], ['literals', true, false]);
   const n = classifyChange('const f = () => 10;', 'const f = () => 12;', 'js');
