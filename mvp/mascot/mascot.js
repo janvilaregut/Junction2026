@@ -250,14 +250,14 @@ const TOOL_FN = {
     if (view() !== 'home') { call('closeGraph'); await sleep(750); }
     call('highlightLanes', list.map((p) => p.id));
     act(`Showing ${list.length} pull request${list.length === 1 ? '' : 's'}`);
-    return { count: list.length, olderNotShown: include_old ? 0 : old, pullRequests: list.slice(0, 25).map((p) => prBrief(p, all.indexOf(p))) };
+    return { count: list.length, olderNotShown: include_old ? 0 : old, pullRequests: list.slice(0, 25).map((p) => prBrief(p, all.findIndex((x) => x.id === p.id))) };
   },
   async highlight_pull_requests({ ids = [] }) { if (view() !== 'home') { call('closeGraph'); await sleep(750); } call('highlightLanes', ids); return { ok: true }; },
   async open_pull_request({ query }) {
     const p = findPR(query);
     if (!p) return { error: `No pull request matches "${query}".`, available: allPRs().map((x) => x.branch).slice(0, 20) };
     const s = app();
-    if (view() !== 'home' && s?.cur?.id === p.id) return { alreadyOpen: true, pullRequest: prBrief(p, allPRs().indexOf(p)) };
+    if (view() !== 'home' && s?.cur?.id === p.id) return { alreadyOpen: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)) };
     if (view() !== 'home') { call('closeGraph'); await sleep(750); }
     call('highlightLanes', [p.id]); await sleep(350);
     const [x, y] = originOf(p);
@@ -265,7 +265,7 @@ const TOOL_FN = {
     call('openGraph', p, x, y);
     act(`Opened ${p.branch}`);
     await waitFor(() => app()?.run?.brief || app()?.plan, 8000);
-    return { opened: true, pullRequest: prBrief(p, allPRs().indexOf(p)), verification: briefOf(app()?.run?.brief, 'summary'), notVerifiedYet: !app()?.run?.brief };
+    return { opened: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)), verification: briefOf(app()?.run?.brief, 'summary'), notVerifiedYet: !app()?.run?.brief };
   },
   async go_home() { document.getElementById('drawer').hidden = true; call('closeGraph'); act('Back home'); return { ok: true }; },
   async get_verification_details({ section = 'summary' } = {}) {
@@ -280,7 +280,10 @@ const TOOL_FN = {
   },
   async start_verification({ mode = 'quick' } = {}) {
     const s = app(); if (!s?.cur || view() === 'home') return { error: 'Open a pull request first.' };
-    s.mode = mode; call('verify'); act(`Verifying (${mode})`); return { started: true, mode };
+    s.mode = mode;
+    const started = (await call('verify')) !== false;
+    if (started) act(`Verifying (${mode})`);
+    return started ? { started: true, mode } : { started: false, note: 'A verification is already running or starting, or no pull request is open.' };
   },
   async get_consensus() {
     const s = app(); const p = s?.cur && view() !== 'home' ? s.cur : null;
@@ -408,12 +411,14 @@ async function onMessage(me, m) {
 
 /* ── Input: click, Space, typing ──────────────────────────────────────── */
 const typing = (el) => el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+// Space keeps its native meaning on focused controls (Verify, Review, a residue <summary>, a branch with role=button).
+const control = (el) => el && el !== document.body && el !== goatBtn && !!el.closest?.('button, summary, a[href], [role="button"], input, textarea, select, [contenteditable="true"]');
 goatBtn.addEventListener('click', () => (sess ? stop() : start()));
 root.querySelector('.m-x').addEventListener('click', () => stop());
 typeForm.addEventListener('submit', (e) => { e.preventDefault(); const t = typeInput.value; typeInput.value = ''; sendText(t); });
 let spaceDown = false;
 addEventListener('keydown', (e) => {
-  if (e.code !== 'Space' || e.repeat || typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.code !== 'Space' || e.repeat || typing(e.target) || control(document.activeElement) || e.metaKey || e.ctrlKey || e.altKey) return;
   if (!document.getElementById('modal')?.hidden) return;
   e.preventDefault(); spaceDown = true;
   if (sess) stop(); else start();

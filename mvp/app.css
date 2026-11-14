@@ -43,6 +43,7 @@ body:has(.mascot) .gfoot{padding-right:120px} /* keep the folded-branches button
 .lane{cursor:pointer;transition:opacity .25s}
 #tree.hl .lane{opacity:.16}#tree.hl .lane.on{opacity:1}
 .lane .tipring{transition:r .25s}.lane.on .tipring{r:14}
+.lane:focus{outline:none}.lane:focus-visible .tipring{r:15;stroke-opacity:.8;stroke-width:1.6}
 .lane.pulse .tipring{animation:pulse 2.4s ease-in-out infinite}
 @keyframes pulse{50%{stroke-opacity:.05}}
 .lbl{font:600 13px var(--head);fill:var(--fg)}

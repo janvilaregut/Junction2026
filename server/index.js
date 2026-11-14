@@ -185,6 +185,8 @@ async function api(req, res, url) {
         const r = getRun(project.id, runId);
         const b = r.brief;
         if (!b) throw new Error('Esta verificación no tiene informe');
+        // One decision per run: a second submit (double click, two tabs) must not add a second ledger entry.
+        if (r.signoff) throw new Error('Esta verificación ya está firmada. Vuelve a verificar para decidir otra vez.');
         const signer = String(body.signer || '').trim();
         const risk = String(body.residualRisk || '').trim();
         const decision = body.decision === 'devolver' ? 'devolver' : 'aprobar';

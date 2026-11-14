@@ -31,13 +31,18 @@ export function latestBriefs(projectId) {
 
 export async function startRun(project, pr, rawOptions, onEvent) {
   if (busy.has(project.id)) throw new Error('Ya hay una verificación en marcha en este proyecto. Espera a que termine.');
-  const options = normalizeOptions(rawOptions, await availableAgents());
   const id = `${slug(pr.branch)}-${Date.now().toString(36)}`;
-  const dir = dirOf(project.id, id);
-  fs.mkdirSync(dir, { recursive: true });
+  // Reserve the project before the first await: two quick requests must not both get past the check.
+  busy.set(project.id, id);
+  const release = () => { if (busy.get(project.id) === id) busy.delete(project.id); };
+  let options, dir;
+  try {
+    options = normalizeOptions(rawOptions, await availableAgents());
+    dir = dirOf(project.id, id);
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (e) { release(); throw e; }
   const run = { id, projectId: project.id, prId: pr.id, branch: pr.branch, head: pr.sha, status: 'running', startedAt: new Date().toISOString(), options, events: [], listeners: new Set(), dir, brief: null, error: null };
   live.set(id, run);
-  busy.set(project.id, id);
   const emit = (e) => {
     const ev = { ...e, t: Date.now() };
     run.events.push(ev);
@@ -56,7 +61,7 @@ export async function startRun(project, pr, rawOptions, onEvent) {
     .catch((e) => { run.status = 'failed'; run.error = e.message; emit({ type: 'error', text: e.message }); })
     .finally(() => {
       run.finishedAt = new Date().toISOString();
-      busy.delete(project.id);
+      release();
       writeJSON(path.join(dir, 'run.json'), { id, projectId: project.id, prId: pr.id, branch: pr.branch, status: run.status, error: run.error, startedAt: run.startedAt, finishedAt: run.finishedAt, options, events: run.events });
       for (const l of run.listeners) l({ type: 'end', status: run.status });
     });

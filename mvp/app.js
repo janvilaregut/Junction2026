@@ -19,6 +19,7 @@ const ERR = [
   [/^Proyecto desconocido: (.*)/, (m) => `Unknown project: ${m[1]}`],
   [/^No existe la rama (.*)/, (m) => `The branch ${m[1]} does not exist`],
   [/^Esta verificación no tiene informe/, () => 'This verification has no report'],
+  [/^Esta verificación ya está firmada/, () => 'This verification is already signed. Verify again to decide again.'],
 ];
 const english = (msg) => { const s = String(msg ?? ''); for (const [re, f] of ERR) { const m = s.match(re); if (m) return f(m); } return s; };
 
@@ -77,13 +78,18 @@ async function init() {
   await loadProject(S.projects.find((p) => p.id === saved)?.id || S.projects[0].id);
 }
 async function loadProject(id) {
-  S.pid = id; store.set('katse.project', id);
+  closeGraph();
+  Object.assign(S, { pid: id, prs: { incoming: [], outgoing: [] }, base: '', expanded: false, hl: [], cur: null, treeW: 0 });
+  store.set('katse.project', id);
   $('projName').textContent = S.projects.find((p) => p.id === id)?.name || id;
-  $('sum').innerHTML = '&nbsp;';
-  await reloadPRs();
+  $('tree').innerHTML = ''; $('tree').style.height = '0px'; $('more').hidden = true; // never show the previous project's branches
+  $('sum').textContent = 'Loading branches…';
+  try { await reloadPRs(); } catch (e) { $('sum').textContent = e.message; }
 }
 async function reloadPRs() {
-  const prs = await api(`/projects/${S.pid}/prs`);
+  const pid = S.pid;
+  const prs = await api(`/projects/${pid}/prs`);
+  if (pid !== S.pid) return; // the project changed while this was loading
   S.prs = prs; S.base = prs.base;
   if (S.cur) S.cur = [...prs.incoming, ...prs.outgoing].find((p) => p.id === S.cur.id) || S.cur;
   renderTree();
@@ -111,6 +117,7 @@ $('proj').onclick = () => projectsModal(false);
 /* ── Home: left = history, centre = you, right = merges still to come ── */
 function renderTree() {
   const svg = $('tree'); svg.innerHTML = '';
+  svg.classList.remove('hl'); $('card').classList.remove('on');
   const W = Math.max(svg.parentElement.clientWidth, 760);
   const recent = S.prs.incoming.filter((p) => p.last || p.running || (!p.behind && Date.now() - new Date(p.date) < 30 * 864e5));
   const old = S.prs.incoming.filter((p) => !recent.includes(p));
@@ -135,17 +142,17 @@ function renderTree() {
 
   const lanes = mk('g', {}, svg);
   const draw = (list, dir) => {
-    const step = Math.min(46, Math.max(14, (W - xNow - 300) / Math.max(list.length - 1, 1)));
+    const step = Math.min(46, Math.max(6, (W - xNow - 380) / Math.max(list.length - 1, 1)));
     list.forEach((p, i) => {
       const st = state(p); const col = PAL[st.tone];
       const y = mainY + dir * (i + 1) * GAP; const dy = Math.abs(y - mainY);
       const xf = p.behind ? Math.max(40, xNow - (30 + 34 * Math.log2(1 + p.behind))) : xNow;
       const R = Math.min(34 + dy * 0.8, 150); // far lanes turn up more steeply instead of sweeping across the history
-      const tipX = Math.max(xNow + 150 + i * step, xf + R + 40);
-      const M = Math.min(44 + dy * 0.45, W - 16 - tipX);
+      const tipX = Math.min(Math.max(xNow + 150 + i * step, xf + R + 40), W - 70); // tips stay inside the view
+      const M = Math.max(16, Math.min(44 + dy * 0.45, W - 16 - tipX));
       const mx = tipX + M;
       const faint = !recent.includes(p) && dir < 0;
-      const g = mk('g', { class: 'lane' + (st.tone === 'warn' || st.tone === 'bad' ? ' pulse' : ''), 'data-pr': p.id }, lanes);
+      const g = mk('g', { class: 'lane' + (st.tone === 'warn' || st.tone === 'bad' ? ' pulse' : ''), 'data-pr': p.id, tabindex: 0, role: 'button', 'aria-label': `${name(p)}: ${p.title} (${st.label})` }, lanes);
       const fork = `M${xf} ${mainY} C ${xf + R * .55} ${mainY}, ${xf + R * .45} ${y}, ${xf + R} ${y} L ${tipX} ${y}`;
       const merge = `M${tipX} ${y} C ${tipX + M * .55} ${y}, ${mx - M * .45} ${mainY}, ${mx} ${mainY}`;
       mk('path', { d: fork, fill: 'none', stroke: col, 'stroke-width': faint ? 1.4 : 2.2, 'stroke-linecap': 'round', 'stroke-opacity': faint ? .5 : .95 }, g);
@@ -163,9 +170,11 @@ function renderTree() {
       }
       mk('text', { x: tipX, y: dir < 0 ? y - (faint ? 11 : 17) : y + 25, 'text-anchor': 'middle', class: 'lbl' + (faint ? ' old' : '') }, g).textContent = dir > 0 ? name(p) + ' · yours' : name(p);
       mk('path', { d: faint ? fork : fork + ' ' + merge, fill: 'none', stroke: 'transparent', 'stroke-width': Math.max(GAP - 8, 18) }, g);
-      g.onmouseenter = () => { svg.classList.add('hl'); g.classList.add('on'); showCard(p, st, tipX, y, dir); };
-      g.onmouseleave = () => { svg.classList.remove('hl'); g.classList.remove('on'); $('card').classList.remove('on'); };
-      g.onclick = () => { const r = svg.getBoundingClientRect(); openGraph(p, r.left + (tipX * r.width) / W, r.top + (y * r.height) / H); };
+      const enter = () => { svg.classList.add('hl'); g.classList.add('on'); showCard(p, st, tipX, y, dir); };
+      const leave = () => { g.classList.remove('on'); $('card').classList.remove('on'); applyHighlight(); };
+      const open = () => { const r = svg.getBoundingClientRect(); openGraph(p, r.left + (tipX * r.width) / W, r.top + (y * r.height) / H); };
+      g.onmouseenter = enter; g.onmouseleave = leave; g.onfocus = enter; g.onblur = leave; g.onclick = open;
+      g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
     });
   };
   draw(inc, -1); draw(out, 1);
@@ -174,8 +183,11 @@ function renderTree() {
   mk('text', { x: xNow - 24, y: mainY - 14, 'text-anchor': 'end', class: 'here' }, svg).textContent = 'you are here';
 
   // On narrow screens the tree scrolls sideways: start at "you are here", where the branches are.
+  // Only when the width changes, so a phone's URL bar showing or hiding doesn't snap the scroll back.
   const box = svg.parentElement;
-  if (box.clientWidth < W) box.scrollLeft = xNow - 112;
+  if (box.clientWidth < W && S.treeW !== W) box.scrollLeft = xNow - 112;
+  S.treeW = W;
+  applyHighlight();
   $('more').hidden = !old.length;
   $('more').textContent = S.expanded ? 'Hide older branches' : `+${old.length} older branches`;
   const pend = recent.filter((p) => state(p).end === 'open').length;
@@ -194,9 +206,14 @@ function showCard(p, st, x, y, dir) {
 /* Light up some branches in the tree (by PR id) and dim the rest; no ids clears it.
    Used by the voice mascot to point at PRs. Older branches are unfolded if needed. */
 function highlightLanes(ids) {
-  const want = new Set(ids || []);
+  S.hl = [...new Set(ids || [])];
+  const want = new Set(S.hl);
   if (want.size && !S.expanded && S.prs.incoming.some((p) => want.has(p.id) && !document.querySelector(`#tree .lane[data-pr="${CSS.escape(p.id)}"]`))) { S.expanded = true; renderTree(); }
-  const svg = $('tree');
+  applyHighlight();
+}
+/* The lasting highlight (S.hl) survives re-renders and hovers; a hover only adds to it for a moment. */
+function applyHighlight() {
+  const svg = $('tree'); const want = new Set(S.hl || []);
   svg.classList.toggle('hl', want.size > 0);
   svg.querySelectorAll('.lane').forEach((g) => g.classList.toggle('on', want.has(g.dataset.pr)));
 }
@@ -289,7 +306,8 @@ function layout({ N, L }, W, H) {
   // up to 1.5x along the longer side of the screen so it uses the space instead of staying a small circle.
   const narrow = W < 600;
   const barTop = $('fbar').getBoundingClientRect().top || H - 100;
-  const L0 = narrow ? 40 : 110, R0 = W - L0, T0 = narrow ? 100 : 120, B0 = Math.min(H - 150, barTop - 44);
+  const L0 = narrow ? 40 : 110, R0 = W - L0, T0 = narrow ? 100 : 120;
+  const B0 = Math.max(T0 + 140, Math.min(H - 150, barTop - 44)); // never a negative area on short screens
   const fx = (R0 - L0) / Math.max(maxX - minX, 1), fy = (B0 - T0) / Math.max(maxY - minY, 1);
   const s = Math.min(fx, fy, 1.5), sx = Math.min(fx, s * 1.5, 1.6), sy = Math.min(fy, s * 1.5, 1.6);
   const ox = (L0 + R0) / 2 - ((minX + maxX) / 2) * sx, oy = (T0 + B0) / 2 - ((minY + maxY) / 2) * sy;
@@ -346,40 +364,63 @@ function renderGraph(m) {
   })();
 }
 
+/* Every opening of a branch gets a number. Anything that comes back late (a fetch, a timer, the live
+   stream) for a branch that is no longer the open one is dropped, so switching fast never mixes runs. */
+let openSeq = 0, closeTimer = 0, renderTimer = 0;
+const alive = (seq) => seq === openSeq && !$('full').hidden && $('full').classList.contains('open');
+function stopStream() { if (S.es) { S.es.close(); S.es = null; } clearInterval(S.timer); }
+const fetchPlan = (p) => api(`/projects/${S.pid}/plan?pr=${encodeURIComponent(p.id)}&mode=${S.mode === 'full' ? 'completo' : 'rapido'}`);
+function scheduleGraph(seq, m) { clearTimeout(renderTimer); renderTimer = setTimeout(() => alive(seq) && renderGraph(m), 380); }
+
 async function openGraph(p, x, y) {
-  $('card').classList.remove('on');
-  Object.assign(S, { cur: p, run: null, plan: null });
+  const seq = ++openSeq;
+  clearTimeout(closeTimer); clearTimeout(renderTimer); stopStream();
+  $('drawer').hidden = true; $('card').classList.remove('on'); $('tip').classList.remove('on');
+  Object.assign(S, { cur: p, run: null, plan: null, model: null, starting: false, hl: [] });
   const full = $('full');
   full.classList.remove('ready', 'open');
   full.style.setProperty('--cx', x + 'px'); full.style.setProperty('--cy', y + 'px');
   $('fid').textContent = name(p); $('fbr').textContent = p.branch;
-  $('g').innerHTML = '';
+  cancelAnimationFrame(raf); $('g').innerHTML = '';
   renderBar();
   full.hidden = false; void full.offsetWidth; full.classList.add('open');
   try {
-    if (p.running) { await loadPlan(); setTimeout(() => renderGraph(model(null, S.plan)), 380); return attach(p.running); }
-    if (p.last) S.run = await api(`/projects/${S.pid}/runs/${p.last.runId}`);
-    if (!S.run?.brief) await loadPlan();
-  } catch (e) { return renderBar(e.message); }
+    if (p.running) {
+      const plan = await fetchPlan(p);
+      if (!alive(seq)) return;
+      S.plan = plan; scheduleGraph(seq, model(null, plan));
+      return attach(p.running, seq);
+    }
+    const run = p.last ? await api(`/projects/${S.pid}/runs/${p.last.runId}`) : null;
+    const plan = run?.brief ? null : await fetchPlan(p);
+    if (!alive(seq)) return;
+    Object.assign(S, { run, plan });
+  } catch (e) { if (alive(seq)) renderBar(e.message, true); return; }
   renderBar();
-  setTimeout(() => renderGraph(model(S.run?.brief, S.plan)), 380);
+  scheduleGraph(seq, model(S.run?.brief, S.plan));
 }
-const loadPlan = async () => { S.plan = await api(`/projects/${S.pid}/plan?pr=${encodeURIComponent(S.cur.id)}&mode=${S.mode === 'full' ? 'completo' : 'rapido'}`); };
 function closeGraph() {
-  const full = $('full'); if (full.hidden) return;
-  if (S.es) { S.es.close(); S.es = null; clearInterval(S.timer); }
+  const full = $('full');
+  if (full.hidden || !full.classList.contains('open')) return;
+  openSeq++; // late answers for this branch are now ignored
+  clearTimeout(renderTimer); stopStream();
+  $('drawer').hidden = true;
   full.classList.remove('open'); $('tip').classList.remove('on');
-  setTimeout(() => { full.hidden = true; full.classList.remove('ready'); cancelAnimationFrame(raf); }, 700);
+  Object.assign(S, { run: null, plan: null, model: null, starting: false });
+  clearTimeout(closeTimer);
+  closeTimer = setTimeout(() => { if (!full.classList.contains('open')) { full.hidden = true; full.classList.remove('ready'); cancelAnimationFrame(raf); } }, 700);
   reloadPRs().catch(() => {});
 }
 $('back').onclick = closeGraph;
 
-/* The one bar at the bottom of the graph: a number, a state, one action. */
-function renderBar(error) {
+/* The one bar at the bottom of the graph: a number, a state, one action.
+   An error from loading the branch is fatal (only Back); an error from an action can be dismissed. */
+function renderBar(error, fatal) {
   const p = S.cur, b = S.run?.brief;
-  const seg = `<div class="seg" title="Full: ${S.agents.length ? `${Math.min(3, S.agents.length)} agents redo the change blind. Takes minutes.` : 'no agents available'}"><button data-m="quick" class="${S.mode === 'quick' ? 'on' : ''}">Quick</button><button data-m="full" class="${S.mode === 'full' ? 'on' : ''}" ${S.agents.length ? '' : 'disabled'}>Full</button></div>`;
+  const seg = `<div class="seg" title="Full: agents redo the change blind, without seeing it. Takes minutes."><button data-m="quick" class="${S.mode === 'quick' ? 'on' : ''}">Quick</button><button data-m="full" class="${S.mode === 'full' ? 'on' : ''}" ${S.agents.length ? '' : 'disabled title="No agents available"'}>Full</button></div>`;
   let h;
-  if (error) h = `<span class="txt" style="color:var(--bad)">${esc(error)}</span><button class="cta ghost" id="bBack">Back</button>`;
+  if (error) h = `<span class="txt" style="color:var(--bad);white-space:normal;max-width:520px">${esc(error)}</span>${fatal ? '<button class="cta ghost" id="bBack">Back</button>' : '<button class="cta ghost" id="bOk">OK</button>'}`;
+  else if (S.starting) h = '<span class="spin"></span><span class="txt" style="color:var(--fg)">Starting…</span><button class="cta" disabled>Verifying…</button>';
   else if (S.es) h = `<span class="spin"></span><span class="txt" style="color:var(--fg)">${esc(S.stage)}</span><span class="txt">${secs(Date.now() - S.t0)}</span><button class="cta" disabled>Verifying…</button>`;
   else if (b) {
     const stale = p.sha && !b.pr.head.startsWith(p.sha);
@@ -390,38 +431,64 @@ function renderBar(error) {
   } else if (S.plan) h = `<span class="num">${S.plan.totals.files}<small> files</small></span><span class="txt">+${S.plan.totals.added} −${S.plan.totals.removed} · not verified yet</span>${seg}<button class="cta" id="bVerify">Verify</button>`;
   else h = '<span class="txt">Loading…</span>';
   $('fbar').innerHTML = h;
-  $('fbar').querySelectorAll('[data-m]').forEach((x) => (x.onclick = async () => { S.mode = x.dataset.m; renderBar(); }));
-  if ($('bVerify')) $('bVerify').onclick = verify;
+  $('fbar').querySelectorAll('[data-m]').forEach((x) => (x.onclick = () => { S.mode = x.dataset.m; renderBar(); }));
+  if ($('bVerify')) $('bVerify').onclick = () => verify();
   if ($('bReview')) $('bReview').onclick = openReview;
   if ($('bBack')) $('bBack').onclick = closeGraph;
+  if ($('bOk')) $('bOk').onclick = () => renderBar();
 }
 
 /* ── Verification, streamed live ──────────────────────────────────────── */
+/* Starts a run for the open branch. Resolves true if it started. One at a time: a second click, or a
+   call while one is streaming, does nothing. The server picks how many agents a Full run gets. */
 async function verify() {
-  const options = { mode: S.mode === 'full' ? 'completo' : 'rapido', mutants: 4 };
-  if (S.mode === 'full') options.agents = S.agents.slice(0, 3).map((a) => a.id);
-  try { const r = await api(`/projects/${S.pid}/verify`, { body: { pr: S.cur.id, options } }); attach(r.runId); }
-  catch (e) { renderBar(e.message); }
+  if (!S.cur || S.es || S.starting || $('full').hidden) return false;
+  const seq = openSeq, p = S.cur;
+  S.starting = true; renderBar();
+  try {
+    const r = await api(`/projects/${S.pid}/verify`, { body: { pr: p.id, options: { mode: S.mode === 'full' ? 'completo' : 'rapido', mutants: 4 } } });
+    S.starting = false;
+    p.running = r.runId; // the tree and a reopen show it as running until the next reload
+    if (S.cur?.id === p.id) S.cur.running = r.runId;
+    if (alive(seq) && S.cur?.id === p.id) attach(r.runId, seq);
+    reloadPRs().catch(() => {});
+    return true;
+  } catch (e) {
+    S.starting = false;
+    if (alive(seq)) renderBar(e.message);
+    return false;
+  }
 }
-function attach(runId) {
+function attach(runId, seq = openSeq) {
+  stopStream();
   const prId = S.cur.id;
   Object.assign(S, { stage: 'Starting in an isolated copy', t0: Date.now() });
   const es = new EventSource(`/api/projects/${S.pid}/runs/${runId}/events`);
   S.es = es; renderBar();
-  clearInterval(S.timer); S.timer = setInterval(() => S.es && renderBar(), 1000);
+  S.timer = setInterval(() => { if (S.es === es && alive(seq)) renderBar(); }, 1000);
   es.onmessage = async (m) => {
+    if (S.es !== es) return;
     const e = JSON.parse(m.data);
     if (e.type === 'stage' && e.status === 'start') { S.stage = STAGE[e.id] || e.name; renderBar(); }
     else if (e.type === 'end') {
-      es.close(); S.es = null; clearInterval(S.timer);
-      await reloadPRs();
-      if (S.cur?.id !== prId || $('full').hidden) return;
-      S.run = await api(`/projects/${S.pid}/runs/${runId}`);
-      if (!S.run.brief) return renderBar(`Verification failed: ${english(S.run.error) || 'unknown error'}`);
-      renderBar(); renderGraph(model(S.run.brief));
+      stopStream();
+      try {
+        await reloadPRs();
+        if (!alive(seq) || S.cur?.id !== prId) return;
+        const run = await api(`/projects/${S.pid}/runs/${runId}`);
+        if (!alive(seq)) return;
+        S.run = run;
+        if (!run.brief) return renderBar(`Verification failed: ${english(run.error) || 'unknown error'}`);
+        renderBar(); renderGraph(model(run.brief));
+      } catch (err) { if (alive(seq)) renderBar(err.message); }
     }
   };
-  es.onerror = () => { if (S.es === es) { es.close(); S.es = null; clearInterval(S.timer); renderBar(); } };
+  es.onerror = () => {
+    if (S.es !== es) return;
+    // The browser reconnects by itself unless the stream is closed for good.
+    if (es.readyState === EventSource.CLOSED) { stopStream(); renderBar('Lost the live connection. The verification may still be running: go back and open the branch again.', true); }
+    else { S.stage = 'Reconnecting…'; renderBar(); }
+  };
 }
 
 /* ── Review drawer: decide, read, sign ────────────────────────────────── */
@@ -431,6 +498,7 @@ function codeHTML(item) {
 }
 const copyBlock = (title, text, id) => `<div class="copy"><label>${esc(title)}</label><button type="button" data-copy="${id}">Copy</button><pre id="${id}">${esc(text)}</pre></div>`;
 function openReview() {
+  if ($('full').hidden || !S.run?.brief) return; // the drawer belongs to the open branch, never to the tree
   const run = S.run, b = run.brief, so = run.signoff;
   $('dk').textContent = `${name(S.cur)} · ${S.cur.branch}`;
   $('dt').textContent = so ? (so.decision === 'aprobar' ? 'Signed' : 'Sent back') : laneName(b.lane.id, b.lane.name);
@@ -449,7 +517,7 @@ function openReview() {
   $('drawer').hidden = false;
   $('mdlink').onclick = async () => showText('Full report', await (await fetch(`/api/projects/${S.pid}/runs/${run.id}/report`)).text());
   $('dbody').querySelectorAll('[data-again]').forEach((x) => (x.onclick = () => { S.mode = x.dataset.again; $('drawer').hidden = true; verify(); }));
-  if (so) bindSigned(); else bindSign();
+  if (so) bindSigned(run); else bindSign(run);
 }
 function signHTML(b) {
   const hard = b.rules.fired.some((r) => HARD.includes(r.id));
@@ -461,9 +529,11 @@ function signHTML(b) {
     <div class="btns"><button class="cta ghost" id="sendBack">Send back</button><button class="cta" id="sign" ${hard ? 'disabled title="A change that does not build or breaks tests cannot be accepted"' : ''}>Accept &amp; sign</button></div>
     <div class="err" id="serr"></div></div>`;
 }
-function bindSign() {
+/* `run` is the run this drawer was built from. If the open branch changed underneath, nothing is sent. */
+function bindSign(run) {
   const submit = async (decision) => {
-    const b = S.run.brief; const answers = {};
+    if (S.run !== run || $('full').hidden) { $('serr').textContent = 'This review no longer matches the open branch. Close it and open it again.'; return; }
+    const b = run.brief; const answers = {};
     for (const q of b.questions) { const c = $('dbody').querySelector(`input[name="q-${CSS.escape(q.id)}"]:checked`); if (c) answers[q.id] = c.value; }
     const signer = $('signer').value.trim(); store.set('katse.signer', signer);
     const residueOk = !!$('ckRes')?.checked, notOk = !!$('ckNot')?.checked, risk = $('risk').value.trim();
@@ -479,11 +549,14 @@ function bindSign() {
       : risk.length < 20 ? 'Describe the residual risk you accept, in your own words (one sentence at least).' : '';
     if (problem) { $('serr').textContent = problem; return; }
     $('serr').textContent = '';
+    const btns = [$('sign'), $('sendBack')]; const was = btns.map((x) => x.disabled);
+    btns.forEach((x) => (x.disabled = true)); // one decision per click
     try {
-      const r = await api(`/projects/${S.pid}/runs/${S.run.id}/signoff`, { body: { signer, decision, answers, residualRisk: risk, checks: { residue: residueOk, notChecked: notOk } } });
-      S.run.signoff = r.signoff; S.run.signed = r;
-      openReview(); renderBar(); reloadPRs().catch(() => {});
-    } catch (e) { $('serr').textContent = e.message; }
+      const r = await api(`/projects/${S.pid}/runs/${run.id}/signoff`, { body: { signer, decision, answers, residualRisk: risk, checks: { residue: residueOk, notChecked: notOk } } });
+      run.signoff = r.signoff; run.signed = r;
+      if (S.run === run && !$('full').hidden) { openReview(); renderBar(); }
+      reloadPRs().catch(() => {});
+    } catch (e) { $('serr').textContent = e.message; btns.forEach((x, i) => (x.disabled = was[i])); }
   };
   $('sign').onclick = () => submit('aprobar');
   $('sendBack').onclick = () => submit('devolver');
@@ -498,10 +571,14 @@ function signedHTML(run) {
     <p class="lead" style="margin-top:14px">Katse never merges. You do.</p>
     <button class="link" id="attach" style="margin-top:10px">Attach the report to the commit (git notes)</button><div class="err" id="aerr" style="color:var(--fg2)"></div></div>`;
 }
-function bindSigned() {
-  $('dbody').querySelectorAll('[data-copy]').forEach((b) => (b.onclick = async () => { await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1200); }));
+function bindSigned(run) {
+  $('dbody').querySelectorAll('[data-copy]').forEach((b) => (b.onclick = async () => {
+    try { await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = 'Copied'; }
+    catch { b.textContent = 'Select and copy'; } // clipboard can be blocked (http, permissions)
+    setTimeout(() => (b.textContent = 'Copy'), 1400);
+  }));
   $('attach').onclick = async () => {
-    try { const r = await api(`/projects/${S.pid}/runs/${S.run.id}/attach`, { body: {} }); $('aerr').innerHTML = `Attached to ${esc(r.commit.slice(0, 9))} in <code>${esc(r.ref)}</code>. To share it: <code>${esc(r.push)}</code>`; }
+    try { const r = await api(`/projects/${S.pid}/runs/${run.id}/attach`, { body: {} }); $('aerr').innerHTML = `Attached to ${esc(r.commit.slice(0, 9))} in <code>${esc(r.ref)}</code>. To share it: <code>${esc(r.push)}</code>`; }
     catch (e) { $('aerr').textContent = e.message; }
   };
 }
@@ -515,7 +592,11 @@ $('mx').onclick = closeModal;
 $('modal').onclick = (e) => { if (e.target === $('modal')) closeModal(); };
 addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (!$('modal').hidden) closeModal(); else if (!$('drawer').hidden) $('drawer').hidden = true; else closeGraph();
+  const typing = e.target.closest?.('#drawer input, #drawer textarea');
+  if (!$('modal').hidden) closeModal();
+  else if (typing) e.target.blur(); // first Esc leaves the field; the sign-off text is not lost
+  else if (!$('drawer').hidden) $('drawer').hidden = true;
+  else closeGraph();
 });
 
 init().catch((e) => { $('sum').textContent = e.message; });
