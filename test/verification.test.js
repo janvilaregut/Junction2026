@@ -146,6 +146,17 @@ test('scenario adapter quotes inputs and rejects unsupported harness modes', () 
   assert.throws(() => materializeScenario({ test: { kind: 'shell', source: 'anything' } }, 'x'), /schema/);
 });
 
+test('metadata resolver setup is deterministic and isolated from agent field mistakes',()=>{
+  const input={test:{kind:'metadata',library:'class Item {}',source:'namespace App; class Cmd {}',resolver:'namespace App; class Wrong {}',resolverSource:'invalid setup'}};
+  const a=materializeScenario(input,'A-1');
+  assert.equal(a.test.resolverSetup,'orchestrator');assert.equal(a.test.resolver,'Katse.Generated.KatseA1Resolver.g.cs');
+  assert.equal(a.test.source,input.test.source);
+  assert.match(a.test.resolverSource,/global::MessagePack.GeneratedMessagePackResolver/);
+  assert.ok(!a.files[0].content.includes('invalid setup'));assert.ok(!a.files[0].content.includes('class Wrong'));
+  const again=materializeScenario({test:{kind:'metadata',library:input.test.library,source:input.test.source}},'A-1');
+  assert.deepEqual(a.files,again.files);
+});
+
 test('model scenario cannot overwrite orchestrator identity or risk provenance', () => {
   const a = materializeScenario({ id: 'forged', attacker: 'someone-else', riskKey: 'new-risk', originCandidate: 'C99', test: { kind: 'analyzer', source: 'class A {}' } }, 'A-2');
   for (const key of ['id', 'attacker', 'riskKey', 'originCandidate']) assert.equal(a[key], undefined);
