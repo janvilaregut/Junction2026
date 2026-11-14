@@ -2,6 +2,20 @@
 
 Valida cambios generados por IA mediante reconstrucción desde la base, ataques ejecutables y una decisión humana respaldada por evidencia. Proyecto para Junction 2026, reto Tieto «Earned Trust in AI Code».
 
+## Última comprobación con NVIDIA (14/11/2026)
+
+Verda respondió y Nemotron participó realmente, sin sustitución por Google. Actívalo en **Settings → Nemotron**; la selección se guarda en este ordenador. La prueba desde la web `ju26-issue-2283-mwgfnpkl` usó Standard sin ampliar límites (300 s / 100.000 tokens) y terminó en **4 min 29 s / 40.247 tokens informados**, sin consumo desconocido.
+
+- **Original:** 171/171 tests correctos, incluido un ataque nuevo de Nemotron; tres casos rojo→verde de la referencia.
+- **C2 / Nemotron:** propuesta en 15,0 s / 4.744 tokens; preparación y checkpoint en 40,1 s en total. Compiló y completó los 171 tests en otros 40,0 s: 170 correctos y un fallo, sin timeout. C1 tuvo el mismo balance.
+- El fallo de las alternativas es `ClosedGenericStruct_FromMetadataReference_UnkeyedMember`: emiten dos diagnósticos MsgPack004 donde se esperan cero. El original supera ese test. Terminar una validación no significa que el candidato sea correcto.
+- **Consumo por proveedor:** Nemotron 16.620; Hydrogen 18.217; Carbon 4.813; Decisions 597. Entire capturó ambos candidatos. La fórmula propuso cuatro alternativas y el presupuesto admitió dos.
+- **Resultado:** 7/10, lista para aprobación humana dentro del alcance declarado. Un grupo de riesgo atacado; faltan más diversidad y repetición independiente. Una intervención final de C1 agotó su límite de salida y se muestra incompleta; C2 completó ambas rondas. Decisions respondió en 445 ms, pero sus propuestas no superaron el umbral de confianza y se aplicaron reglas deterministas.
+
+Se corrigió el montaje del test: Katse añade el resolver atribuido en un árbol sintáctico separado, los agentes solo proponen el escenario. Los ataques priorizan expectativas críticas aún no comprobadas, sin convertir esa prioridad en cobertura. El reintento de formato recibe un motivo concreto y sigue limitado a uno. Validación: **101/101 tests de Katse**, una prueba .NET aislada del harness y la ejecución completa anterior.
+
+Hubo tres ejecuciones de diagnóstico previas (44.686, 49.489 y 44.171 tokens); las cuatro revisiones suman **178.593 tokens informados**. No es el coste de una sola revisión. Los informes históricos se conservan. Gemma no se ejecutó: esta prueba usó la excepción del ejemplo público fijado de Tieto. La revisión privada con Gemma y una ejecución Deep con NVIDIA siguen pendientes. Mutación y retirada de cambios no se ejecutan en Standard.
+
 ## Arranque en otro ordenador con Gemma (Windows)
 
 `main` reúne el panel de modelos y soporte de archivos nuevos de `ui-hud`, junto con el pipeline, la evidencia y la privacidad de `fabian`. Esta es la ruta para probar **#2283 con Gemma real**. Los informes y claves del ordenador de Fabián no se transfieren por Git.
@@ -154,7 +168,7 @@ El gateway combina reglas para secretos y datos personales, un diccionario expl�
 
 Validación del 14/11: 97 tests automatizados correctos. Una llamada real a Decisions respondió en 1,06 s / 592 tokens dentro del #2283; sus tres elecciones quedaron por debajo de 0,8 y se mantuvieron las reglas deterministas. El transporte directo de Gemini respondió a una prueba sintética en 1,79 s. Gemma **no se ha ejecutado realmente en este ordenador** por falta de recursos: se verificaron el bloqueo sin modelo y la integración con respuestas simuladas. La ejecución privada completa necesita validación en el otro equipo.
 
-Último #2283: `ju26-issue-2283-mwgdn6hs`, perfil Standard con presupuesto temporal ampliado explícitamente a 600 s, terminó en **5 min 12 s / 43.598 tokens**, sin consumo desconocido. Demanda 4, admitidos 2. Original: 171 tests correctos y tres reproducciones rojo→verde. C1 y C2: 170 correctos y un fallo cada uno; ambos completaron la suite y tienen checkpoints reales. Resultado **7/10, lista para aprobación humana dentro del alcance declarado**, sin fallos confirmados en el original; falta más diversidad de ataques y repetición independiente. Mutación/retirada de cambios no se ejecutan en Standard. Verda agotó el timeout y se sustituyó por Hydrogen, por lo que esta ejecución no demuestra diversidad entre familias. Esta medición no demuestra que el perfil predeterminado de 300 s complete siempre.
+Comprobación histórica anterior a la recuperación de Verda: `ju26-issue-2283-mwgdn6hs`, perfil Standard con presupuesto temporal ampliado explícitamente a 600 s, terminó en **5 min 12 s / 43.598 tokens**, sin consumo desconocido. Demanda 4, admitidos 2. Original: 171 tests correctos y tres reproducciones rojo→verde. C1 y C2: 170 correctos y un fallo cada uno; ambos completaron la suite y tienen checkpoints reales. Resultado **7/10, lista para aprobación humana dentro del alcance declarado**, sin fallos confirmados en el original; falta más diversidad de ataques y repetición independiente. Mutación/retirada de cambios no se ejecutan en Standard. Verda agotó el timeout y se sustituyó por Hydrogen, por lo que esta ejecución no demuestra diversidad entre familias. Esta medición no demuestra que el perfil predeterminado de 300 s complete siempre.
 
 ### Evidencia y comprobación
 
@@ -188,7 +202,7 @@ La fase de tests reserva ahora 30 segundos para el informe, manteniendo Standard
 
 Validación real `ju26-issue-2283-mwg90r70`: **4 min 31 s, 40.859 tokens, 171 tests por versión**. El original pasa; C1 y C2 completan la suite y fallan un test cada uno. Ambos conservan checkpoints de Entire. La preparación de cada candidato fue de unos 38 segundos frente a unos 77 en la ejecución anterior. Resultado: **5/10, evidencia insuficiente** porque E2 no quedó asociado a una prueba admitida. Una respuesta de la ronda posterior del debate se truncó; la ejecución de tests de C2 sí terminó. La puntuación no se fuerza para que el demo aparezca aprobado.
 
-**Verda continúa sin responder con las credenciales recibidas.** URL y modelo coinciden con las instrucciones del evento. GET /models y POST /chat/completions autenticados agotan el plazo, también mediante comprobaciones fuera de OpenCode; una comprobación larga agotó 90 segundos. Las peticiones sin clave y con una clave deliberadamente inválida devuelven HTTP 404 rápidamente. Esto no permite confirmar el estado del despliegue ni de la autenticación sin una respuesta del proveedor. No se ha cambiado de endpoint ni se afirma que Nemotron esté arreglado. La web muestra la sustitución por Google.
+**Diagnóstico histórico, anterior a la recuperación documentada al inicio: Verda no respondía con las credenciales recibidas.** URL y modelo coinciden con las instrucciones del evento. GET /models y POST /chat/completions autenticados agotan el plazo, también mediante comprobaciones fuera de OpenCode; una comprobación larga agotó 90 segundos. Las peticiones sin clave y con una clave deliberadamente inválida devuelven HTTP 404 rápidamente. Esto no permite confirmar el estado del despliegue ni de la autenticación sin una respuesta del proveedor. No se ha cambiado de endpoint ni se afirma que Nemotron esté arreglado. La web muestra la sustitución por Google.
 
 `npm run check:verda` reproduce el diagnóstico sin enviar código y guarda un JSON sin credenciales en `data/diagnostics`. `-- --timeout=90000` amplía cada comprobación hasta 90 segundos. El comando devuelve un código de error mientras catálogo e inferencia no estén disponibles.
 

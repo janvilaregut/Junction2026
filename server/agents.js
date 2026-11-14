@@ -78,16 +78,24 @@ export function parseObject(text) {
 
 export const estimateInputTokens = prompt => Math.ceil(Buffer.byteLength(prompt, 'utf8') / 3) + 4096;
 
+// Fixed local validation messages only: never echo restored private source or
+// arbitrary model output into an unscanned retry prompt.
+const validationHints = {
+  'scenario-metadata-schema': 'test.library must be a C# source string of at most 12000 characters. Put the consuming scenario inside test.source. Katse supplies the attributed resolver; do not supply a resolver field.',
+  'scenario-schema': 'test.kind must be metadata or analyzer and test.source must be a C# source string of at most 12000 characters.',
+  'unfounded-expectation': 'expectations must contain only grounded contract IDs explicitly supplied in the prompt.',
+};
+
 export async function session({ dir, role, model, prompt, artifacts, validate = x => x && typeof x === 'object', timeout = 90000, execute = run, noTools = false, maxOutputTokens = 4096, maxInputTokens = 16000 }) {
   return modelQueue.use(async () => {
     const begin = Date.now();
     const deadline = begin + Math.min(timeout, remaining(timeout));
     const prepared = execution.getStore()?.privacy ? await execution.getStore().privacy.prepare(prompt) : {text:prompt,restore:x=>x,strict:false};
     const id = `${role}-${begin}-${Math.random().toString(36).slice(2, 6)}`;
-    let formatRetry = 0, transientRetry = 0, lastError = '', result;
+    let formatRetry = 0, transientRetry = 0, lastError = '', formatHint = '', result;
     const history = [];
     while (Date.now() < deadline) {
-      const message = prepared.text + (formatRetry ? '\nYour previous response was not valid for the requested JSON schema. Return ONLY valid JSON matching the schema.' : '');
+      const message = prepared.text + (formatRetry ? `\nYour previous response was not valid for the requested JSON schema. ${formatHint} Return ONLY valid JSON matching the schema.` : '');
       const inputEstimate = estimateInputTokens(message);
       if (inputEstimate > maxInputTokens) { lastError = `context-limit: ${inputEstimate} estimated input tokens exceeds ${maxInputTokens}`; break; }
       const outputLimit = Math.max(256, Math.min(8192, Math.floor(maxOutputTokens)));
@@ -132,6 +140,7 @@ export async function session({ dir, role, model, prompt, artifacts, validate = 
       catch (e) {
         const truncated = events.some(e => e.type === 'step_finish' && e.part?.reason === 'length');
         lastError = truncated ? 'session-output-limit' : e.message;
+        formatHint = validationHints[e.message] || 'Check required fields and their types.';
         // Retrying the same prompt and cap cannot repair a truncated response.
         if (!truncated && e.message !== 'session-step-limit' && formatRetry++ < 1) continue;
         break;

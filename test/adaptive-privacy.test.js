@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {populationPlan,allocateGroup,groupMission,updateGroups} from '../server/planner.js';
+import {populationPlan,allocateGroup,groupMission,updateGroups,unverifiedCritical} from '../server/planner.js';
 import {PrivacyGateway,privacyMode,PUBLIC_TIETO,localURL} from '../server/privacy.js';
 import {decisionMissions} from '../server/decisions.js';
 import {privateGenerate} from '../server/private-generation.js';
 import {execution} from '../server/execution.js';
 import {session} from '../server/agents.js';
+import {materializeScenario} from '../server/pipeline/messagepack-harness.js';
 import {liveToken} from '../server/live.js';
 import {ask} from '../server/llm.js';
 import {generate} from '../server/consensus/gemini.js';
@@ -14,6 +15,29 @@ import os from 'node:os';
 import path from 'node:path';
 const group=(id='G1')=>({id,risk:3,unverified:1,disagreement:null,estimatedMs:45000,explored:0,expectations:['E1'],symbol:'Collect',file:'src/Code.cs',start:1,end:20});
 const contract={expectations:[{id:'E1',behavior:'Preserve diagnostics'}]};
+test('one bounded schema retry explains the rejected metadata library field',async()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'katse-schema-test-'));let calls=0;
+  try {
+    const record=await session({dir,artifacts:dir,role:'attack-probe',model:'verda-nemotron/nemotron',prompt:'Return a metadata scenario.',noTools:true,
+      validate:x=>!!materializeScenario(x,'A1'),
+      execute:async(cmd,args,opts)=>{
+        calls++;
+        if(calls===2){assert.match(opts.input,/test.library must be a C# source string/);assert.match(opts.input,/inside test.source/);}
+        return {code:0,ms:1,stderr:'',stdout:JSON.stringify({type:'text',text:JSON.stringify({test:{kind:'metadata',library:calls===1?{}:'class Item {}',source:'class App {}'}})})};
+      }});
+    assert.equal(calls,2);assert.equal(record.result.test.library,'class Item {}');
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('critical attack targets require admitted passing original evidence, never labels or candidate agreement',()=>{
+  const expectations=['E1','E2'].map(id=>({id,critical:true,status:'documented',sources:[{id:'requirement'}]}));
+  expectations.push({id:'pending',critical:true,status:'pending',sources:[]},{id:'optional',critical:false,status:'documented',sources:[{}]});
+  const attack={status:'admitted',expectations:['E1'],targetExpectations:['E1','E2']};
+  const outcome=(a,e)=>e.outcome;
+  assert.deepEqual(unverifiedCritical(expectations,[attack],[{version:'C2',outcome:'passed'}],outcome),['E1','E2']);
+  assert.deepEqual(unverifiedCritical(expectations,[attack],[{version:'original',outcome:'failed'}],outcome),['E1','E2']);
+  assert.deepEqual(unverifiedCritical(expectations,[{...attack,status:'disputed'}],[{version:'original',outcome:'passed'}],outcome),['E1','E2']);
+  assert.deepEqual(unverifiedCritical(expectations,[attack],[{version:'original',outcome:'passed'}],outcome),['E2']);
+});
 test('strict deployment blocks legacy cloud paths before any request',async()=>{
   const old=process.env.KATSE_PRIVACY_MODE;process.env.KATSE_PRIVACY_MODE='strict';
   try {

@@ -17,6 +17,12 @@ export function groupMission(group,contract,decision='repair') {
   if(!group)return 'No executable group';
   return JSON.stringify({group:group.id,file:group.file,symbol:group.symbol,lines:[group.start,group.end],risk:group.risk,riskReason:group.riskReason,mission:decision,expectations:contract.expectations.filter(e=>group.expectations.includes(e.id)).map(e=>({id:e.id,behavior:e.behavior})),instruction:'Focus on this group and its direct dependencies. Preserve every other contract expectation. Do not invent changes outside supplied source blocks.'});
 }
+// This is a work list, never proof of coverage. Only the admitted test's own
+// expectation IDs and an original execution can remove a critical gap.
+export function unverifiedCritical(expectations,attacks,evidence,outcome) {
+  const covered=new Set(attacks.filter(a=>a.status==='admitted' && evidence.some(e=>e.version==='original' && outcome(a,e)==='passed')).flatMap(a=>a.expectations));
+  return expectations.filter(e=>e.critical && e.status!=='pending' && e.sources?.length && !covered.has(e.id)).map(e=>e.id);
+}
 export function updateGroups(groups,attacks,evidence,outcome) {
   for(const g of groups) {
     const relevant=attacks.filter(a=>a.status==='admitted'&&a.expectations.some(id=>g.expectations.includes(id)));
