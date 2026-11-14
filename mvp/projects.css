@@ -1,0 +1,91 @@
+/* Katse · the landing (project picker, the first page) and the projects sidebar. Uses the tokens of app.css. */
+
+/* Projects sidebar: hidden until the button before the logo opens it; it slides over the home without moving it */
+.topl{display:flex;align-items:center;gap:14px}
+.sidebtn{width:38px;height:38px;border-radius:50%;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--fg2);transition:border-color .2s,color .2s}
+.sidebtn:hover{border-color:var(--line2);color:var(--fg)}
+.sidebtn svg,.side svg,.lsearch svg,.pbase svg,.pplus svg{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+.sidebtn svg{width:17px;height:17px;stroke-width:1.6}
+.sscrim{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .25s}
+.side{position:fixed;top:0;bottom:0;left:0;z-index:31;width:280px;max-width:86vw;padding:32px 12px 20px;display:flex;flex-direction:column;background:#111113;border-right:1px solid var(--line);box-shadow:24px 0 80px rgba(0,0,0,.5);transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto}
+body.sideon .side{transform:none}
+body.sideon .sscrim{opacity:1;pointer-events:auto}
+.shead{display:flex;align-items:center;justify-content:space-between;padding:0 4px}
+.shead .logo{font-size:17px}
+.side .logo svg{width:22px;height:22px;fill:var(--fg);stroke:none}
+.sicon{width:38px;height:38px;border-radius:10px;color:var(--fg2);display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+.sicon:hover{background:var(--card2);color:var(--fg)}
+.sicon svg{width:17px;height:17px;stroke-width:1.6}
+.sicon.sm{width:28px;height:28px;border-radius:8px}
+.sicon.sm svg{width:16px;height:16px;stroke-width:2}
+.slabel{display:flex;align-items:center;justify-content:space-between;padding:22px 8px 8px;font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--fg2)}
+.slist{list-style:none;display:flex;flex-direction:column;gap:2px}
+.sitem{width:100%;min-height:48px;display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;text-align:left;transition:background .15s}
+.sitem:hover{background:#1a1a1d}
+.sitem.on{background:var(--card2)}
+.sitem .ptile{width:30px;height:30px;border-radius:9px;font-size:11px}
+.sitem.on .ptile{outline:1.5px solid currentColor}
+.sitem .pname b{font:500 13px var(--body)}
+.sbadge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:rgba(243,226,166,.14);color:var(--warn);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sall{display:flex;align-items:center;gap:10px;margin-top:6px;padding:10px 8px;border-radius:12px;font-size:13px;color:var(--fg2);transition:color .15s}
+.sall:hover{color:var(--fg)}
+.sall svg{width:16px;height:16px;stroke-width:1.8}
+
+/* Landing: the first page is the project picker */
+.landing{position:fixed;inset:0;z-index:35;background:var(--bg);overflow-y:auto;padding:32px 48px 48px}
+.lwrap{width:min(980px,100%);margin:72px auto 0;display:flex;flex-direction:column;gap:26px}
+.lhead{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.ltitle{font-size:clamp(36px,4.4vw,52px)}
+.llead{margin-top:10px;color:var(--fg2);font-size:15px}
+.lsearch{position:relative;width:240px}
+.lsearch svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--fg2);stroke-width:2}
+.lsearch input,.lfield input{width:100%;border:1px solid var(--line);color:var(--fg);outline:none;transition:border-color .2s}
+.lsearch input{padding:10px 12px 10px 34px;border-radius:999px;background:var(--card2);font-size:13px}
+.lsearch input:focus,.lfield input:focus{border-color:var(--line2)}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.pcard{min-height:232px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:18px;border-radius:20px;text-align:left;background:var(--card);border:1px solid rgba(255,255,255,.1);transition:border-color .2s,background .2s,transform .2s}
+.pcard:hover{background:var(--card2);transform:translateY(-2px)}
+.pcard.on{background:var(--card2);border-color:rgba(191,227,208,.45)}
+.phead{display:flex;align-items:center;gap:12px;width:100%}
+.ptile{width:40px;height:40px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font:600 14px var(--head);letter-spacing:.02em}
+.ptile[data-t=file]{background:rgba(205,228,238,.14);color:var(--file)}
+.ptile[data-t=agent]{background:rgba(227,220,244,.14);color:var(--agent)}
+.ptile[data-t=warn]{background:rgba(243,226,166,.14);color:var(--warn)}
+.ptile[data-t=ok]{background:rgba(191,227,208,.14);color:var(--ok)}
+.pname{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.pname b{font:600 16px var(--head);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pname small{font:400 11px var(--mono);color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pnow{display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:rgba(191,227,208,.12);color:var(--ok);font-size:11px;font-weight:500;flex-shrink:0}
+.pnow i{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.pmini{width:100%;height:56px;display:block;fill:none;stroke-width:2;stroke-linecap:round}
+.pmini line{stroke:var(--fg);stroke-opacity:.55}
+.pmini circle{fill:var(--card)}
+.pcard:hover .pmini circle,.pcard.on .pmini circle{fill:var(--card2)}
+.pcount{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--fg2)}
+.pcount span{display:flex;align-items:center;gap:6px}
+.pcount i{width:7px;height:7px;border-radius:50%}
+.pcount i.ring{border:1.5px solid var(--fg2)}
+.pfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;margin-top:auto;padding-top:12px;border-top:1px solid var(--line);font-size:11px;color:var(--fg2)}
+.pfoot>span:last-child{flex-shrink:0}
+.pbase{display:flex;align-items:center;gap:6px;min-width:0;font-family:var(--mono)}
+.pbase span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbase svg{width:13px;height:13px;flex-shrink:0;stroke-width:2}
+.padd{align-items:center;justify-content:center;background:transparent;border:1.5px dashed var(--line2)}
+.padd:hover{background:transparent;border-color:rgba(255,255,255,.28)}
+.padd b{font:600 15px var(--head)}
+.padd small{font-size:12px;color:var(--fg2);text-align:center;max-width:200px}
+.pplus{width:44px;height:44px;border-radius:14px;background:var(--card2);display:flex;align-items:center;justify-content:center}
+.pplus svg{width:20px;height:20px;stroke-width:2}
+.lnone{color:var(--fg2);font-size:13px}
+.ladd{display:flex;flex-direction:column;gap:14px;padding:20px;border-radius:20px;background:var(--card2)}
+.ltabs{display:flex;gap:4px;padding:4px;border-radius:999px;background:var(--card);align-self:flex-start}
+.ltabs button{padding:8px 16px;min-height:36px;border-radius:999px;font-size:13px;font-weight:500;color:var(--fg2)}
+.ltabs button[aria-selected=true]{background:var(--card3);color:var(--fg)}
+.lrow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.lfield{flex:1 1 280px;display:flex;flex-direction:column;gap:6px}
+.lfield label{font-size:12px;color:var(--fg2)}
+.lfield input{padding:13px 14px;border-radius:14px;background:var(--card);font:400 13px var(--mono)}
+.ladd .cta{min-height:46px}
+@media (max-width:760px){.landing{padding:20px 16px 32px}.lwrap{margin-top:40px}.lsearch{width:100%}}
+@media (prefers-reduced-motion:reduce){.side,.sscrim,.pcard{transition:none}}
