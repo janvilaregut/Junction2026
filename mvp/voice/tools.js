@@ -14,11 +14,8 @@ const TOOLS = [
   { name: 'open_pull_request', description: 'Open one pull request full screen. Accepts its id, branch, number, a word from its title, or an ordinal like "first"/"second".', parameters: T({ query: { type: 'STRING' } }, ['query']) },
   { name: 'go_home', description: 'Close the pull request and go back to the branch tree.', parameters: T() },
   { name: 'get_verification_details', description: 'Details of the current pull request verification, for explaining it: verdict lane, recommendation, what was checked and how (tests red-before/green-after, seeded defects, rewind, blind replicas), what was NOT checked and why, the lines the human must read, and the open questions.', parameters: T({ section: { type: 'STRING', enum: ['summary', 'checked', 'not_checked', 'residue', 'questions', 'all'] } }) },
-  { name: 'open_review', description: 'Review & sign: open the review of the open pull request as the agents\' tree, growing out of a spot. Each AI agent that rebuilt the change from the ticket (without seeing the PR) is a branch with twigs for what it touched; when two branches meet the camera zooms in and the two agents argue; the attacker brings its test; everything merges into one trunk that ends in the verdict card, where the user signs (or sends it back, with the agents\' fix if the review found a problem). Use it when the user asks to review, check, prove, fix something, or whether it works. If the branch has no full review yet this STARTS one (minutes, real cost): ask for a yes first. Returns the story so you can narrate it.', parameters: T({ query: { type: 'STRING', description: 'The spot: a line like "985" or "TypeCollector.cs:985", a file name, or empty for the whole change.' } }) },
+  { name: 'open_review', description: 'Review one spot with the agents, shown as the agents\' tree growing out of that node: three AI agents rebuild that one function blind from the requirement (each is a branch), mathematics compares their versions with the pull request, they argue at the junction and it ends in a verdict card (reproduced, differs with a fix, or you decide). Takes about 15 seconds. query: the function name or file:line of the spot; empty = the most pressing open spot. Use it when the user asks to review, check, verify or fix a spot, or asks whether it is right.', parameters: T({ query: { type: 'STRING', description: 'The spot: a line like "985" or "TypeCollector.cs:985", a file name, or empty for the whole change.' } }) },
   { name: 'start_verification', description: 'Start the real review of the current pull request: contract, alternatives rebuilt from the base by AI agents, their debate, attacks on the PR and a judge with a 0-10 score. Profiles: quick (90 s, no alternatives), standard (5 min, default), deep (15 min). Ask the user to confirm first.', parameters: T({ profile: { type: 'STRING', enum: ['quick', 'standard', 'deep'] } }) },
-  { name: 'get_consensus', description: 'Results of the multi-agent consensus for the current pull request: several Gemini agents solved the same requirement blind, a heatmap compared their code zone by zone with the PR, then they debated in pairs until a consensus. Returns agents, where they agreed/disagreed, each debate argument and who convinced whom, and the verdict (coincide = PR matches the consensus, difiere = the consensus proposes something else, dudoso = no clear majority).', parameters: T() },
-  { name: 'start_consensus', description: 'Start a multi-agent consensus check on the current pull request (takes ~15 minutes). Ask the user to confirm first.', parameters: T() },
-  { name: 'open_consensus', description: 'Open the raw technical consensus report page (heatmap, full arguments) for the current pull request. For the visual story of the agents use show_agent_debate instead.', parameters: T() },
   { name: 'show_commits', description: 'Unfold one branch in the tree so all its commits show on a long rail (the other branches fold away). Use when the user asks for the commits / history of a branch. query: id, branch, number, a word from its title, or empty for the one open or in focus.', parameters: T({ query: { type: 'STRING' } }) },
   { name: 'show_all_branches', description: 'Fold the commits back (or zoom back out) and show every branch in the tree again.', parameters: T() },
   { name: 'zoom_branch', description: 'Zoom the home tree\'s camera into one branch: a close-up of where it starts and its first commits, big, on one glowing line (the user can then slide along it). Use when the user asks to zoom in on, enlarge or magnify a branch ("amplíame la rama", "acércate a esa rama"). query: id, branch, number, a word from its title, or empty for the one in focus.', parameters: T({ query: { type: 'STRING' } }) },
@@ -34,12 +31,17 @@ const TOOLS = [
 TOOLS.push(
   { name: 'review_step', description: 'In the review tree: "skip" jumps to the verdict, "replay" plays it again.', parameters: T({ to: { type: 'STRING', enum: ['skip', 'replay'] } }, ['to']) },
   { name: 'leave_review', description: 'Leave the review tree and go back to the graph.', parameters: T() },
-  { name: 'where_to_look', description: 'The spots of code the user should read first (the red "you read it" regions of the graph, where no agent reproduced the PR), lit up in the graph. Use it for "where do I start", "what should I review", "what is risky".', parameters: T() },
+  { name: 'where_to_look', description: 'The spots that still need someone, most pressing first, lit up in the graph: the risky (red) and uncertain (amber) functions that mathematics could not settle and no agent or person has settled since. Use it for "where do I start", "what should I review", "what is risky", "what is left".', parameters: T() },
   { name: 'show_code', description: 'Fly the graph to one code region and return its code (removed and added lines) and which agents also wrote it. query: a line like "1429" or "TypeCollector.cs:985", or a file name. For understanding, not fixing.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
   { name: 'ask_agent', description: 'What one agent did and said in the review: C1, C2 (agents that rebuilt the change from the base), the PR, the attacker, or the judge.', parameters: T({ name: { type: 'STRING' } }, ['name']) },
+  { name: 'review_all', description: 'Send every open spot of the graph to the agents at once (three at a time, about 15 seconds each): the nodes turn green when the agents reproduce them, red when they wrote it differently, and stay amber when a person must decide. Use it for "review everything", "check it all", "turn it green".', parameters: T() },
+  { name: 'graph_overview', description: 'What mathematics settled in the open pull request, without any AI: how many changed functions are proved (the edit cannot change behaviour), cleared (nothing flagged, not a proof), uncertain and risky, how many lines still need someone, and the open spots in order. Use it for "how risky is this", "what did the maths say", "can I approve".', parameters: T() },
+  { name: 'mark_read', description: 'The user says they read a spot and accept it: mark that function as read by them so it turns green. query: the function name or file:line. Only when the user says so.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
   { name: 'look_deeper', description: 'The user wants the change looked at harder: launches a Deep review (up to 15 min, real cost). ASK FOR A YES FIRST.', parameters: T() },
 );
-const RETIRED = new Set(['show_agent_debate', 'debate_step', 'open_agent', 'close_agent', 'leave_debate']); // Fix it tells that story now
+// Retired: the bubbles story. Agents are shown in one place only, the review tree (open_review); the raw
+// consensus page that the voice could open is gone.
+const RETIRED = new Set(['show_agent_debate', 'debate_step', 'open_agent', 'close_agent', 'leave_debate']);
 for (let i = TOOLS.length - 1; i >= 0; i--) if (RETIRED.has(TOOLS[i].name)) TOOLS.splice(i, 1);
 for (const t of TOOLS) t.behavior = 'BLOCKING';
 
@@ -100,32 +102,6 @@ function briefOf(b, section = 'summary') {
   out.otherSections = Object.keys(b).filter((k) => !known.has(k)).slice(0, 20);
   return out;
 }
-async function consensusFor(p) {
-  const r = await fetch('/api/consenso'); if (!r.ok) return { available: false, note: 'The consensus engine is not installed on this server yet.' };
-  const runs = (await r.json()).filter((x) => x.branch === p.branch);
-  if (!runs.length) return { available: true, found: false };
-  const c = await (await fetch(`/api/consenso/${encodeURIComponent(runs[0].id)}`)).json();
-  const sol = c.solutions || {};
-  return {
-    available: true, found: true, id: c.id, status: c.status, model: c.model,
-    agents: (c.agents || []).map((a) => ({ id: a.id, name: a.name, role: a.role, temperature: a.temperature, topP: a.topP, topK: a.topK, files: sol[a.id]?.files, summary: clip(sol[a.id]?.summary, 260), finished: sol[a.id]?.ok !== false, error: sol[a.id]?.error })),
-    heatmap: (c.heatmap?.zones || []).slice(0, 12).map((z) => ({ where: `${z.file}${z.newFile ? ' (new)' : `:${z.start}-${z.end}`}`, agreement: Math.round(z.agreement * 100) + '%', differFromPR: Object.entries(z.cells || {}).filter(([id, v]) => id !== 'PR' && v.same_as_pr === false).map(([id]) => id) })),
-    debates: (c.rounds || []).map((d) => ({ round: d.round, pair: d.pair, outcome: d.hold ? 'nobody convinced the other' : d.kind === 'equivalent' ? `${d.winner} and ${d.loser} are equivalent` : `${d.winner} convinced ${d.loser}`, reason: clip(d.reason, 300), arguments: Object.fromEntries(Object.entries(d.arguments || {}).map(([k, v]) => [k, { argument: clip(v.argument || v.argumento, 420), flaws: (v.rival_flaws || v.fallos_rival || []).slice(0, 3) }])) })),
-    verdict: c.verdict ? { verdict: c.verdict.verdict, confidence: c.verdict.confidence, majority: c.verdict.members, prInConsensus: c.verdict.prInConsensus, prConceded: c.verdict.prConceded, summary: c.verdict.summary, issues: c.verdict.issues } : null,
-  };
-}
-let overlay = null;
-function showConsensus(id) {
-  overlay?.remove();
-  overlay = document.createElement('div'); overlay.className = 'm-overlay';
-  overlay.innerHTML = `<div class="m-sheet"><button class="m-x" type="button" aria-label="Close">×</button><iframe title="Consensus" src="/consenso.html?id=${encodeURIComponent(id)}"></iframe></div>`;
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add('on'));
-  const close = () => { overlay?.classList.remove('on'); const o = overlay; overlay = null; setTimeout(() => o?.remove(), 400); };
-  overlay.querySelector('.m-x').onclick = close;
-  overlay.onclick = (e) => { if (e.target === overlay) close(); };
-}
-
 const TOOL_FN = {
   async get_screen() {
     const s = app(); const v = view(); const p = s?.cur && v !== 'home' ? s.cur : null;
@@ -133,7 +109,8 @@ const TOOL_FN = {
     const f = v === 'commits' ? s.focus : v === 'zoom' ? s.zoom : null;
     return {
       view: v, project: project?.name, base: s?.base, pullRequest: p ? prBrief(p, allPRs().findIndex((x) => x.id === p.id)) : null, verification: p ? briefOf(s.run?.brief, 'summary') : null, verifyingNow: !!s?.es,
-      graphNodes: v === 'graph' ? graphSummary() : undefined,
+      graphNodes: v === 'graph' && !s?.math ? graphSummary() : undefined,
+      mathematics: v === 'graph' && s?.math ? { proved: s.math.summary.nodes.proved, cleared: s.math.summary.nodes.cleared, uncertain: s.math.summary.nodes.uncertain, risky: s.math.summary.nodes.risky, openNow: (call('mathQueue') || []).slice(0, 8).map((x) => ({ name: x.name, state: x.state, why: x.why })), selected: s.fixTarget?.label || null } : undefined,
       commitsShown: f ? { branch: allPRs().find((x) => x.id === f.id)?.branch, total: f.total, commits: f.commits.map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date })) } : undefined,
       agentsStory: v === 'debate' || v === 'agent' ? call('debateInfo') : undefined,
       review: v === 'review' ? call('treeInfo') : undefined,
@@ -225,6 +202,13 @@ const TOOL_FN = {
   async where_to_look() {
     if (!inGraph()) return { error: 'Open a pull request first.' };
     if (call('treeOpen')) { call('closeTree'); await sleep(700); }
+    if (app()?.math) { // the mathematical graph: the open spots, most pressing first
+      const q = call('mathQueue') || [];
+      if (!q.length) return { open: 0, note: 'Nothing is left: every changed spot is proved, cleared or settled.' };
+      call('focusOn', q.slice(0, 6).map((x) => x.id), { noTip: true });
+      act(`${q.length} spot${q.length === 1 ? '' : 's'} to review`);
+      return { open: q.length, spots: q.slice(0, 8).map((x) => ({ name: x.name, where: `${x.file}:${x.line}`, state: x.state, why: x.why, lines: x.lines, dependents: x.dependents })), tip: 'Say the first one in plain words. open_review reviews one with the agents; review_all sends them all.' };
+    }
     const list = call('focusGraph', 'what I must read');
     if (!list) return { error: 'No red regions: nothing is left only for the human, or the branch is not verified yet.', nodes: graphSummary() };
     act(`${list.length} spot${list.length === 1 ? '' : 's'} to read`);
@@ -276,11 +260,47 @@ const TOOL_FN = {
   async open_review({ query = '' } = {}) {
     if (!inGraph()) return { error: 'Open a pull request first.' };
     if (call('debateOpen')) call('closeDebate');
-    const r = await call('openTree', { query });
+    let r;
+    if (app()?.math) { // one function of the mathematical graph, reviewed alone by three agents
+      const g = typeof G !== 'undefined' ? G : null;
+      const hit = query ? (call('findNodes', query) || []).find((n) => n.kind === 'sym') : null;
+      const next = (call('mathQueue') || []).find((x) => g?.nodes.get(x.id)?.kind === 'sym');
+      const node = hit || (query ? null : app().fixTarget || (next && g.nodes.get(next.id)));
+      if (!node) return query ? { error: `No changed function matches "${query}".`, open: (call('mathQueue') || []).map((x) => x.name).slice(0, 12) } : { error: 'There is no open spot left to review. For the whole pull request use start_verification.' };
+      call('focusOn', [node.id], { noTip: true }); await sleep(500);
+      r = await call('openReview', { node });
+      if (r && !r.error) { act(`Review · ${node.label}`); return { ...r, spot: node.label, result: r.verdict?.label, note: 'Say what the agents concluded in one or two sentences: reproduced, or the concrete input where they differ and the rule of the requirement that decides it. The verdict card has the fix.' }; }
+    } else r = await call('openTree', { query });
     if (!r) return { error: 'Could not open the review.' };
     if (r.error) return r;
     act(r.spot ? `Review · ${r.spot.where}` : 'Review');
     return { ...r, note: r.live ? 'A real review is running now: the tree grows live and continues with the debate and verdict when it ends (minutes). Say so.' : 'Narrate it while it plays: who rebuilt it, the debate, the attack, the verdict; at the end the user signs in the card.' };
+  },
+  async review_all() {
+    if (!inGraph() || !app()?.math) return { error: 'Open a pull request first.' };
+    if (call('treeOpen')) { call('closeTree'); await sleep(700); }
+    const before = (call('mathQueue') || []).length;
+    if (!before) return { open: 0, note: 'Nothing is left to review.' };
+    act(`Agents review ${before} spot${before === 1 ? '' : 's'}`);
+    const res = await call('reviewAll');
+    const s = app(), left = call('mathQueue') || [];
+    const by = {}; for (const m of Object.values(s.marks || {})) by[m.state] = (by[m.state] || 0) + 1;
+    return { started: res !== false, reviewedByAgents: res?.reviewed ?? 0, reproduced: by.reproduced || 0, differ: by.differs || 0, forThePerson: by.unclear || 0, stillOpen: left.map((x) => ({ name: x.name, state: x.state, why: x.why })).slice(0, 8), note: 'Say how many turned green, which ones the agents wrote differently (red) and why, and what is left for the user.' };
+  },
+  async graph_overview() {
+    const s = app(); if (!inGraph() || !s?.math) return { error: 'Open a pull request first.' };
+    const m = s.math.summary, q = call('mathQueue') || [];
+    return { settledByMathematics: { proved: m.nodes.proved, cleared: m.nodes.cleared }, open: { uncertain: m.nodes.uncertain, risky: m.nodes.risky, now: q.length }, lines: { total: m.lines.total, proved: m.lines.proved, cleared: m.lines.cleared, needSomeone: q.reduce((n, x) => n + x.lines, 0) },
+      first: q.slice(0, 5).map((x) => ({ name: x.name, where: `${x.file}:${x.line}`, state: x.state, why: x.why })), dependencyGraph: m.graph, decisionModel: m.routing?.status === 'used' ? `asked, raised ${m.routing.adopted.length} node(s)` : m.routing?.status,
+      meaning: 'proved = a proof that the edit cannot change behaviour (same tokens, or only local variables renamed). cleared = nothing flagged and low exposure, NOT a proof. uncertain / risky = behaviour changed and mathematics cannot vouch for it: these go to the agents and to the person. Node size = how much code depends on it.', limits: s.math.limits };
+  },
+  async mark_read({ query }) {
+    const s = app(); if (!inGraph() || !s?.math) return { error: 'Open a pull request first.' };
+    const node = (call('findNodes', query) || []).find((n) => n.kind === 'sym' || n.kind === 'grp');
+    if (!node) return { error: `No changed spot matches "${query}".` };
+    const ok = await call('markNode', node.id, 'read');
+    if (ok) act(`Read · ${node.label}`);
+    return { ok: !!ok, left: (call('mathQueue') || []).length };
   },
   async start_verification({ profile = 'standard' } = {}) {
     const s = app(); if (!s?.cur || !inGraph()) return { error: 'Open a pull request first.' };
@@ -289,28 +309,6 @@ const TOOL_FN = {
     const started = (await call('verify')) !== false;
     if (started) act(`Reviewing (${s.profile})`);
     return started ? { started: true, profile: s.profile, note: 'Live progress shows in the bottom bar; when it ends the graph, the score and the agents story update with the real result.' } : { started: false, note: 'A verification is already running or starting, or no pull request is open.' };
-  },
-  async get_consensus() {
-    const s = app(); const p = s?.cur && view() !== 'home' ? s.cur : null;
-    if (!p) return { error: 'Open a pull request first.' };
-    return consensusFor(p);
-  },
-  async start_consensus() {
-    const s = app(); const p = s?.cur && view() !== 'home' ? s.cur : null;
-    if (!p) return { error: 'Open a pull request first.' };
-    const project = s.projects.find((x) => x.id === s.pid);
-    const r = await fetch('/api/consenso', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: project.path, branch: p.branch, base: s.base, lang: 'en' }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: j.error || `Server answered ${r.status}` };
-    act('Consensus started'); showConsensus(j.id);
-    return { started: true, id: j.id, note: 'Takes about 15 minutes; the live view is open.' };
-  },
-  async open_consensus() {
-    const s = app(); const p = s?.cur && view() !== 'home' ? s.cur : null;
-    if (!p) return { error: 'Open a pull request first.' };
-    const c = await consensusFor(p);
-    if (!c.found) return { error: c.note || 'There is no consensus run for this pull request yet.' };
-    showConsensus(c.id); act('Consensus view'); return { opened: true };
   },
   async end_conversation() { end(); return { ok: true, note: 'Say a very short goodbye (2-4 words); the voice closes when you finish.' }; },
 };
