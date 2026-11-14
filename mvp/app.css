@@ -14,9 +14,9 @@ a{color:var(--file)}
 body{display:flex;flex-direction:column;min-height:100vh;padding:32px 48px 28px;overflow-x:hidden}
 ::selection{background:rgba(205,228,238,.25)}
 /* The home zooms toward the branch you open and fades; closing brings it back from the same point. */
-#home{flex:1 0 auto;display:flex;flex-direction:column;transform-origin:var(--ox,50%) var(--oy,50%);transition:transform .95s cubic-bezier(.65,0,.2,1),opacity .6s ease,filter .8s ease}
+#home{flex:1 0 auto;display:flex;flex-direction:column;transform-origin:var(--ox,50%) var(--oy,50%);transition:transform .95s cubic-bezier(.65,0,.2,1),opacity .6s ease} /* zoom + fade only: both run on the compositor (a blur here was a full-screen filter on every frame) */
 body.dive{overflow:hidden}
-body.dive #home{transform:scale(1.45);opacity:0;filter:blur(5px);pointer-events:none}
+body.dive #home{transform:scale(1.45);opacity:0;pointer-events:none}
 
 /* Header */
 .top{display:flex;justify-content:space-between;align-items:center}
@@ -50,7 +50,8 @@ body:has(.mascot) .gfoot{padding-right:120px} /* keep the folded-branches button
 #tree.hl .lane{opacity:.16}#tree.hl .lane.on{opacity:1}
 .lane .tipring{transition:r .25s}.lane.on .tipring{r:14}
 .lane:focus{outline:none}.lane:focus-visible .tipring{r:15;stroke-opacity:.8;stroke-width:1.6}
-.lane.pulse .tipring{animation:pulse 2.4s ease-in-out infinite}
+.lane.pulse .tipring{animation:pulse 2.4s steps(10) infinite} /* stepped: ~8 repaints a second instead of one per frame, the same look */
+body.dive .lane.pulse .tipring{animation-play-state:paused}
 @keyframes pulse{50%{stroke-opacity:.05}}
 .lbl{font:600 13px var(--head);fill:var(--fg)}
 .lbl.old{font-weight:500;fill:var(--fg2);font-size:12px}
@@ -100,7 +101,7 @@ body:has(.mascot) .gfoot{padding-right:120px} /* keep the folded-branches button
 
 /* Full-screen graph */
 .full{position:fixed;inset:0;z-index:10}
-#g{position:absolute;inset:0;width:100%;height:100%;touch-action:none;transition:opacity .5s ease,transform .8s cubic-bezier(.2,.8,.2,1),filter .6s ease}
+#g{position:absolute;inset:0;width:100%;height:100%;touch-action:none;transition:opacity .5s ease,transform .8s cubic-bezier(.2,.8,.2,1)}
 #g.panning{cursor:grabbing}
 /* The chrome arrives after the graph has started to move, and leaves first. */
 .full .back,.full .flegend,.full .agentsBtn,.full .fbar{opacity:0;transition:opacity .25s ease,left .35s cubic-bezier(.2,.9,.25,1)}
@@ -145,7 +146,7 @@ body:has(#drawer:not([hidden])) .flegend{display:none}
 #g .lk{transition:opacity .25s}
 #g.hl .lk{opacity:.07}#g.hl .lk.on{opacity:1;stroke:#fff;stroke-opacity:.6}
 #g.hl .nd{opacity:.15}#g.hl .nd.on{opacity:1}
-.tip{position:fixed;z-index:30;pointer-events:none;background:var(--fg);color:#111;border-radius:14px;padding:9px 12px;font:500 12.5px/1.35 var(--body);max-width:280px;transform:translate(-50%,calc(-100% - 18px));opacity:0;transition:opacity .15s}
+.tip{position:fixed;left:0;top:0;z-index:30;pointer-events:none;background:var(--fg);color:#111;border-radius:14px;padding:9px 12px;font:500 12.5px/1.35 var(--body);max-width:280px;transform:translate(-50%,calc(-100% - 18px));opacity:0;transition:opacity .15s}
 .tip.on{opacity:1}.tip small{display:block;opacity:.6;font-size:11.5px;margin-top:2px}
 
 /* Review drawer */
@@ -334,12 +335,13 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 .sw:disabled{opacity:.5;cursor:default}
 
 /* Fix it: the agents' tree. The graph dives into the clicked spot and a tree grows from it; junctions are debates. */
-#full.infix #g{transform:scale(2.3);opacity:0;filter:blur(3px);pointer-events:none;transition:transform 1.1s cubic-bezier(.2,.8,.2,1),opacity .8s ease,filter .8s ease}
+#full.infix #g{transform:scale(2.3);opacity:0;pointer-events:none;transition:transform 1.1s cubic-bezier(.2,.8,.2,1),opacity .8s ease}
 #full.infix .flegend,#full.infix .fbar{opacity:0;pointer-events:none;transition:opacity .25s ease}
 .cta small.spot{font:500 11px var(--mono);opacity:.6;margin-left:4px}
 .fix{position:absolute;inset:0;z-index:1;opacity:0;transition:opacity .5s ease .1s}
 .fix.on{opacity:1}
-.fix svg{position:absolute;inset:0;width:100%;height:100%}
+.fix svg,.fix canvas{position:absolute;inset:0;width:100%;height:100%}
+.fix canvas{pointer-events:none}
 .fblab{font:600 14px var(--head);fill:#16161a;text-anchor:middle;pointer-events:none;transition:opacity .25s}
 .fblab.sub{font:500 10.5px var(--body);fill:#45454c}
 .flab{font:500 12px var(--body);fill:var(--fg2)}
@@ -353,7 +355,7 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 .fctl button:hover{color:var(--fg)}
 .fctl #fclose{padding:0;font-size:18px}
 .fsays{position:absolute;inset:0;pointer-events:none;z-index:2}
-.fsay{position:absolute;width:max-content;max-width:min(320px,40vw);padding:12px 16px 13px;border-radius:20px;background:rgba(24,24,27,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line2);box-shadow:0 18px 50px rgba(0,0,0,.5);font:500 15px/1.4 var(--head);color:var(--fg);opacity:0;transform:scale(.92) translateY(6px);transition:opacity .3s ease,transform .5s cubic-bezier(.3,1.4,.5,1)}
+.fsay{position:absolute;left:0;top:0;width:max-content;max-width:min(320px,40vw);padding:12px 16px 13px;border-radius:20px;background:rgba(24,24,27,.97);border:1px solid var(--line2);box-shadow:0 18px 50px rgba(0,0,0,.5);font:500 15px/1.4 var(--head);color:var(--fg);opacity:0;transform:scale(.92) translateY(6px);transition:opacity .3s ease,transform .5s cubic-bezier(.3,1.4,.5,1)}
 .fsay.on{opacity:1;transform:none}
 .fsay b{display:flex;gap:7px;align-items:center;font:600 10.5px var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--fg2);margin-bottom:5px}
 .fsay b i{width:8px;height:8px;border-radius:50%;flex:0 0 8px}

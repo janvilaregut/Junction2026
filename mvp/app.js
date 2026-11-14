@@ -33,6 +33,10 @@ async function api(path, opts) {
 
 const NS = 'http://www.w3.org/2000/svg';
 const mk = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+/* Animation loops write through these: a write whose text did not change is skipped, because in SVG even an
+   identical write can cost style, layout and a repaint. Use them for every attribute a loop animates. */
+const setA = (el, k, v) => { const c = el.__a || (el.__a = {}); if (c[k] !== v) { c[k] = v; el.setAttribute(k, v); } };
+const setS = (el, k, v) => { const c = el.__s || (el.__s = {}); if (c[k] !== v) { c[k] = v; el.style[k] = v; } };
 const PAL = { ok: '#bfe3d0', warn: '#f3e2a6', bad: '#f2a99f', no: '#55555c', file: '#cde4ee', filedim: '#4d585d', agent: '#e3dcf4', core: '#f5f5f7' };
 const S = { projects: [], agents: [], pid: null, prs: { incoming: [], outgoing: [] }, base: '', expanded: false, cur: null, run: null, plan: null, mode: 'quick', es: null, stage: '', t0: 0, timer: 0 };
 /* The real review pipeline (server/pipeline/complete.js) runs with a profile: a time and token budget. */
@@ -87,7 +91,7 @@ async function init() {
 }
 async function loadProject(id) {
   closeGraph();
-  Object.assign(S, { pid: id, prs: { incoming: [], outgoing: [] }, base: '', expanded: false, hl: [], cur: null, treeW: 0, focus: null, zoom: null, unfold: false, commits: {} });
+  Object.assign(S, { pid: id, prs: { incoming: [], outgoing: [] }, prsKey: '', base: '', expanded: false, hl: [], cur: null, treeW: 0, focus: null, zoom: null, unfold: false, commits: {} });
   focusTok++; // a commits request still in flight belongs to the previous project
   store.set('katse.project', id);
   $('projName').textContent = S.projects.find((p) => p.id === id)?.name || id;
@@ -99,9 +103,10 @@ async function reloadPRs() {
   const pid = S.pid;
   const prs = await api(`/projects/${pid}/prs`);
   if (pid !== S.pid) return; // the project changed while this was loading
-  S.prs = prs; S.base = prs.base;
+  const same = S.prsKey === pid + JSON.stringify(prs); // a reload that changed nothing redraws nothing
+  S.prs = prs; S.base = prs.base; S.prsKey = pid + JSON.stringify(prs);
   if (S.cur) S.cur = [...prs.incoming, ...prs.outgoing].find((p) => p.id === S.cur.id) || S.cur;
-  renderTree();
+  if (!same || S.treeStale || !$('tree').firstChild) renderTree(); else applyHighlight();
 }
 function projectsModal(first) {
   modal(`<h2>${first ? 'Pick a project' : 'Projects'}</h2><p class="lead">Katse works on a git repository. It never writes inside it: it uses throwaway copies.</p>
@@ -151,6 +156,7 @@ $('gear').onclick = settingsModal;
 
 /* ── Home: left = history, centre = you, right = merges still to come ── */
 function renderTree() {
+  S.treeStale = false;
   const svg = $('tree'); svg.innerHTML = '';
   svg.classList.remove('hl', 'zoomed'); $('card').classList.remove('on');
   const W = Math.max(svg.parentElement.clientWidth, 760);
@@ -212,8 +218,10 @@ function renderTree() {
       }
       mk('text', { x: tipX, y: dir < 0 ? y - (faint ? 11 : 17) : y + 25, 'text-anchor': 'middle', class: 'lbl' + (faint ? ' old' : '') }, g).textContent = dir > 0 ? name(p) + ' · yours' : name(p);
       mk('path', { d: faint ? fork : fork + ' ' + merge, fill: 'none', stroke: 'transparent', 'stroke-width': Math.max(GAP - 8, 18) }, g);
-      const enter = () => { svg.classList.add('hl'); g.classList.add('on'); showCard(p, st, tipX, y, dir); };
-      const leave = () => { g.classList.remove('on'); $('card').classList.remove('on'); applyHighlight(); };
+      // Moving from one branch to the next must not switch the dimming off and on: toggling 'hl' on the whole tree
+      // restyles all of it, twice. Leaving clears it on the next frame, unless another branch was entered by then.
+      const enter = () => { cancelAnimationFrame(S.hlRaf); if (!svg.classList.contains('hl')) svg.classList.add('hl'); g.classList.add('on'); showCard(p, st, tipX, y, dir); };
+      const leave = () => { g.classList.remove('on'); $('card').classList.remove('on'); cancelAnimationFrame(S.hlRaf); S.hlRaf = requestAnimationFrame(applyHighlight); };
       const open = () => openGraph(p);
       g.onmouseenter = enter; g.onmouseleave = leave; g.onfocus = enter; g.onblur = leave; g.onclick = open;
       g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } else if (e.key === 'c') showCommits(p.id); else if (e.key === 'z') zoomBranch(p.id); };
@@ -518,13 +526,15 @@ function highlightLanes(ids) {
 /* The lasting highlight (S.hl) survives re-renders and hovers; a hover only adds to it for a moment. */
 function applyHighlight() {
   const svg = $('tree'); const want = new Set(S.hl || []);
-  svg.classList.toggle('hl', want.size > 0);
-  svg.querySelectorAll('.lane').forEach((g) => g.classList.toggle('on', want.has(g.dataset.pr)));
+  if (svg.classList.contains('hl') !== want.size > 0) svg.classList.toggle('hl', want.size > 0);
+  svg.querySelectorAll('.lane').forEach((g) => { const on = want.has(g.dataset.pr); if (g.classList.contains('on') !== on) g.classList.toggle('on', on); });
 }
 $('more').onclick = () => { S.expanded = !S.expanded; renderTree(); if (S.expanded) $('more').scrollIntoView({ block: 'end', behavior: 'smooth' }); };
-let resizeTimer = 0;
+let resizeTimer = 0, resizeRaf = 0;
 addEventListener('resize', () => {
-  if (S.pid) renderTree();
+  G.fp = null; // the free area moved
+  // Resize fires many times per frame while dragging a window edge: redraw the tree at most once per frame, and only when the home shows.
+  if (S.pid && !resizeRaf) resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; if (!document.body.classList.contains('dive')) renderTree(); else S.treeStale = true; });
   clearTimeout(resizeTimer); // the graph is fitted to the screen, so fit it again once resizing stops
   resizeTimer = setTimeout(() => { if (!$('full').hidden && S.model) renderGraph(S.model); }, 250);
 });
@@ -643,10 +653,14 @@ function spring(o, key, target, K, dt, z = 1) {
 const radius = (n) => (n.kind === 'core' ? CORE_R : n.kind === 'zone' ? 6 : n.kind === 'file' ? 9 + Math.min(n.deg || 0, 6) * 0.8 : 10);
 const toScreen = (x, y) => [x * G.cam.k + G.cam.x, y * G.cam.k + G.cam.y];
 const toWorld = (x, y) => [(x - G.cam.x) / G.cam.k, (y - G.cam.y) / G.cam.k];
-/* The middle of the free area, between the header and the bar. */
+/* The middle of the free area, between the header and the bar.
+   It reads layout, so it is remembered for a moment: the camera loop asks for it every frame. */
 function focusPoint() {
+  const now = performance.now();
+  if (G.fp && now - G.fpT < 250) return G.fp;
   const bar = $('fbar').getBoundingClientRect().top || innerHeight - 100;
-  return [innerWidth / 2, (90 + bar) / 2];
+  G.fp = [innerWidth / 2, (90 + bar) / 2]; G.fpT = now;
+  return G.fp;
 }
 
 function resetGraph() {
@@ -655,12 +669,16 @@ function resetGraph() {
   Object.assign(G.cam, { x: 0, y: 0, k: 1, tx: 0, ty: 0, tk: 1, vx: 0, vy: 0, vk: 0 });
   G.camEl = mk('g', {}, svg); G.gl = mk('g', {}, G.camEl); G.gn = mk('g', {}, G.camEl);
 }
+/* A node is a group that only moves (translate) holding a shape that grows (scale) and a label that never scales.
+   Blink lays out and reshapes SVG text again whenever the scale above it changes: with the label inside the scaled
+   group, every frame of the bloom and of the collapse re-laid out every label. */
 function nodeEl(n) {
   const g = mk('g', { class: `nd ${n.kind}${n.kind !== 'zone' ? ' big' : ''}` });
+  const sh = (n.sh = mk('g', {}, g));
   const c = PAL[n.tone] || PAL.no, r = radius(n);
-  if (n.kind === 'core') { mk('circle', { r: r + 12, fill: 'none', stroke: '#f5f5f7', 'stroke-opacity': 0.1 }, g); n.body = mk('circle', { r, class: 'body', style: `fill:${c}` }, g); }
-  else if (n.kind === 'check' || n.kind === 'agent') mk('rect', { x: -r, y: -r, width: 2 * r, height: 2 * r, rx: r * 0.5, fill: c }, g);
-  else mk('circle', { r, fill: c }, g);
+  if (n.kind === 'core') { mk('circle', { r: r + 12, fill: 'none', stroke: '#f5f5f7', 'stroke-opacity': 0.1 }, sh); n.body = mk('circle', { r, class: 'body', style: `fill:${c}` }, sh); }
+  else if (n.kind === 'check' || n.kind === 'agent') mk('rect', { x: -r, y: -r, width: 2 * r, height: 2 * r, rx: r * 0.5, fill: c }, sh);
+  else mk('circle', { r, fill: c }, sh);
   mk('text', { y: r + 17, 'text-anchor': 'middle' }, g).textContent = n.label;
   g.onmouseenter = () => hoverNode(n);
   g.onmouseleave = () => hoverNode(null);
@@ -668,11 +686,11 @@ function nodeEl(n) {
   n.el = g; n.lab = false;
   return g;
 }
-const place = (n) => n.el.setAttribute('transform', `translate(${n.x.toFixed(1)},${n.y.toFixed(1)}) scale(${Math.max(0.001, n.s).toFixed(3)})`);
+const place = (n) => { setA(n.el, 'transform', `translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`); setA(n.sh, 'transform', `scale(${Math.max(0.001, n.s).toFixed(3)})`); };
 
 /* The branch's dot, already in the graph before anything has loaded: it is what the person clicked. */
 function seedGraph(x, y, tone) {
-  resetGraph();
+  resetGraph(); G.paused = false; G.fp = null;
   const [cx, cy] = focusPoint();
   const n = { id: 'pr', label: 'PR', kind: 'core', tone: 'core', info: 'The whole change', depth: 0, i: 0, x, y, bx: cx, by: cy, s: TIP_S, ts: 1, at: 0, K: 0.016 };
   G.gn.appendChild(nodeEl(n)); n.body.style.fill = PAL[tone] || PAL.core;
@@ -714,30 +732,44 @@ function renderGraph(m) {
   startLoop();
 }
 
-function startLoop() { if (!G.raf) { G.t = 0; G.raf = requestAnimationFrame(frame); } }
-function stopLoop() { cancelAnimationFrame(G.raf); G.raf = 0; }
+/* The loop runs at full rate only while something travels (a node, the camera, a hand on the graph). Once
+   everything has arrived, only the breathing is left: a drift of a pixel or two that looks the same at
+   ~20 updates a second, so the loop naps between frames and the page mostly rests.
+   While Fix it covers the graph the loop stops altogether (pauseGraph). */
+function startLoop() {
+  if (G.paused) return;
+  if (G.nap) { clearTimeout(G.nap); G.nap = 0; }
+  if (!G.raf) G.raf = requestAnimationFrame(frame);
+}
+function stopLoop() { cancelAnimationFrame(G.raf); clearTimeout(G.nap); G.raf = 0; G.nap = 0; G.t = 0; }
+function pauseGraph(on) { G.paused = !!on; if (on) stopLoop(); else startLoop(); }
+const NAP_MS = 40;
 function frame(now) {
-  G.raf = requestAnimationFrame(frame);
+  G.raf = 0;
   const dt = G.t ? Math.min(3, (now - G.t) / 16.667) : 1; G.t = now;
   const ts = now / 1000;
+  const fp = G.focus ? focusPoint() : null; // layout is read before anything is written this frame
+  let moving = false;
   for (const n of G.nodes.values()) {
     if (now >= n.at) {
       const w = n.kind === 'core' || n.follow || RM ? 0 : 1.6; // a slow breathing so the graph feels alive
       const gx = n.follow ? n.follow.x : n.bx + Math.sin(ts * 0.7 + n.i * 1.3) * w;
       const gy = n.follow ? n.follow.y : n.by + Math.cos(ts * 0.6 + n.i * 0.9) * w;
       if (RM) { n.x = gx; n.y = gy; n.s = n.ts; }
-      else { spring(n, 'x', gx, n.K, dt); spring(n, 'y', gy, n.K, dt); spring(n, 's', n.ts, n.K * 1.7, dt, 0.82); }
-    }
+      else {
+        spring(n, 'x', gx, n.K, dt); spring(n, 'y', gy, n.K, dt); spring(n, 's', n.ts, n.K * 1.7, dt, 0.82);
+        if (!moving && (Math.abs(n.vx) > 0.06 || Math.abs(n.vy) > 0.06 || Math.abs(n.vs) > 0.002 || Math.abs(n.ts - n.s) > 0.004 || Math.abs(gx - n.x) > 3 || Math.abs(gy - n.y) > 3)) moving = true;
+      }
+    } else moving = true; // still waiting to grow
     place(n);
     if (!n.lab && n.ts === 1 && n.s > 0.85) { n.lab = true; n.el.classList.add('lab'); }
     else if (n.lab && n.ts !== 1) { n.lab = false; n.el.classList.remove('lab'); }
   }
   for (const l of G.links) {
-    l.el.setAttribute('x1', l.a.x.toFixed(1)); l.el.setAttribute('y1', l.a.y.toFixed(1));
-    l.el.setAttribute('x2', l.b.x.toFixed(1)); l.el.setAttribute('y2', l.b.y.toFixed(1));
+    setA(l.el, 'x1', l.a.x.toFixed(1)); setA(l.el, 'y1', l.a.y.toFixed(1));
+    setA(l.el, 'x2', l.b.x.toFixed(1)); setA(l.el, 'y2', l.b.y.toFixed(1));
     const o = Math.max(0, Math.min(1, l.a.s, l.b.s));
-    if (o > 0.98) { if (l.op !== 1) { l.el.style.opacity = ''; l.op = 1; } }
-    else { l.el.style.opacity = o.toFixed(3); l.op = o; }
+    setS(l.el, 'opacity', o > 0.98 ? '' : o.toFixed(2));
   }
   const c = G.cam;
   if (G.focus) {
@@ -746,20 +778,29 @@ function frame(now) {
       const xs = list.map((n) => n.x), ys = list.map((n) => n.y);
       const fx = (Math.min(...xs) + Math.max(...xs)) / 2, fy = (Math.min(...ys) + Math.max(...ys)) / 2;
       // While something is being talked about, the camera keeps drifting in, slowly.
-      const k = G.focus.k * (RM || G.focus.still ? 1 : 1 + 0.06 * Math.min(1, (now - G.focus.t0) / 9000));
-      const [px, py] = focusPoint();
-      c.tk = k; c.tx = px - fx * k; c.ty = py - fy * k;
+      const drift = RM || G.focus.still ? 1 : 1 + 0.06 * Math.min(1, (now - G.focus.t0) / 9000);
+      if (drift > 1 && now - G.focus.t0 < 9000) moving = true;
+      const k = G.focus.k * drift;
+      c.tk = k; c.tx = fp[0] - fx * k; c.ty = fp[1] - fy * k;
     }
   }
   if (RM) Object.assign(c, { x: c.tx, y: c.ty, k: c.tk });
-  else { const K = G.focus?.K || 0.02; spring(c, 'x', c.tx, K, dt); spring(c, 'y', c.ty, K, dt); spring(c, 'k', c.tk, K, dt); }
-  G.camEl.setAttribute('transform', `translate(${c.x.toFixed(2)},${c.y.toFixed(2)}) scale(${c.k.toFixed(4)})`);
+  else {
+    const K = G.focus?.K || 0.02; spring(c, 'x', c.tx, K, dt); spring(c, 'y', c.ty, K, dt); spring(c, 'k', c.tk, K, dt);
+    if (Math.abs(c.vx) > 0.05 || Math.abs(c.vy) > 0.05 || Math.abs(c.vk) > 0.0002 || Math.abs(c.tx - c.x) > 0.5 || Math.abs(c.ty - c.y) > 0.5 || Math.abs(c.tk - c.k) > 0.001) moving = true;
+  }
+  setA(G.camEl, 'transform', `translate(${c.x.toFixed(1)},${c.y.toFixed(1)}) scale(${c.k.toFixed(4)})`);
   if (G.pin && !G.hover) { const n = G.nodes.get(G.pin); if (n) tipAt(n); }
+  if (G.paused) return;
+  if (moving || G.drag || G.pan) G.raf = requestAnimationFrame(frame);
+  else G.nap = setTimeout(() => { G.nap = 0; G.raf = requestAnimationFrame(frame); }, RM ? 400 : NAP_MS);
 }
 function tipAt(n) {
   const tip = $('tip'); const [sx, sy] = toScreen(n.x, n.y);
   if (tip.dataset.id !== n.id) { tip.dataset.id = n.id; tip.innerHTML = `${esc(n.label)}<small>${esc(n.info)}</small>`; }
-  tip.style.left = sx + 'px'; tip.style.top = sy - radius(n) * n.s * G.cam.k + 'px'; tip.classList.add('on');
+  // Moved with a transform, not left/top: no layout, and the compositor can do it.
+  setS(tip, 'transform', `translate(${sx.toFixed(1)}px,${(sy - radius(n) * n.s * G.cam.k).toFixed(1)}px) translate(-50%,calc(-100% - 18px))`);
+  if (!tip.classList.contains('on')) tip.classList.add('on');
 }
 function hoverNode(n) {
   if (G.drag || G.pan?.moved) return;
@@ -792,18 +833,18 @@ function focusOn(ids, opts = {}) {
   G.focus = { ids: list.map((n) => n.id), k, t0: performance.now(), K: opts.K, still: opts.still };
   G.pin = list.length === 1 && !opts.noTip ? list[0].id : null;
   if (!G.pin) $('tip').classList.remove('on');
-  paintHL();
+  paintHL(); startLoop();
   return list;
 }
 function zoomGraph(action) {
   const c = G.cam;
   if (action === 'in' || action === 'out') {
     const f = action === 'in' ? 1.6 : 1 / 1.6;
-    if (G.focus) { G.focus.k = Math.max(0.5, Math.min(5, G.focus.k * f)); G.focus.t0 = performance.now(); return true; }
+    if (G.focus) { G.focus.k = Math.max(0.5, Math.min(5, G.focus.k * f)); G.focus.t0 = performance.now(); startLoop(); return true; }
     const [px, py] = focusPoint(); zoomAt(px, py, f); return true;
   }
   G.focus = null; G.pin = null; G.hover = null; paintHL(); $('tip').classList.remove('on');
-  Object.assign(c, { tx: 0, ty: 0, tk: 1 });
+  Object.assign(c, { tx: 0, ty: 0, tk: 1 }); startLoop();
   return true;
 }
 function zoomAt(sx, sy, f) {
@@ -811,7 +852,7 @@ function zoomAt(sx, sy, f) {
   if (G.focus) { G.focus = null; G.pin = null; paintHL(); $('tip').classList.remove('on'); }
   const k = Math.min(5, Math.max(0.45, c.tk * f));
   const wx = (sx - c.tx) / c.tk, wy = (sy - c.ty) / c.tk;
-  Object.assign(c, { tk: k, tx: sx - wx * k, ty: sy - wy * k });
+  Object.assign(c, { tk: k, tx: sx - wx * k, ty: sy - wy * k }); startLoop();
 }
 /* Find graph nodes from words: a file, a check, a line ("Foo.cs:120"), an agent, or a group. */
 const GROUPS = [
@@ -851,13 +892,14 @@ function focusGraph(q) { const list = findNodes(q); return list.length ? focusOn
   const svg = $('g');
   svg.onpointerdown = (e) => { if (e.button === 0) { G.pan = { x: e.clientX, y: e.clientY, cx: G.cam.tx, cy: G.cam.ty, moved: false }; svg.setPointerCapture(e.pointerId); } };
   svg.onpointermove = (e) => {
-    if (G.drag) { const [wx, wy] = toWorld(e.clientX, e.clientY); G.drag.bx = wx; G.drag.by = wy; return; }
+    if (G.drag) { const [wx, wy] = toWorld(e.clientX, e.clientY); G.drag.bx = wx; G.drag.by = wy; startLoop(); return; }
     if (!G.pan) return;
     const dx = e.clientX - G.pan.x, dy = e.clientY - G.pan.y;
     if (!G.pan.moved && Math.hypot(dx, dy) < 5) return;
     if (!G.pan.moved) { G.pan.moved = true; G.focus = null; G.pin = null; G.hover = null; paintHL(); $('tip').classList.remove('on'); svg.classList.add('panning'); }
     Object.assign(G.cam, { tx: G.pan.cx + dx, ty: G.pan.cy + dy });
     Object.assign(G.cam, { x: G.cam.tx, y: G.cam.ty, vx: 0, vy: 0 }); // the hand moves the world directly
+    startLoop();
   };
   svg.onpointerup = svg.onpointercancel = (e) => {
     const click = G.pan && !G.pan.moved && e.type === 'pointerup' && e.target === svg;
@@ -885,6 +927,7 @@ function collapseGraph([x, y], tone) {
     Object.assign(n, { follow: core, ts: 0, K: 0.05 });
   }
   if (core) { Object.assign(core, { bx: x, by: y, ts: TIP_S, K: 0.03 }); if (core.body) core.body.style.fill = PAL[tone] || PAL.core; }
+  G.paused = false; startLoop();
 }
 
 /* Every opening of a branch gets a number. Anything that comes back late (a fetch, a timer, the live
@@ -941,7 +984,8 @@ function closeGraph() {
   Object.assign(S, { run: null, plan: null, model: null, starting: false });
   clearTimeout(closeTimer);
   closeTimer = setTimeout(() => { if (!full.classList.contains('open')) { full.hidden = true; stopLoop(); resetGraph(); } }, 760);
-  reloadPRs().catch(() => {});
+  // Reload once the home has zoomed back in: redrawing the tree mid-move costs a layout and a full repaint.
+  setTimeout(() => { if (!document.body.classList.contains('dive')) reloadPRs().catch(() => {}); }, 980);
 }
 $('back').onclick = () => (typeof treeOpen === 'function' && treeOpen() ? closeTree() : closeGraph());
 /* There is one view of a branch now, the graph. Kept for older callers. */

@@ -42,8 +42,10 @@ function express(m, ms = 2600) {
   moodTimer = setTimeout(() => { mood = null; setGoatState(svg, base); }, ms);
 }
 let tx = 0, ty = 0, cx = 0, cy = 0;
+let goatRect = null, goatRectT = 0; // the goat barely moves: read its box at most twice a second, not on every pointer move (each read can force a layout)
 addEventListener('pointermove', (e) => {
-  const r = svg.getBoundingClientRect();
+  if (!goatRect || e.timeStamp - goatRectT > 500) { goatRect = svg.getBoundingClientRect(); goatRectT = e.timeStamp; }
+  const r = goatRect;
   tx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / 420));
   ty = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / 360));
   lastActive = performance.now();
@@ -127,9 +129,12 @@ function f32ToB64(arr) {
 
 /* ── Animation loop: look-at, lip-sync, rings, sleep ──────────────────── */
 let amp = 0;
+/* A custom property set on every frame restyles the whole goat even when the value is the same: write only changes. */
+const lastVar = new Map();
+const setVar = (el, k, v) => { const key = (el === svg ? 's' : 'r') + k; if (lastVar.get(key) !== v) { lastVar.set(key, v); el.style.setProperty(k, v); } };
 (function loop() {
   cx += (tx - cx) * 0.12; cy += (ty - cy) * 0.12;
-  svg.style.setProperty('--lx', cx.toFixed(3)); svg.style.setProperty('--ly', cy.toFixed(3));
+  setVar(svg, '--lx', cx.toFixed(2)); setVar(svg, '--ly', cy.toFixed(2));
   let a = 0;
   if (analyser && speaking()) {
     const d = new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(d);
@@ -137,13 +142,13 @@ let amp = 0;
     a = Math.min(1, Math.sqrt(s / d.length) * 5.5);
   }
   amp += (a - amp) * (a > amp ? 0.55 : 0.25);
-  svg.style.setProperty('--amp', amp.toFixed(3));
+  setVar(svg, '--amp', amp.toFixed(2));
   if (sess) {
     const want = speaking() ? 'talking' : sess.busy ? 'thinking' : 'listening';
     if (base !== want) face(want);
-    root.style.setProperty('--lvl', (want === 'talking' ? amp : micLevel).toFixed(3));
+    setVar(root, '--lvl', (want === 'talking' ? amp : micLevel).toFixed(2));
   } else {
-    root.style.setProperty('--lvl', '0');
+    setVar(root, '--lvl', '0');
     if (base !== 'sleeping' && performance.now() - lastActive > 120000) face('sleeping');
   }
   requestAnimationFrame(loop);
