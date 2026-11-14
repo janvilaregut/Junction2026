@@ -40,6 +40,10 @@ export function markdown(brief, signoff) {
       for (const c of score.caps || []) L.push(`- Límite ${c.max}/10: ${c.reason}`);
       if (score.explanation) L.push('', score.explanation);
     }
+    if (b.intentComparison) {
+      L.push('', '### Lo solicitado / lo implementado', 'Interpretaciones con citas verificadas, sin puntos por coincidencia. No recuperan el prompt histórico ni prueban corrección.', `Entire del original: ${b.intentComparison.originalPromptStatus}.`, 'Artefactos: intent-comparison.json y original-change.patch.');
+      for (const row of b.intentComparison.rows) L.push(`- ${row.expectation} [${row.assessment}]: solicitado: ${row.requested}; interpretado: ${row.implemented}. ${row.question || ''}`);
+    }
     L.push('', budgetSummary(b));
     if (b.verdict.pending?.length) { L.push('', '**Pendiente:**'); for (const p of b.verdict.pending) L.push(`- ${pendingSummary(p)}`); }
     if (b.verdict.findings?.length) {

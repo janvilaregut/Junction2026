@@ -9,6 +9,7 @@ import { resolveProfile } from '../profiles.js';
 import { loadContinuation } from './resume.js';
 import { applyProposal, deduplicateCandidates } from './proposals.js';
 import { sourceBlocks } from './source-context.js';
+import { intentInput, semanticPrompt, normalizeIntent, intentPending } from './intent.js';
 import { artifactManifest } from '../integrity.js';
 import { models, session, setupCapture, checkpoint, attachSession, providerPreflight, usageTokens } from '../agents.js';
 import { blindCopy } from './sandbox.js';
@@ -135,7 +136,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
     await Promise.allSettled(built.map(async c=>{
       try {
         const reply = await call({dir:reviewerDir,role:`debate-${afterExecution?'results':'proposals'}-${c.id}`,model:c.model,timeout:25000,noTools:true,maxOutputTokens:1000,
-          prompt:`You authored candidate ${c.id}. Cooperatively review the other candidate. The original implementation is hidden. Revise your view when warranted; agreement is not evidence. NO tools. Respond compact JSON {"strength":"...","risk":"...","expectation":"E1","scenario":"concrete test idea","revision":"what you would change or why keep"}. Do not invent outcomes. Contract: ${JSON.stringify(state.contract.expectations)}\nCandidates:${JSON.stringify(proposals)}\nActual execution:${JSON.stringify(outcomes).slice(0,7000)}`,validate:x=>typeof x.scenario==='string' && typeof x.revision==='string'});
+          prompt:`You authored candidate ${c.id}. Cooperatively review the other candidate. The original implementation is hidden. Revise your view when warranted; agreement is not evidence. NO tools. Each field at most 140 characters. Respond compact JSON {"strength":"...","risk":"...","expectation":"E1","scenario":"concrete test idea","revision":"what you would change or why keep"}. Do not invent outcomes. Contract: ${JSON.stringify(state.contract.expectations)}\nCandidates:${JSON.stringify(proposals)}\nActual execution:${JSON.stringify(outcomes).slice(0,7000)}`,validate:x=>typeof x.scenario==='string' && typeof x.revision==='string'});
         state.debate.push({candidate:c.id,model:c.model,round:afterExecution?'results':'proposals',...reply});
         emit({type:'debate',candidate:c.id,round:afterExecution?'results':'proposals',...reply});save();
       } catch(e) { state.debate.push({candidate:c.id,round:afterExecution?'results':'proposals',status:'incomplete',reason:e.message}); }
@@ -167,6 +168,8 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       state.harness = String(pr.branch).includes('2283') && it.toolchain.testProjects.some(p => p.endsWith('MessagePack.SourceGenerator.Tests.csproj')) ? [{ path: harnessPath, content: harnessContent }] : [];
       if (state.harness.length) writeJSON(path.join(artifacts, 'harness.json'), state.harness);
       state.proposedPatch = await out(it.repo, ['diff', it.mergeBase, it.headSha, '--', ...it.files.filter(f => f.kind === 'source').map(f => f.path)]);
+      fs.writeFileSync(path.join(artifacts, 'original-change.patch'), state.proposedPatch);
+      state.intentContext = intentInput(state.contract, state.proposedPatch, state.input);
       state.suiteOverlay = [];
       for (const f of it.files.filter(f => f.kind === 'test' || f.kind === 'source')) {
         const text = await out(it.repo, ['show', `${it.headSha}:${f.path}`]);
@@ -261,11 +264,16 @@ async function executeComplete(args, { intake, verifyBaseline }) {
 
   try {
     if (state.contract && reviewerDir) await within(deadline - 2000, async () => {
-      const reviewSources = state.contract.sources.map(s=>({id:s.id,kind:s.kind,uri:s.uri,text:state.contract.expectations.flatMap(e=>e.sources.filter(r=>r.id===s.id).map(r=>{const i=s.text.indexOf(r.quote);return s.text.slice(Math.max(0,i-200),i+r.quote.length+200)})).join('\n')}));
-      semantic = await call({ dir: reviewerDir, role: 'semantic-judge', model: models().review, noTools: true, maxOutputTokens: 2500, timeout: Math.min(55000, deadline - Date.now() - 2000),
-        prompt: `Audit this evidence. Explain in Spanish, at most FIVE concise sentences. Cite artifact names but do not repeat full hashes in prose. A passing attack refutes its hypothesis; it is not a requirement contradiction. Only list material unresolved requirement ambiguities or inconsistent evidence in ambiguities/contradictions. Do NOT decide correctness by votes or textual similarity. Cite artifact IDs, distinguish original-only/candidate-only failures, do not invent test results. Return {"explanation":"...","ambiguities":[],"contradictions":[],"artifactRefs":[],"invalidAttacks":[{"id":"attack identifier if invalid","reason":"..."}]}.\n${JSON.stringify({ contract: { expectations: state.contract.expectations, ambiguities: state.contract.ambiguities, sources: reviewSources }, attacks: state.attacks.map(({ files, ...a }) => a), evidence: state.evidence.map(e => ({id:e.id,artifact:e.artifact,version:e.version,scope:e.scope,status:e.status,ran:e.ran,attacks:e.attacks,failures:e.tests?.filter(t=>t.outcome==='Failed').map(t=>({name:t.name,error:t.error?.slice(0,1800)}))})), pending: state.pending }).slice(0, 36000)}`, validate: x => typeof x.explanation === 'string' && Array.isArray(x.ambiguities) && Array.isArray(x.contradictions) });
+      semantic = await call({ dir: reviewerDir, role: 'semantic-judge', model: models().review, noTools: true, maxOutputTokens: 6000, timeout: Math.min(55000, deadline - Date.now() - 2000),
+        prompt: semanticPrompt(state), validate: x => typeof x.explanation === 'string' && Array.isArray(x.intentRows) && Array.isArray(x.ambiguities) && Array.isArray(x.contradictions) });
     });
   } catch (e) { pending('semantic-judge', e); }
+  if (state.intentContext) {
+    state.intentComparison = normalizeIntent(semantic?.intentRows, state.intentContext, state.contract);
+    for (const text of intentPending(state.intentComparison)) state.pending.push({where:'intent', text});
+    writeJSON(path.join(artifacts, 'intent-comparison.json'), state.intentComparison);
+    emit({type:'intent', status:state.intentComparison.status, rows:state.intentComparison.rows});
+  }
   state.verdict = adjudicate({ ...state, baseline, semantic, complete, finalMissions: state.finalMissions, requiredFinalMissions: profile.finalMissions, extraPending: [...state.pending.map(p=>`${p.where}: ${p.text}`), ...state.attacks.filter(a=>a.status==='disputed').map(a=>`${a.id}: disputed`)] });
   state.verdict.auditWarnings.push(...(state.providers?.errors || []).map(e=>`Provider availability: ${e}; any model substitution is recorded and reduces model-family diversity.`));
   state.budget.elapsedMs = Date.now() - started; state.budget.exhausted = !complete && Date.now() >= finalEnd; state.budget.remainingMs = Math.max(0, deadline - Date.now());
@@ -281,7 +289,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   state.budget.accounting = execution.getStore().tokenBudget.snapshot();
   state.budget.usageIncomplete = state.budget.accounting.usageIncomplete || state.sessions.some(s => s.error && !s.history?.some(h => h.usage?.length));
   const fallback = { version: 1, createdAt: new Date().toISOString(), project: { id: project.id, name: project.name }, provenance: { status: 'none' }, pr: { id: pr.id, branch: pr.branch, direction: pr.direction, title: pr.title, head: it?.headSha || pr.sha || '', base: project.base, baseSha: it?.baseSha, commits: [] }, totals: it?.totals || { lines: 0, files: 0, added: 0, removed: 0 }, kinds: it?.kinds || {}, files: [], claims: [], questions: [], residue: { lines: it?.totals.lines || 0, total: it?.totals.lines || 0, items: [] }, notChecked: [], rules: { fired: [] }, timing: { stages: [] }, areas: [], toolchain: { kind: it?.toolchain.kind || 'none' }, options, cost: { usd: 0 } };
-  const brief = { ...(baseline || fallback), version: 2, contract: state.contract, candidates: state.candidates.map(stripCandidate), attacks: state.attacks, evidence: state.evidence, budget: state.budget, verdict: state.verdict, input: state.input, environment: state.environment, finalMissions: state.finalMissions, analysis: state.analysis, providers: state.providers, continuation: state.continuation, debate: state.debate };
+  const brief = { ...(baseline || fallback), version: 2, contract: state.contract, candidates: state.candidates.map(stripCandidate), attacks: state.attacks, evidence: state.evidence, budget: state.budget, verdict: state.verdict, input: state.input, environment: state.environment, finalMissions: state.finalMissions, analysis: state.analysis, providers: state.providers, continuation: state.continuation, debate: state.debate, intentComparison: state.intentComparison };
   brief.options = options; brief.timing.totalMs = Date.now() - started; brief.pr.base = project.base;
   brief.claims = brief.claims.filter(c => c.id !== 'replicas');
   brief.notChecked = brief.notChecked.filter(c => c.what !== 'Réplicas independientes');
@@ -291,7 +299,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   brief.recommendation = { id: state.verdict.status === 'ready-for-human' ? 'lista' : state.verdict.status === 'request-changes' ? 'cambios' : 'insuficiente', lista: state.verdict.status === 'ready-for-human', name: state.verdict.label, why: state.verdict.semantic?.explanation || 'Comprobaciones deterministas y alcance pendiente', text: state.verdict.label };
   brief.notChecked.push(...state.verdict.pending.map(what => ({ what, why: 'Evidencia pendiente del pipeline completo' })));
   brief.claims.push({ id: 'courtroom', text: 'Veredicto basado en ejecución y contrato versionado', status: state.verdict.status === 'ready-for-human' ? 'reproducido' : 'parcial', detail: state.verdict.label, evidence: [{ label: 'Contrato y trazabilidad', artifact: 'pipeline.json' }] });
-  brief.binding = sha256(JSON.stringify({ head: brief.pr.head, contract: state.contract?.hash, evidence: state.evidence.map(e => e.id), tests: state.attacks.map(a => a.hash) }));
+  brief.binding = sha256(JSON.stringify({ head: brief.pr.head, contract: state.contract?.hash, evidence: state.evidence.map(e => e.id), tests: state.attacks.map(a => a.hash), intent: state.intentComparison }));
   save(); brief.artifactManifest = artifactManifest(artifacts); writeJSON(path.join(artifacts, 'brief.json'), brief); emit({ type: 'judgment', verdict: state.verdict, artifact: 'brief.json' });
   // No active workers remain. Retain candidate repositories with captured checkpoints for audit.
   return brief;

@@ -324,6 +324,17 @@ function renderBrief(keepScroll) {
       <dt>Procedencia</dt><dd>${b.provenance.status === 'none' ? '<span class="t-warn">sin prompt guardado</span>; intención reconstruida desde el requisito' : `<span class="t-ok">prompt original guardado con el commit</span> (${b.provenance.status === 'nota' ? 'git notes' : 'Entire'})`}</dd>
     </dl>`);
 
+  if (b.intentComparison) {
+    const comparison = b.intentComparison;
+    const labels = { aligned: 'Compatible según el análisis', gap: 'Posible desviación', uncertain: 'Pendiente de interpretar' };
+    P.push('<h3>Lo solicitado / lo implementado</h3><p class="sub">Interpretación del juez con citas verificadas. Coincidir no demuestra corrección ni suma puntos: hacen falta pruebas.</p>');
+    P.push(`<p class="sub">Entire del original: ${comparison.originalPromptStatus === 'recorded-messages' ? 'mensajes registrados disponibles' : 'sin mensajes históricos disponibles; se usa el requisito'}. Los checkpoints de los candidatos tienen procedencia separada.</p>`);
+    for (const row of comparison.rows) {
+      const support = b.verdict?.support?.filter(s => s.expectation === row.expectation) || [];
+      P.push(`<details><summary>${h(row.expectation)} · ${h(labels[row.assessment] || row.assessment)}</summary><p><b>Solicitado:</b> ${h(row.requested)}</p><p><b>Interpretado:</b> ${h(row.implemented)}</p>${row.source ? `<p class="sub">Fuente ${h(row.source.id)}: ${h(row.source.quote)}</p>` : ''}${row.patchQuote ? `<pre>${h(row.patchQuote)}</pre>` : ''}<p class="sub">${h(row.limitation)}</p>${row.question ? `<p>${h(row.question)}</p>` : ''}<p class="sub">Soporte ejecutable: ${support.length ? h(support.flatMap(s=>s.tests || s.evidence).join(', ')) : 'consultar hallazgos y pendientes; esta interpretación no lo acredita'}</p></details>`);
+    }
+    P.push('<button class="linkbtn" data-art="intent-comparison.json">Ver contraste y procedencia</button> <button class="linkbtn" data-art="original-change.patch">Ver cambio original</button>');
+  }
   if (b.version >= 2) P.push(courtroomHTML(b));
   P.push('<h3>Por qué este carril</h3>');
   P.push(b.rules.fired.length ? b.rules.fired.map((r) => `<div class="item"><span class="dot ${r.lane === 'devolver' ? 'bad' : r.lane === 'residuo' ? 'ok' : 'warn'}"></span><div><div class="ttl">${h(r.title)}</div><div class="d">${h(r.detail)}</div>${r.evidence?.length ? `<div class="links">${r.evidence.map(ev).join('')}</div>` : ''}</div></div>`).join('') : '<p class="sub">No se ha disparado ninguna regla de riesgo.</p>');
