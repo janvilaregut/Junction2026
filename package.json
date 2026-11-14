@@ -7,7 +7,16 @@
   "scripts": {
     "start": "node server/index.js",
     "review": "node server/cli.js",
-    "consenso": "node server/consensus/cli.js"
+    "consenso": "node server/consensus/cli.js",
+    "test": "node --test test/*.test.js",
+    "test:controls": "node scripts/acceptance-controls.js",
+    "evaluate": "node scripts/compare-strategies.js",
+    "doctor": "node scripts/doctor.js"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=22.15"
+  },
+  "dependencies": {
+    "opencode-ai": "1.19.5"
+  }
 }

@@ -2,6 +2,8 @@
 import path from 'node:path';
 import { DATA, readJSON, writeJSON, run, which } from './util.js';
 import { git } from './git.js';
+import { userMessages } from './agents.js';
+import { remaining } from './execution.js';
 
 export const PROMPT_NOTES = 'katse-prompt';
 
@@ -15,7 +17,7 @@ export function requirementIdFrom(text) {
 async function gh(pathname) {
   const res = await fetch(`https://api.github.com${pathname}`, {
     headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'katse-review' },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(remaining(15_000)),
   });
   if (!res.ok) throw new Error(`GitHub ${res.status} en ${pathname}`);
   return res.json();
@@ -77,8 +79,8 @@ export async function provenance(repo, commitList) {
     if (!m) continue;
     const item = { commit: c.sha.slice(0, 9), checkpoint: m[1], prompt: null, source: 'trailer' };
     if (entire) {
-      const r = await run('entire', ['checkpoint', 'explain', m[1]], { cwd: repo, timeout: 60_000 });
-      if (r.code === 0) { item.prompt = r.stdout.trim().slice(0, 20_000); item.source = 'entire checkpoint explain'; }
+      const r = await run('entire', ['checkpoint', 'explain', m[1], '--raw-transcript'], { cwd: repo, timeout: 60_000 });
+      if (r.code === 0) { item.prompts = userMessages(r.stdout); item.prompt = item.prompts.map(p => p.text).join('\n').slice(0, 20_000) || null; item.source = 'entire transcript: user messages only'; }
       else item.error = (r.stderr || r.stdout).trim().slice(0, 500);
     }
     found.push(item);

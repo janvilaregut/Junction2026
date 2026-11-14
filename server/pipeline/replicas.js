@@ -2,6 +2,7 @@
 // provenance exists) and a blind copy of the base commit. It never sees the PR.
 import fs from 'node:fs';
 import path from 'node:path';
+import { models } from '../agents.js';
 import { run, tail } from '../util.js';
 import { clis, agentEnv } from '../llm.js';
 import { parseDiff } from '../git.js';
@@ -15,7 +16,7 @@ let modelCache = { at: 0, list: [] };
 async function opencodeModels() {
   if (Date.now() - modelCache.at < 5 * 60_000 && modelCache.list.length) return modelCache.list;
   const r = await run('opencode', ['models'], { timeout: 30_000, env: agentEnv() });
-  const list = r.stdout.split('\n').map((l) => l.trim()).filter((l) => /^opencode\/[\w.-]+$/.test(l));
+  const list = r.stdout.split('\n').map((l) => l.trim()).filter((l) => /^[\w.-]+\/[\w.-]+$/.test(l));
   modelCache = { at: Date.now(), list };
   return list;
 }
@@ -33,6 +34,10 @@ export async function availableAgents() {
   }
   const have = await clis();
   const agents = [];
+  if (have.opencode) for (const [role, model] of Object.entries(models())) if ((role === 'diverse' && process.env.VERDA_INFERENCE_KEY) || (role !== 'diverse' && process.env.GEMINI_API_KEY)) agents.push({ id: role, cli: 'opencode', model, label: model });
+  // The full pipeline uses these explicitly configured providers. Listing every
+  // public OpenCode model delays page startup and does not establish credentials.
+  if (agents.length) return agents;
   if (have.opencode) {
     for (const m of await opencodeModels()) {
       const id = m.split('/')[1].replace(/-free$/, '');
@@ -92,7 +97,7 @@ function agentCommand(agent, prompt) {
       ],
     };
   }
-  return { cmd: 'opencode', args: ['run', '--auto', '--standalone', '-m', agent.model, prompt] };
+  return { cmd: 'opencode', args: ['run', '--auto',  '-m', agent.model, prompt] };
 }
 
 const SANDBOX = '/usr/bin/sandbox-exec';
@@ -138,7 +143,7 @@ export async function preflight(agent) {
   if (agent.cli === 'fake') return { ok: true };
   const args = agent.cli === 'claude'
     ? ['-p', 'Reply with exactly: OK', '--model', agent.model, '--output-format', 'json']
-    : ['run', '--standalone', '-m', agent.model, 'Reply with exactly: OK'];
+    : ['run',  '-m', agent.model, 'Reply with exactly: OK'];
   const r = await run(agent.cli, args, { cwd: fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'replica-pf-')), timeout: 90_000, env: agentEnv() });
   const why = failureOf(agent, r);
   return why ? { ok: false, why } : { ok: true };
