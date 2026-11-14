@@ -59,6 +59,7 @@ export function route(ctx) {
   rule(merge && !merge.ok, 'conflicto', 'No se mezcla limpio', merge?.conflicts?.length ? `Conflictos en ${merge.conflicts.slice(0, 5).join(', ')}` : 'El merge falla.', 'devolver');
   rule(build && !build.ok, 'no-compila', 'No compila', 'El resultado de mezclar el PR sobre la base no compila.', 'devolver', [{ label: 'Registro de compilaciÃ³n', artifact: 'build-merged.log' }]);
   if (ran(l2)) {
+    rule(l2.suite.ran === 0 || (l2.suite.ok === false && l2.suite.failed === 0), 'sin-evidencia-ejecutable', 'La ejecución de tests está incompleta', 'Revisa el registro del runner antes de aprobar.', 'decision');
     const broken = l2.newFailures || [];
     rule(broken.length > 0, 'suite-rota', 'Rompe tests que antes pasaban',
       `${broken.length} test(s) fallan con el PR y no en la base: ${broken.slice(0, 3).map((t) => t.split('.').pop()).join(', ')}`, 'devolver', [{ label: 'Suite con el PR', artifact: 'suite-merged.log' }]);

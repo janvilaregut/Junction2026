@@ -13,6 +13,7 @@ import { runMutation, runRewind, changeGroups } from './mutation.js';
 import { availableAgents, buildPrompt, runReplica, preflight } from './replicas.js';
 import { withKinds, compareRegions } from './compare.js';
 import { judge } from './judge.js';
+import { resolveProfile } from '../profiles.js';
 import { route } from './lanes.js';
 
 const sec = (ms) => `${Math.round(ms / 1000)} s`;
@@ -27,33 +28,37 @@ const testSide = (f) => (f.kind === 'test' || (f.kind === 'derived' && /(^|\/)te
 export function normalizeOptions(o = {}, agentsAvailable = []) {
   const mode = o.mode === 'completo' ? 'completo' : 'rapido';
   const agentsPicked = Array.isArray(o.agents) && o.agents.length > 0;
-  let agents = agentsPicked ? o.agents : mode === 'completo' ? agentsAvailable.slice(0, 3).map((a) => a.id) : [];
+  let agents = agentsPicked ? o.agents : mode === 'completo' ? ['fast', 'diverse', 'review'] : [];
   agents = agents.filter((id) => agentsAvailable.some((a) => a.id === id)).slice(0, 5);
   return {
     mode, agents, agentsPicked,
+    ...resolveProfile(o), profile: resolveProfile(o).id,
+    resumeRunId: typeof o.resumeRunId === 'string' && /^[\w.-]+$/.test(o.resumeRunId) ? o.resumeRunId : null,
+    controls: !!o.controls,
+    providers: o.providers || {}, concurrency: { models: 2, runners: 1 },
     mutants: Number.isFinite(+o.mutants) ? Math.max(0, Math.min(12, +o.mutants)) : 4,
     crossTests: o.crossTests !== false,
     rewind: o.rewind !== false,
     judge: o.judge !== false,
-    agentTimeoutMin: Math.max(3, Math.min(45, +o.agentTimeoutMin || 20)),
+    agentTimeoutMin: mode === 'completo' ? 3 : Math.max(3, Math.min(45, +o.agentTimeoutMin || 20)),
     keepTrees: !!o.keepTrees,
   };
 }
 
 /**
- * Replica budget: n = min(6, 1 + groups of changes + high-risk groups).
+ * Replica budget: n = min(4, 2 + ceil(log2(groups)) + high-risk groups).
  * A group is hand-written code that changes one behaviour (hunks close together in one file).
  * A group is high risk when it touches public surface or silences existing behaviour.
  */
 export function replicaBudget(files) {
   const groups = changeGroups(files);
   const risky = groups.filter((g) => g.hunks.some((h) => h.added.some((l) => HIGH_RISK.test(l)) || h.removed.some((l) => /\bthrow\b|Report(Diagnostic)?\(/.test(l))));
-  const n = Math.max(1, Math.min(6, 1 + groups.length + risky.length));
+  const n = groups.length ? Math.min(4, 2 + Math.ceil(Math.log2(groups.length)) + risky.length) : 0;
   const where = (g) => `${path.basename(g.file)}:${g.start}`;
   const missions = [{ why: 'base', text: 'Solve the requirement in the way you think is best.' }];
   for (const g of groups) missions.push({ why: `grupo ${where(g)}`, text: `Pay special attention to the code around ${g.file} line ${g.start}; consider a different way to solve that part than the obvious one.` });
   for (const g of risky) missions.push({ why: `riesgo ${where(g)}`, text: `Choose the most conservative strategy: change as little existing behaviour as possible around ${g.file} line ${g.start}, and add a test proving that existing behaviour (warnings, errors, results) is preserved.` });
-  return { n, groups: groups.length, risky: risky.length, formula: `mín(6, 1 + ${groups.length} grupos + ${risky.length} de alto riesgo)`, missions: missions.slice(0, n) };
+  return { n, groups: groups.length, risky: risky.length, formula: `mín(4, 2 + ceil(log2(${groups.length})) + ${risky.length} de alto riesgo)`, missions: missions.slice(0, n) };
 }
 const HIGH_RISK = /^\s*public\s+(?:(?:sealed|static|abstract|partial|readonly)\s+)*(class|interface|struct|record|enum)\b|\bcatch\b|#pragma warning disable|\b(drop|ignore|suppress|skip|silenc)\w*/i;
 
@@ -61,14 +66,14 @@ const HIGH_RISK = /^\s*public\s+(?:(?:sealed|static|abstract|partial|readonly)\s
 export async function intake(project, pr) {
   const repo = project.path;
   const baseRef = await resolveRef(repo, project.base);
-  const headSha = await out(repo, ['rev-parse', pr.ref]);
+  const headSha = await out(repo, ['rev-parse', '--verify', `${pr.ref}^{commit}`]);
   const baseSha = await out(repo, ['rev-parse', baseRef]);
   const mergeBase = await out(repo, ['merge-base', baseSha, headSha]);
   const files = withKinds(await diff(repo, mergeBase, headSha));
   const log = await commits(repo, mergeBase, headSha);
   const reqId = pr.requirement || requirementIdFrom(log.map((c) => c.subject).join(' '));
   const [requirement, prov, toolchain] = await Promise.all([
-    fetchRequirement(project, reqId),
+    pr.requirementText ? Promise.resolve({ id: 'user-input', title: 'Requisito aportado', body: String(pr.requirementText), url: null }) : fetchRequirement(project, reqId),
     provenance(repo, log),
     detectToolchain({ repo, sha: headSha, project, changedPaths: files.map((f) => f.path) }),
   ]);
@@ -79,8 +84,10 @@ export async function intake(project, pr) {
   return { repo, baseRef, baseSha, headSha, mergeBase, files, commits: log, requirement, provenance: prov, toolchain, totals, kinds, groups: mechanicalGroups(files) };
 }
 
-export async function verify({ project, pr, options, runDir, emit }) {
+export async function verifyBaseline({ project, pr, options, runDir, emit }) {
   const started = Date.now();
+  const workDir = options.scratchRoot || runDir;
+  fs.mkdirSync(workDir, { recursive: true });
   const art = path.join(runDir, 'artifacts');
   fs.mkdirSync(art, { recursive: true });
   const save = (name, text) => fs.writeFileSync(path.join(art, name), typeof text === 'string' ? text : JSON.stringify(text, null, 2));
@@ -130,7 +137,7 @@ export async function verify({ project, pr, options, runDir, emit }) {
     });
 
     // 2 ── Sandbox: merge + build ──────────────────────────────────────────
-    const merged = path.join(runDir, 'merged');
+    const merged = path.join(workDir, 'merged');
     ctx.merge = await stage('merge', `Mezclar sobre ${project.base} en una copia aislada`, async () => {
       const m = await mergedTree(repo, merged, baseRef, headSha);
       trees.push(merged);
@@ -139,7 +146,7 @@ export async function verify({ project, pr, options, runDir, emit }) {
 
     let baseTree = null;
     const ensureBase = async () => {
-      if (!baseTree) { baseTree = path.join(runDir, 'base'); await worktree(repo, baseTree, baseSha); trees.push(baseTree); }
+      if (!baseTree) { baseTree = path.join(workDir, 'base'); await worktree(repo, baseTree, baseSha); trees.push(baseTree); }
       return baseTree;
     };
     let canRun = ctx.merge.ok && toolchain.kind !== 'none';
@@ -217,9 +224,9 @@ export async function verify({ project, pr, options, runDir, emit }) {
         }));
         // A new test "fails" with the PR only when it is a new failure, not when the whole class already failed.
         const newFailures = failing.filter((n) => !newNames.some((m) => matches(n, m)));
-        const teeth = newTests.filter((t) => t.green === 'Passed' && (t.red === 'Failed' || t.red === 'NoCompila')).length;
+        const teeth = newTests.filter((t) => t.green === 'Passed' && t.red === 'Failed').length;
         return {
-          suite: { ran: suite.ran, passed: suite.passed, failed: suite.failed, skipped: suite.skipped, ms: suite.ms },
+          suite: { ok: suite.ok, ran: suite.ran, passed: suite.passed, failed: suite.failed, skipped: suite.skipped, ms: suite.ms },
           newTests, newFailures, preexisting, redBuilt, teeth,
           detail: `${suite.passed} de ${suite.ran} tests pasan con el PR · ${newNames.length ? `${teeth} de ${newNames.length} tests nuevos fallan sin el cambio y pasan con él` : 'el PR no añade tests'}`,
         };
@@ -229,7 +236,7 @@ export async function verify({ project, pr, options, runDir, emit }) {
     }
 
     // 4 ── Seeded defects ──────────────────────────────────────────────────
-    const l2ok = ctx.l2 && !ctx.l2.skipped && !ctx.l2.newFailures.length;
+    const l2ok = ctx.l2 && !ctx.l2.skipped && ctx.l2.suite.ok && ctx.l2.suite.ran > 0 && !ctx.l2.newFailures.length;
     ctx.mutation = await stage('mutacion', 'Defectos sembrados en las líneas cambiadas', async () => {
       if (!options.mutants) return { skipped: true, reason: 'Desactivado en esta verificación.', detail: 'Desactivado' };
       if (!l2ok) return { skipped: true, reason: 'No se ejecuta si el PR no compila o rompe tests.', detail: 'No aplicable' };
@@ -287,7 +294,7 @@ export async function verify({ project, pr, options, runDir, emit }) {
         const before = await repoState();
         const forbidden = [ROOT, DATA];
         const rs = await Promise.all(agents.map(async (agent) => {
-          const dir = path.join(runDir, `replica-${agent.id}`);
+          const dir = path.join(workDir, `replica-${agent.id}`);
           trees.push(dir);
           try {
             const mission = budget.missions[agents.indexOf(agent) % budget.missions.length];
@@ -444,7 +451,7 @@ function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) 
       claims.push(claim('rojo-verde', 'Hay tests nuevos que fallan sin el cambio', files.some((f) => f.kind === 'source') ? 'fallo' : 'no-ejecutado', 'El PR no añade ningún test.'));
     }
     claims.push(claim('suite', `No rompe los tests existentes (${l2.suite.ran} ejecutados)`,
-      l2.newFailures.length ? 'fallo' : 'reproducido',
+      l2.suite.ran === 0 || (l2.suite.ok === false && l2.suite.failed === 0) ? 'no-ejecutado' : l2.newFailures.length ? 'fallo' : 'reproducido',
       l2.newFailures.length ? `${l2.newFailures.length} fallan con el PR y no en la base` : `${l2.suite.passed} pasan${l2.preexisting.length ? ` · ${l2.preexisting.length} ya fallaban antes del PR` : ''} · ${sec(l2.suite.ms)}`,
       [{ label: 'Suite con el PR', artifact: 'suite-merged.log' }]));
   } else {
@@ -463,11 +470,11 @@ function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) 
   }
 
   if (mutation.skipped) claims.push(claim('mutacion', 'Los tests detectarían un defecto en las líneas cambiadas', ...notRun(mutation.reason)));
-  else claims.push(claim('mutacion', 'Los tests detectarían un defecto en las líneas cambiadas', mutation.survived ? 'parcial' : 'reproducido',
+  else claims.push(claim('mutacion', 'Los tests detectarían un defecto en las líneas cambiadas', !mutation.valid ? 'no-ejecutado' : mutation.survived ? 'parcial' : 'reproducido',
     `${mutation.killed} de ${mutation.valid} defectos sembrados detectados`, [{ label: 'Detalle de mutantes', artifact: 'mutation.json' }]));
 
   if (rewind && !rewind.skipped) {
-    claims.push(claim('rebobinar', 'Cada cambio de código es necesario para algún test', rewind.untested ? 'parcial' : 'reproducido',
+    claims.push(claim('rebobinar', 'Cada cambio de código es necesario para algún test', rewind.needed === rewind.steps.length && rewind.steps.length ? 'reproducido' : 'parcial',
       `${rewind.needed} de ${rewind.steps.length} cambios: al quitarlos falla algún test${rewind.untested ? ` · ${rewind.untested} se pueden quitar sin que falle nada` : ''}`,
       [{ label: 'Detalle de rebobinar', artifact: 'rewind.json' }]));
   } else if (rewind?.skipped) {
@@ -477,8 +484,8 @@ function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) 
   if (compare && compare.n) {
     const code = compare.regions.filter((r) => r.kind === 'source' || r.kind === 'config');
     const agree = code.filter((r) => r.verdict === 'consensus' || r.verdict === 'trivial').length;
-    claims.push(claim('replicas', 'El cambio es el que sale al rehacerlo desde el requisito',
-      agree === code.length ? 'reproducido' : 'parcial', `${agree} de ${code.length} zonas de código coinciden en ${compare.n} réplicas válidas`,
+    claims.push(claim('replicas', 'Similitud textual de alternativas (no prueba equivalencia)',
+      'parcial', `${agree} de ${code.length} zonas de código coinciden en ${compare.n} réplicas válidas`,
       replicas.filter((r) => r.ok).map((r) => ({ label: `Parche de ${r.label}`, artifact: r.patchFile }))));
     if (cross?.length) {
       const a = cross.filter((c) => c.prTestsOnReplica);
@@ -491,7 +498,7 @@ function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) 
         cross.flatMap((c) => [c.prTestsOnReplica && { label: `Tests del PR sobre ${c.label}`, artifact: `cross-${c.replica}-prtests.log` }, c.replicaTestsOnPr && { label: `Tests de ${c.label} sobre el PR`, artifact: `cross-${c.replica}-onpr.log` }].filter(Boolean))));
     }
   } else {
-    claims.push(claim('replicas', 'El cambio es el que sale al rehacerlo desde el requisito', ...notRun(ctx.options.agents.length ? `Ninguna réplica válida: ${(replicas || []).map((r) => `${r.label} ${r.status}`).join(' · ').slice(0, 300)}` : 'Verificación rápida: no se han lanzado réplicas.')));
+    claims.push(claim('replicas', 'Similitud textual de alternativas (no prueba equivalencia)', ...notRun(ctx.options.agents.length ? `Ninguna réplica válida: ${(replicas || []).map((r) => `${r.label} ${r.status}`).join(' · ').slice(0, 300)}` : 'Verificación rápida: no se han lanzado réplicas.')));
   }
 
   const kinds = {};
@@ -539,4 +546,10 @@ function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) 
     timing: { totalMs: Date.now() - started, stages },
     cost: { usd: Math.round(costUsd * 1000) / 1000 },
   };
+}
+
+export async function verify(args) {
+  if (args.options.mode !== 'completo') return verifyBaseline(args);
+  const { verifyComplete } = await import('./complete.js');
+  return verifyComplete(args, { intake, verifyBaseline });
 }

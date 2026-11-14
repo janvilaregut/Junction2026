@@ -14,6 +14,9 @@ import { availableAgents } from './pipeline/replicas.js';
 import { areaStates, areasOf, metrics, record, entries, K_EARN } from './ledger.js';
 import { markdown, trailers, answer } from './report.js';
 import { savePrompt } from './requirements.js';
+import { verifyIntegrity } from './integrity.js';
+import { resolveProfile } from './profiles.js';
+import { session, models } from './agents.js';
 
 const PORT = Number(process.env.PORT || 4173);
 const UI = path.join(ROOT, 'mvp');
@@ -30,23 +33,24 @@ const readBody = (req) => new Promise((resolve, reject) => {
 });
 
 /** What a verification will and will not do for this PR, computed without running anything. */
-async function planFor(project, pr, mode) {
+async function planFor(project, pr, mode, profileId = 'standard') {
   const it = await intake(project, pr);
   const agents = await availableAgents();
   const tests = addedTestNames(it.files.filter((f) => f.kind === 'test'));
   const derived = it.files.filter((f) => f.kind === 'derived').length;
   const src = it.files.filter((f) => f.kind === 'source').length;
   const full = mode === 'completo';
+  const profile = resolveProfile({ profile: profileId });
   const budget = replicaBudget(it.files);
   const will = [
     `Mezclar ${pr.branch} sobre ${project.base} en una copia aislada (tu repo no se toca)`,
     it.toolchain.kind !== 'none' ? `Compilar y pasar los tests afectados (${it.toolchain.describe})` : null,
     tests.length ? `Comprobar que los ${tests.length} tests nuevos fallan sin el cambio y pasan con él` : null,
     derived ? `Analizar ${derived} ficheros derivados: cambio repetido y anomalías` : null,
-    src && it.toolchain.kind !== 'none' ? 'Sembrar defectos en las líneas cambiadas y ver si algún test los detecta' : null,
-    src && it.toolchain.kind !== 'none' ? 'Rebobinar: quitar cada cambio de código de uno en uno y ver si algún test lo nota' : null,
-    full && agents.length ? `Rehacer el cambio a ciegas con ${budget.n} ${budget.n === 1 ? 'agente' : 'agentes'}, ${budget.formula}, cada uno con una misión distinta, y comparar` : null,
-    full && agents.length && tests.length ? 'Cruzar tests: los del PR contra cada réplica y los de cada réplica contra el PR' : null,
+    src && it.toolchain.kind !== 'none' && (!full || profile.id === 'deep') ? 'Sembrar defectos en las líneas cambiadas y ver si algún test los detecta' : null,
+    src && it.toolchain.kind !== 'none' && (!full || profile.id === 'deep') ? 'Rebobinar: quitar cada cambio de código de uno en uno y ver si algún test lo nota' : null,
+    full ? `Contrato con fuentes; hasta ${profile.initialCandidates} alternativas independientes desde la base` : null,
+    full ? `Mesa de pruebas, checkpoints de Entire y juicio con evidencia. Límite: ${profile.budgetMs/1000}s y ${profile.tokenBudget.toLocaleString()} tokens presupuestados; resultados pendientes si no alcanza` : null,
   ].filter(Boolean);
   const text = `${it.requirement?.title || ''}\n${it.requirement?.body || ''}`;
   const wont = [];
@@ -70,8 +74,15 @@ async function planFor(project, pr, mode) {
 }
 
 async function askModel(question, brief) {
-  const slim = { lane: brief.lane, rules: brief.rules.fired, claims: brief.claims.map(({ evidence, ...c }) => c), questions: brief.questions, residue: { lines: brief.residue.lines, total: brief.residue.total, items: brief.residue.items.map(({ code, ...i }) => i) }, notChecked: brief.notChecked, requirement: brief.requirement, totals: brief.totals, replicas: brief.l3?.replicas?.map((r) => ({ label: r.label, ok: r.ok, summary: r.summary, decisions: r.decisions })) };
+  const slim = { verdict: brief.verdict, contract: brief.contract?.expectations, candidates: brief.candidates?.map(c => ({id:c.id,status:c.status,checkpoint:c.checkpoint?.status})), lane: brief.lane, rules: brief.rules.fired, claims: brief.claims.map(({ evidence, ...c }) => c), questions: brief.questions, residue: { lines: brief.residue.lines, total: brief.residue.total, items: brief.residue.items.map(({ code, ...i }) => i) }, notChecked: brief.notChecked, requirement: brief.requirement, totals: brief.totals, replicas: brief.l3?.replicas?.map((r) => ({ label: r.label, ok: r.ok, summary: r.summary, decisions: r.decisions })) };
   const prompt = `Eres el asistente de una herramienta de verificación de pull requests. Responde en español, en 2 a 5 frases, sin formato, usando SOLO los datos de este informe. Si el informe no lo dice, di que no está comprobado. Nunca digas que el cambio está bien, es correcto o se puede aprobar: eso lo decide la persona.\n\nINFORME:\n${JSON.stringify(slim).slice(0, 24_000)}\n\nPREGUNTA: ${question.slice(0, 600)}`;
+  if (process.env.GEMINI_API_KEY) {
+    const artifacts = path.join(ROOT, 'data', 'chat', String(Date.now())); fs.mkdirSync(artifacts, { recursive: true });
+    try {
+      const r = await session({ dir: ROOT, artifacts, role: 'semantic-chat', model: models().fast, prompt: `${prompt}\nNO uses herramientas. Devuelve JSON {"answer":"respuesta breve"}.`, timeout: 35000, validate: x => typeof x.answer === 'string' });
+      return r.result.answer;
+    } catch { return null; }
+  }
   const r = await ask(prompt, { cwd: path.join(ROOT, 'data'), timeout: 90_000, model: 'haiku' });
   return r?.text || null;
 }
@@ -89,6 +100,16 @@ async function ledgerView(project) {
   const briefs = latestBriefs(project.id);
   const areas = new Set(briefs.flatMap((b) => (b.areas || []).map((a) => a.area)));
   return { k: K_EARN, areas: areaStates(project.id, [...areas]), metrics: metrics(project.id, briefs), entries: entries(project.id).filter((e) => e.type !== 'run').slice(-50).reverse() };
+}
+
+async function checkedRun(project, runId) {
+  const r = getRun(project.id, runId);
+  if (r.signoff && r.brief?.version >= 2) {
+    const head = await git(project.path, ['rev-parse', '--verify', `${r.brief.input.proposedRef}^{commit}`], { allowFail: true });
+    const base = await git(project.path, ['rev-parse', '--verify', `${r.brief.input.targetRef}^{commit}`], { allowFail: true });
+    r.signatureValid = r.signatureValid && head.stdout.trim() === r.brief.input.proposed && base.stdout.trim() === r.brief.input.target;
+  }
+  return r;
 }
 
 async function api(req, res, url) {
@@ -122,12 +143,15 @@ async function api(req, res, url) {
     }
     if (sub === 'plan') {
       const pr = await findPullRequest(project, url.searchParams.get('pr'));
-      return send(res, 200, await planFor(project, pr, url.searchParams.get('mode') || 'rapido'));
+      return send(res, 200, await planFor(project, pr, url.searchParams.get('mode') || 'rapido', url.searchParams.get('profile') || 'standard'));
     }
     if (sub === 'verify' && method === 'POST') {
       const body = await readBody(req);
-      const pr = await findPullRequest(project, body.pr);
-      const run = await startRun(project, pr, body.options || {});
+      if (body.proposedRef && (!/^[\w./-]+$/.test(body.proposedRef) || body.proposedRef.startsWith('-'))) throw new Error('Referencia propuesta no válida');
+      if (body.baseRef && (!/^[\w./-]+$/.test(body.baseRef) || body.baseRef.startsWith('-'))) throw new Error('Referencia base no válida');
+      const pr = body.proposedRef ? { id: `ref:${body.proposedRef}`, ref: body.proposedRef, branch: body.proposedRef, title: body.proposedRef, direction: 'incoming', requirementText: body.requirement || '' } : await findPullRequest(project, body.pr);
+      if (body.requirement) pr.requirementText = String(body.requirement);
+      const run = await startRun(body.baseRef ? { ...project, base: body.baseRef } : project, pr, body.options || {});
       return send(res, 200, { runId: run.id, options: run.options });
     }
     if (sub === 'prompt' && method === 'POST') {
@@ -158,8 +182,18 @@ async function api(req, res, url) {
       const runId = seg[3];
       const action = seg[4];
       if (!action) {
-        const r = getRun(project.id, runId);
-        return send(res, 200, { ...r, signed: r.signoff && r.brief ? signedView(r.brief, r.signoff) : null });
+        const r = await checkedRun(project, runId);
+        return send(res, 200, { ...r, signed: r.signoff && r.brief && r.signatureValid !== false ? signedView(r.brief, r.signoff) : null });
+      }
+      if (action === 'continue' && method === 'POST') {
+        const previous = await checkedRun(project, runId);
+        if (previous.status !== 'done' || !previous.brief?.contract || !verifyIntegrity(previous.brief, path.join(previous.dir,'artifacts')).ok) throw new Error('La revisión anterior no tiene evidencia íntegra para continuar');
+        const body = await readBody(req);
+        const input = previous.brief.input;
+        const pr = previous.prId.startsWith('ref:') ? { id:previous.prId,ref:input.proposedRef,branch:input.proposedRef,title:previous.branch,direction:'incoming' } : await findPullRequest(project, previous.prId);
+        if(input.requirement?.id==='user-input') pr.requirementText=input.requirement.body;
+        const next = await startRun({ ...project, base:input.targetRef }, pr, { mode:'completo', profile:body.profile || 'deep', resumeRunId:runId });
+        return send(res,200,{runId:next.id,options:next.options});
       }
       if (action === 'events') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
@@ -174,8 +208,8 @@ async function api(req, res, url) {
       }
       if (action === 'artifact') return send(res, 200, artifact(project.id, runId, url.searchParams.get('name') || ''), 'text/plain; charset=utf-8');
       if (action === 'report') {
-        const r = getRun(project.id, runId);
-        return send(res, 200, markdown(r.brief, r.signoff), 'text/markdown; charset=utf-8');
+        const r = await checkedRun(project, runId);
+        return send(res, 200, markdown(r.brief, r.signatureValid === false ? null : r.signoff), 'text/markdown; charset=utf-8');
       }
       if (action === 'signoff' && method === 'POST') {
         const body = await readBody(req);
@@ -187,6 +221,14 @@ async function api(req, res, url) {
         const decision = body.decision === 'devolver' ? 'devolver' : 'aprobar';
         if (!signer) throw new Error('Falta tu nombre: la firma es de una persona.');
         if (decision === 'aprobar') {
+          if (b.version >= 2) {
+            const integrity = verifyIntegrity(b, path.join(r.dir, 'artifacts'));
+            if (!integrity.ok) throw new Error(`Evidencia modificada: ${integrity.errors.join(', ')}`);
+            if (b.verdict.status !== 'ready-for-human') throw new Error(`No se puede aprobar este informe: ${b.verdict.label}`);
+            const head = await git(project.path, ['rev-parse', '--verify', `${b.input.proposedRef}^{commit}`]);
+            const target = await git(project.path, ['rev-parse', '--verify', `${b.input.targetRef}^{commit}`]);
+            if (head.stdout.trim() !== b.input.proposed || target.stdout.trim() !== b.input.target) throw new Error('El código o la base ha cambiado: vuelve a verificar');
+          }
           const hard = b.rules.fired.filter((x) => ['conflicto', 'no-compila', 'suite-rota', 'tests-propios-fallan'].includes(x.id));
           if (hard.length) throw new Error(`No se puede aceptar: ${hard[0].title.toLowerCase()}. Devuélvelo al autor.`);
           const open = b.questions.filter((q) => !body.answers?.[q.id]);
@@ -197,7 +239,7 @@ async function api(req, res, url) {
         }
         const signoff = {
           signer, decision, answers: body.answers || {}, checks: body.checks || {}, residualRisk: risk || '(devuelto al autor)',
-          briefHash: sha256(JSON.stringify(b)), head: b.pr.head, lane: b.lane.id, auditRequired: !!b.audit && decision === 'aprobar',
+          briefHash: sha256(JSON.stringify(b)), binding: b.binding, contractHash: b.contract?.hash, head: b.pr.head, lane: b.lane.id, auditRequired: !!b.audit && decision === 'aprobar',
           ts: new Date().toISOString(),
         };
         saveSignoff(project.id, runId, signoff);
@@ -214,9 +256,9 @@ async function api(req, res, url) {
       }
       if (action === 'attach' && method === 'POST') {
         // Attach the brief to the commit as a git note, so it travels with the branch. Only on explicit request.
-        const r = getRun(project.id, runId);
+        const r = await checkedRun(project, runId);
         const file = path.join(r.dir, 'note.md');
-        fs.writeFileSync(file, markdown(r.brief, r.signoff));
+        fs.writeFileSync(file, markdown(r.brief, r.signatureValid === false ? null : r.signoff));
         await git(project.path, ['notes', '--ref=katse', 'add', '-f', '-F', file, r.brief.pr.head]);
         return send(res, 200, { ok: true, ref: 'refs/notes/katse', commit: r.brief.pr.head, push: 'git push origin refs/notes/katse' });
       }

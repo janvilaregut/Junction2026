@@ -89,7 +89,7 @@ export async function runMutation({ tree, prFiles, toolchain, max, emit }) {
       if (!b.ok) { mutants.push({ ...cand, status: 'no-compila' }); continue; }
       const t = await toolchain.test(tree, {});
       const killers = t.tests.filter((x) => x.outcome === 'Failed').map((x) => x.name);
-      mutants.push({ ...cand, status: killers.length ? 'detectado' : 'sobrevive', killers: killers.slice(0, 5), killerCount: killers.length });
+      mutants.push({ ...cand, status: !t.ran || (t.executionComplete === false) ? 'no-ejecutado' : killers.length ? 'detectado' : 'sobrevive', killers: killers.slice(0, 5), killerCount: killers.length });
     } finally {
       fs.writeFileSync(abs, original);
     }
@@ -155,7 +155,7 @@ export async function runRewind({ tree, prFiles, toolchain, max, emit }) {
       if (!b.ok) { steps.push({ ...g, hunks: undefined, status: 'no-compila-sin-el' }); continue; }
       const t = await toolchain.test(tree, {});
       const failing = t.tests.filter((x) => x.outcome === 'Failed').map((x) => x.name);
-      steps.push({ ...g, hunks: undefined, status: failing.length ? 'necesario' : 'sin-test', tests: failing.slice(0, 5), testCount: failing.length });
+      steps.push({ ...g, hunks: undefined, status: !t.ran || (t.executionComplete === false) ? 'no-ejecutado' : failing.length ? 'necesario' : 'sin-test', tests: failing.slice(0, 5), testCount: failing.length });
     } finally {
       fs.writeFileSync(abs, original);
     }
@@ -163,7 +163,7 @@ export async function runRewind({ tree, prFiles, toolchain, max, emit }) {
   return {
     steps,
     total: changeGroups(prFiles).length,
-    needed: steps.filter((s) => s.status === 'necesario' || s.status === 'no-compila-sin-el').length,
+    needed: steps.filter((s) => s.status === 'necesario').length,
     untested: steps.filter((s) => s.status === 'sin-test').length,
   };
 }

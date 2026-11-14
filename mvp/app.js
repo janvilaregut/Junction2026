@@ -13,7 +13,23 @@ async function api(path, opts) {
   return data;
 }
 
-const S = { projects: [], agents: [], clis: {}, project: null, status: null, prs: { incoming: [], outgoing: [] }, side: 'incoming', cur: null, plan: null, run: null, mode: 'rapido', agents_sel: null, mutants: 4, es: null, stageEls: {} };
+const PROFILES = { quick: { name: 'Quick', seconds: 90, tokens: 25000, detail: 'Primeras comprobaciones · sin alternativas' }, standard: { name: 'Standard', seconds: 300, tokens: 100000, detail: 'Dos alternativas · debate y pruebas' }, deep: { name: 'Deep', seconds: 900, tokens: 250000, detail: 'Exploración adicional ante dudas concretas' } };
+const savedProfile = localStorage.getItem('katse.profile');
+const S = { projects: [], agents: [], clis: {}, project: null, status: null, prs: { incoming: [], outgoing: [] }, side: 'incoming', cur: null, plan: null, run: null, mode: 'completo', profile: PROFILES[savedProfile] ? savedProfile : 'standard', agents_sel: null, mutants: 4, es: null, stageEls: {} };
+const number = n => Number.isFinite(n) ? n.toLocaleString('es-ES') : '—';
+const candidateStatus = status => ({ built: 'Parche generado', pending: 'En preparación', failed: 'Generación fallida', timeout: 'Tiempo agotado', duplicate: 'Propuesta duplicada', empty: 'Sin cambios' }[status] || status);
+function pendingMessage(value) {
+  const text = String(value || '');
+  if (text.startsWith('Contract ambiguity unresolved: ')) return `Ambigüedad del contrato pendiente: ${text.slice('Contract ambiguity unresolved: '.length)}`;
+  if (text === 'No contract behavior has executable support') return 'Ningún comportamiento del contrato tiene todavía evidencia ejecutada.';
+  const labels = { 'No testable contract': 'No se ha podido construir un contrato comprobable.', 'Original relevant suite incomplete or failing': 'La suite pertinente del original no terminó correctamente.', 'Baseline/integration suite incomplete': 'La comprobación de la integración o de la base está incompleta.', 'Review budget exhausted or pipeline incomplete': 'El recorrido quedó incompleto o agotó su presupuesto.', 'Final missions incomplete': 'Faltan ataques finales por ejecutar.', 'Semantic review missing or unresolved': 'Falta la revisión semántica final o quedan ambigüedades.', 'Final candidate did not complete a passing relevant suite; this alone does not invalidate the original.': 'La alternativa final no superó toda la suite. Este resultado no demuestra un fallo del original.', 'No candidate Entire checkpoint recovered.': 'No se recuperó un checkpoint de Entire de los candidatos.', 'No valid mutation was executed; attack sensitivity remains unmeasured.': 'No se ejecutaron mutaciones válidas; queda pendiente medir la sensibilidad de los ataques.' };
+  if (labels[text]) return labels[text];
+  const json = text.indexOf('[{"type":"error"');
+  if (json >= 0) {
+    try { const errors = JSON.parse(text.slice(json)); const detail = errors[0]?.error?.data; return `${text.slice(0, json)}El proveedor rechazó la petición${detail?.statusCode ? ` (HTTP ${detail.statusCode})` : ''}: ${detail?.message || 'error de API'}`; } catch {}
+  }
+  return text.length > 450 ? `${text.slice(0, 450)}… Detalle completo en el expediente.` : text;
+}
 const pid = () => S.project.id;
 const TONE = { ok: 't-ok', warn: 't-warn', no: 't-no', bad: 't-bad' };
 const CLAIM = { reproducido: ['ok', 'Reproducido'], parcial: ['warn', 'Parcial'], fallo: ['bad', 'Falla'], 'no-ejecutado': ['no', 'No ejecutado'] };
@@ -74,7 +90,8 @@ async function loadProject(id, keep) {
   const all = [...prs.incoming, ...prs.outgoing];
   const again = keep && S.cur && all.find((p) => p.id === S.cur.id);
   if (again) { S.cur = again; renderList(); return; }
-  const first = S.prs[S.side][0];
+  const remembered = localStorage.getItem('katse.pr.' + id);
+  const first = S.prs[S.side].find(p => p.id === remembered) || S.prs[S.side][0];
   if (first) selectPR(first); else { S.cur = null; $('panel').innerHTML = `<h3>Sin cambios pendientes</h3><p class="sub">No hay ramas por delante de <code>${h(prs.base)}</code>. Crea una rama o cambia la rama base en los ajustes.</p>`; $('chat').innerHTML = ''; chips([]); }
 }
 function renderEnv() {
@@ -104,6 +121,7 @@ function renderList() {
 }
 
 async function selectPR(pr) {
+  localStorage.setItem('katse.pr.' + pid(), pr.id);
   if (S.es) { S.es.close(); S.es = null; }
   Object.assign(S, { cur: pr, run: null, plan: null, signed: null });
   renderList();
@@ -122,21 +140,19 @@ async function selectPR(pr) {
 
 /* ── Plan (before verifying) ──────────────────────────────────────────── */
 async function loadPlan() {
-  S.plan = await api(`/projects/${pid()}/plan?pr=${encodeURIComponent(S.cur.id)}&mode=${S.mode}`);
+  S.plan = await api(`/projects/${pid()}/plan?pr=${encodeURIComponent(S.cur.id)}&mode=${S.mode}&profile=${S.profile}`);
   renderPlan();
   const p = S.plan;
   say(`<b>${h(S.cur.branch)}</b> — ${h(S.cur.title)}\n${p.totals.files} ficheros, +${p.totals.added} −${p.totals.removed}. Todavía no lo he verificado. A la derecha tienes lo que voy a comprobar y lo que no.`);
   chips(['¿Qué vas a hacer?', '¿Qué no vas a comprobar?']);
 }
 function optionsHTML() {
-  const full = S.mode === 'completo';
-  const sel = S.agents_sel || S.agents.slice(0, 3).map((a) => a.id);
-  return `<div class="seg"><button type="button" data-mode="rapido" class="${full ? '' : 'on'}">Rápida · sin agentes</button><button type="button" data-mode="completo" class="${full ? 'on' : ''}">Completa · con réplicas</button></div>
-  ${full ? (S.agents.length ? `<div class="agents">${S.agents.map((a) => `<label><input type="checkbox" value="${h(a.id)}" ${sel.includes(a.id) ? 'checked' : ''}>${h(a.label)}</label>`).join('')}</div><p class="sub" style="margin:6px 0 0">Cada agente rehace el cambio sin ver el PR. Varios modelos distintos evitan que compartan los mismos puntos ciegos. Tarda varios minutos.</p>` : '<p class="err">No hay ningún agente disponible. Instala opencode o inicia sesión con «claude auth login».</p>') : ''}
-  ${!S.clis.claude && S.clis.claudeInstalled && full ? '<p class="sub" style="margin:6px 0 0">Claude no aparece porque su sesión ha caducado: ejecuta <code>claude auth login</code>.</p>' : ''}`;
+  const p = PROFILES[S.profile];
+  return `<div class="seg profiles" role="group" aria-label="Profundidad de revisión">${Object.entries(PROFILES).map(([id, x]) => `<button type="button" data-profile="${id}" aria-pressed="${S.profile === id}" class="${S.profile === id ? 'on' : ''}"><b>${x.name}</b><small>Hasta ${secs(x.seconds * 1000)}</small></button>`).join('')}</div>
+    <p class="sub profile-description">${h(p.detail)}. Presupuesto: hasta <b>${number(p.tokens)} tokens</b>. Son límites de ejecución; las comprobaciones que no terminen quedarán pendientes.</p>`;
 }
 function bindOptions(rerender) {
-  $('panel').querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; rerender(); }));
+  $('panel').querySelectorAll('[data-profile]').forEach((b) => (b.onclick = () => { S.mode = 'completo'; S.profile = b.dataset.profile; localStorage.setItem('katse.profile', S.profile); rerender(); }));
   $('panel').querySelectorAll('.agents input').forEach((c) => (c.onchange = () => { S.agents_sel = [...$('panel').querySelectorAll('.agents input:checked')].map((x) => x.value); }));
 }
 function renderPlan() {
@@ -168,16 +184,16 @@ function renderPlan() {
     catch (e) { $('prerr').textContent = e.message; }
   };
 }
-async function refreshPlan() { S.plan = await api(`/projects/${pid()}/plan?pr=${encodeURIComponent(S.cur.id)}&mode=${S.mode}`); renderPlan(); }
+async function refreshPlan() { S.plan = await api(`/projects/${pid()}/plan?pr=${encodeURIComponent(S.cur.id)}&mode=${S.mode}&profile=${S.profile}`); renderPlan(); }
 const kindName = (k) => ({ source: 'de código', test: 'de test', doc: 'de docs', config: 'de config', derived: 'derivados' }[k] || k);
 
 /* ── Verification (live) ──────────────────────────────────────────────── */
 async function verify() {
-  const options = { mode: S.mode, mutants: S.mutants };
+  const options = { mode: 'completo', profile: S.profile, mutants: S.mutants };
   if (S.mode === 'completo' && S.agents_sel) options.agents = S.agents_sel;
   try {
     const r = await api(`/projects/${pid()}/verify`, { body: { pr: S.cur.id, options } });
-    say(`Empiezo. Trabajo en una copia aislada: tu repositorio no se toca.`);
+    say(`Empiezo con ${PROFILES[S.profile].name}: hasta ${secs(PROFILES[S.profile].seconds * 1000)} y ${number(PROFILES[S.profile].tokens)} tokens. Trabajo en copias locales del código.`);
     attach(r.runId);
   } catch (e) {
     const el = $('perr') || $('panel');
@@ -195,14 +211,21 @@ function attach(runId) {
   es.onmessage = async (m) => {
     const e = JSON.parse(m.data);
     if (e.type === 'stage') stageLine(e);
-    else if (e.type === 'log') line('start', '·', h(e.text));
-    else if (e.type === 'error') line('fail', '✗', h(e.text));
+    else if (e.type === 'contract') stageLine({ id: 'contract', name: 'Contrato revisado', status: 'done', detail: `${e.expectations.length} expectativas · ${e.hash.slice(0, 10)}` });
+    else if (e.type === 'candidate') stageLine({ id: `candidate-${e.id}`, name: `Alternativa ${e.id}`, status: e.status === 'pending' ? 'start' : e.status === 'built' ? 'done' : 'skip', detail: candidateStatus(e.status) });
+    else if (e.type === 'attack') stageLine({ id: e.id, name: `Ataque ${e.id}`, status: e.status === 'admitted' ? 'done' : 'skip', detail: `${e.status} · ${e.mission}` });
+    else if (e.type === 'result') line(e.status === 'passed' ? 'done' : 'skip', '·', `${h(e.version)}: ${h(e.status)} · ${e.ran || 0} tests ejecutados`);
+    else if (e.type === 'debate') stageLine({ id: `debate-${e.id || e.candidate || 'round'}`, name: 'Mesa de debate', status: e.status === 'pending' ? 'start' : 'done', detail: e.summary || e.status || 'Decisiones y riesgos registrados' });
+    else if (e.type === 'budget') stageLine({ id: 'budget', name: 'Presupuesto', status: 'start', detail: `${number(e.tokens ?? e.spent ?? e.used)} tokens contabilizados` });
+    else if (e.type === 'judgment') stageLine({ id: 'judgment', name: 'Juicio final', status: 'done', detail: e.verdict.label });
+    else if (e.type === 'log') line('start', '·', h(pendingMessage(e.text)));
+    else if (e.type === 'error') line('fail', '✗', h(pendingMessage(e.text)));
     else if (e.type === 'end') {
       es.close(); S.es = null; busy(false);
       await loadProject(pid(), true);
       if (S.cur?.id !== prId) return;
       S.run = await api(`/projects/${pid()}/runs/${runId}`);
-      if (S.run.brief) { renderBrief(); const b = S.run.brief; say(`Listo en ${secs(b.timing.totalMs)}. Carril <b>${h(b.lane.name)}</b>: te quedan <b>${b.residue.lines} de ${b.totals.lines}</b> líneas por leer${b.questions.length ? ` y <b>${b.questions.length}</b> ${b.questions.length === 1 ? 'pregunta' : 'preguntas'} por responder` : ''}. La decisión es tuya.`); briefChips(); }
+      if (S.run.brief) { renderBrief(); const b = S.run.brief; say(b.verdict ? `Revisión terminada en ${secs(b.timing.totalMs)}. <b>${h(b.verdict.label)}</b>${b.verdict.score ? ` · confianza ${b.verdict.score.value == null ? 'no evaluable' : h(b.verdict.score.value) + '/10'}` : ''}. ${b.verdict.pending?.length || 0} bloqueos del veredicto en el alcance comprobado. Revisa también las limitaciones y lo no comprobado. Abre cada apartado para ver sus pruebas. La aprobación es tuya.` : `Listo en ${secs(b.timing.totalMs)}. Carril <b>${h(b.lane.name)}</b>: quedan ${b.residue.lines} de ${b.totals.lines} líneas por revisar.`); briefChips(); }
       else $('panel').innerHTML = `<p class="err">La verificación falló: ${h(S.run.error || 'error desconocido')}</p><button class="act" id="retry">Volver</button>`, ($('retry').onclick = () => loadPlan());
     }
   };
@@ -230,23 +253,68 @@ function stageLine(e) {
 /* ── Brief ────────────────────────────────────────────────────────────── */
 function greetBrief() {
   const b = S.run.brief;
-  say(`<b>${h(S.cur.branch)}</b> — ${h(S.cur.title)}\nVerificado ${new Date(b.createdAt).toLocaleString()}. Carril <b>${h(b.lane.name)}</b>: lees <b>${b.residue.lines} de ${b.totals.lines}</b> líneas${b.questions.length ? ` y respondes ${b.questions.length} ${b.questions.length === 1 ? 'pregunta' : 'preguntas'}` : ''}.${S.run.signoff ? `\nFirmado por ${h(S.run.signoff.signer)}.` : ''}`);
+  say(`<b>${h(S.cur.branch)}</b> — ${h(S.cur.title)}\nRevisión del ${new Date(b.createdAt).toLocaleString()}. ${b.verdict ? `<b>${h(b.verdict.label)}</b>${b.verdict.score ? ` · confianza ${b.verdict.score.value == null ? 'no evaluable' : h(b.verdict.score.value) + '/10'}` : ''}. ${b.verdict.pending?.length || 0} bloqueos del veredicto en el alcance comprobado. Revisa también las limitaciones y lo no comprobado.` : `Carril <b>${h(b.lane.name)}</b>: lees ${b.residue.lines} de ${b.totals.lines} líneas.`}${S.run.signoff ? `\nFirmado por ${h(S.run.signoff.signer)}.` : ''}`);
   briefChips();
 }
-const briefChips = () => chips(['¿Qué recomiendas?', '¿Qué has comprobado?', '¿Qué no has comprobado?', '¿Qué tengo que decidir?', '¿Qué tengo que leer?', '¿Qué pasa si quito cada cambio?']);
+const briefChips = () => chips(['¿Por qué esta nota?', '¿Qué problemas encontraste?', '¿Qué queda pendiente?', '¿Cuánto ha costado?', '¿Qué aportó el debate?']);
 const ev = (e) => e.artifact ? `<button type="button" class="linkbtn" data-art="${h(e.artifact)}">${h(e.label)}</button>` : e.url ? `<a href="${h(e.url)}" target="_blank" rel="noopener">${h(e.label)}</a>` : `<span class="mono" style="color:var(--dim)">${h(e.label)}</span>`;
 function codeHTML(item) {
   if (!item.code?.length) return '';
   return `<pre class="code">${item.code.map((c) => `<span class="h">@@ línea ${c.at}</span>\n${c.removed.map((l) => `<span class="r">- ${h(l)}</span>`).join('\n')}${c.removed.length && c.added.length ? '\n' : ''}${c.added.map((l) => `<span class="a">+ ${h(l)}</span>`).join('\n')}`).join('\n')}</pre>`;
 }
+function evidenceLinks(ids, b) {
+  return [...new Set(ids || [])].map(id => {
+    const e = (b.evidence || []).find(x => x.id === id || x.artifact === id);
+    return e?.artifact ? ev({ artifact: e.artifact, label: `${e.version}: ${e.status}` }) : `<span class="mono">${h(id)}</span>`;
+  }).join(' · ');
+}
+function scoreHTML(b) {
+  const score = b.verdict?.score;
+  if (!score) return '';
+  const tone = b.verdict.status === 'request-changes' ? 'bad' : b.verdict.status === 'ready-for-human' ? 'ok' : 'warn';
+  return `<section class="score-card" aria-label="Confianza de la revisión"><div class="score-heading"><div><div class="sub">Confianza de revisión</div><div class="score-number t-${tone}">${score.value == null ? '<span class="not-evaluable">No evaluable</span>' : `${h(score.value)}<small>/10</small>`}</div></div><span class="pill ${tone}">${h(b.verdict.label)}</span></div>
+    <p class="sub">Evalúa el cambio original${b.pr?.head ? ` <span class="mono">${h(b.pr.head.slice(0, 9))}</span>` : ''}: ${h(score.scope)}. Los fallos exclusivos de alternativas no lo penalizan. Rúbrica heurística; la nota no es una probabilidad de ausencia de errores.</p>
+    ${(score.components || []).map(c => `<details class="score-part"><summary><span>${h(c.label)}</span><b>${h(c.earned)} / ${h(c.max)}</b></summary><p class="sub">${h(c.reason)}</p><div class="links">${evidenceLinks(c.evidence, b)}</div>${c.expectations?.length ? `<div class="sub">Expectativas: ${c.expectations.map(h).join(', ')}</div>` : ''}</details>`).join('')}
+    ${(score.caps || []).map(c => `<p class="sub t-warn">Límite ${h(c.max)}/10: ${h(c.reason)}</p>`).join('')}
+    ${score.explanation ? `<p class="sub">${h(score.explanation)}</p>` : ''}
+    <details ${b.verdict.pending?.length ? 'open' : ''}><summary>Bloqueos del veredicto · ${b.verdict.pending?.length || 0}</summary>${(b.verdict.pending || []).map(x => `<div class="item"><span class="dot no"></span><span class="sub">${h(pendingMessage(x))}</span></div>`).join('') || '<p class="sub">No hay bloqueos del veredicto en el alcance comprobado. Las limitaciones de ejecución, los aspectos no comprobados y los riesgos residuales siguen siendo relevantes antes de firmar.</p>'}<div class="links">${ev({artifact:'pipeline.json',label:'Ver expediente y errores completos'})}</div></details>
+    ${(b.verdict.residualRisks || []).length ? `<details><summary>Límites del alcance</summary>${b.verdict.residualRisks.map(x => `<p class="sub">${h(x)}</p>`).join('')}</details>` : ''}</section>`;
+}
+function findingsHTML(b) {
+  const labels = { 'confirmed-original': 'Incumplimiento confirmado del original', 'original-failure-unconfirmed': 'Fallo del original pendiente de confirmar', 'candidate-only': 'Fallo exclusivo de una alternativa', refuted: 'Acusación refutada', 'invalid-test': 'Prueba inválida', pending: 'Pendiente', unstable: 'Resultado inestable' };
+  return `<details open><summary>Hallazgos trazables · ${b.verdict.findings.length}</summary>${b.verdict.findings.map(f => `<details class="finding"><summary><span><b>${h(labels[f.classification] || f.classification)}</b><span class="why">${h(f.hypothesis)}</span></span></summary><dl class="kv"><dt>Origen</dt><dd>${h(f.agent || 'Agente')}${f.originCandidate ? ` · ${h(f.originCandidate)}` : ''}</dd><dt>Esperado</dt><dd>${h(f.expected)}</dd><dt>Escenario</dt><dd>${h(f.scenario)}</dd><dt>Fundamento</dt><dd>${(f.sources || []).map(s => `${h(s.id)}: ${h(s.quote)}`).join('<br>')}</dd></dl><table><tr><th>Versión</th><th>Prueba</th><th>Evidencia</th></tr>${(f.outcomes || []).map(o => `<tr><td>${h(o.version)}</td><td>${h({ passed:'Pasa',failed:'Falla',pending:'Pendiente' }[o.outcome] || o.outcome)}${o.reused ? ' · reutilizada' : ''}</td><td>${o.artifact ? ev({artifact:o.artifact,label:o.attempt === 'reproduction' ? 'Repetición' : 'Ejecución'}) : h(o.evidence)}</td></tr>`).join('')}</table><p class="sub">${h(f.reason)}</p>${f.attribution ? `<p class="sub">Atribución: ${h(f.attribution)}</p>` : ''}</details>`).join('')}</details>`;
+}
+function debateHTML(b) {
+  const entries = Array.isArray(b.debate) ? b.debate : b.debate?.entries || [];
+  if (!entries.length) return '<p class="sub">Sin intervenciones de debate registradas en esta revisión.</p>';
+  return entries.map(d => `<div class="note"><b>${h(d.candidate || d.id || d.role || 'Intervención')}</b>${d.model ? ` · ${h(d.model)}` : ''}${d.round ? ` · ${d.round === 'results' ? 'Tras las pruebas' : 'Propuestas'}` : ''}${d.status ? ` · ${h(d.status)}` : ''}\n${h(d.summary || d.result?.summary || d.reason || '')}${d.strength ? `\n<b>Fortaleza:</b> ${h(d.strength)}` : ''}${d.risk ? `\n<b>Riesgo:</b> ${h(d.risk)}` : ''}${d.expectation ? `\n<b>Expectativa:</b> ${h(d.expectation)}` : ''}${d.scenario ? `\n<b>Escenario:</b> ${h(d.scenario)}` : ''}${d.revision ? `\n<b>Rectificación:</b> ${h(d.revision)}` : ''}${d.artifact ? `<div class="links">${ev({artifact:d.artifact,label:'Decisiones y argumentos'})}</div>` : ''}${d.error ? `<div class="sub">${h(d.error)}</div>` : ''}</div>`).join('');
+}
+function budgetHTML(b) {
+  const budget = b.budget || {};
+  const used = budget.accounting?.observed ?? budget.tokens ?? budget.tokenUsage?.spent ?? budget.usage?.spent;
+  const limit = budget.accounting?.limit ?? budget.tokenLimit ?? budget.tokenBudget?.limit ?? (typeof budget.tokenBudget === 'number' ? budget.tokenBudget : null);
+  const cumulative = budget.cumulativeTokens ?? (Number.isFinite(budget.inheritedTokens) && Number.isFinite(used) ? budget.inheritedTokens + used : null);
+  return `<div class="budget-strip"><span>${h(PROFILES[b.options?.profile]?.name || b.options?.profile || 'Revisión')} · ${secs(budget.elapsedMs || 0)} / ${secs(budget.limitMs || 0)}</span><span>${number(used)}${limit ? ` / ${number(limit)}` : ''} tokens registrados</span></div><p class="sub">Consumo comunicado por los proveedores${budget.usageIncomplete || budget.accounting?.usageIncomplete ? ' · contabilización incompleta' : ''}. No equivale directamente a coste monetario.${budget.accounting?.unknownReserved ? ` Hay ${number(budget.accounting.unknownReserved)} tokens reservados para intentos cuyo consumo no se confirmó; no se cuentan como gasto cero.` : ''}</p>${b.continuation ? `<p class="sub">Continuación de <span class="mono">${h(b.continuation.runId)}</span>. ${Number.isFinite(cumulative) ? `${budget.cumulativeTokens == null ? 'Anterior + actual' : 'Acumulado de la investigación'}: <b>${number(cumulative)} tokens registrados</b>.` : 'Consumo acumulado pendiente.'} Las pruebas se validan de nuevo para esta ejecución.</p>` : ''}${budget.accounting?.exceeded ? '<p class="banner">El consumo comunicado superó la reserva estimada. Se detuvo la admisión de nuevas tareas; revisa el alcance pendiente.</p>' : ''}`;
+}
+function courtroomHTML(b) {
+  return `<h3>Reconstrucción y juicio</h3>${budgetHTML(b)}<p class="sub">Contrato ${h(b.contract?.hash?.slice(0, 12) || 'pendiente')}</p>
+  ${b.verdict.findings?.length ? findingsHTML(b) : ''}
+  <details ${b.debate?.length ? 'open' : ''}><summary>Mesa de debate</summary>${debateHTML(b)}</details>
+  <details open><summary>Contrato comprobable</summary>${(b.contract?.expectations || []).map(e => `<div class="note"><b>${h(e.id)} · ${h(e.status)}</b> ${h(e.behavior)}<div class="sub">${(e.sources || []).map(s => h(s.id + ': ' + s.quote)).join(' · ')}</div></div>`).join('')}</details>
+  <details open><summary>Alternativas · ${b.candidates.length}</summary><table><tr><th>Candidato</th><th>Estado</th><th>Procedencia</th></tr>${b.candidates.map(c => `<tr><td>${h(c.id)}${c.final ? ' · final' : ''}<div class="sub">${h(c.model)} · padres: ${h(c.parents.join(', ') || 'base')}</div></td><td>${h(candidateStatus(c.status))}${c.patch ? `<br><button class="linkbtn" data-art="${h(c.patch)}">Parche</button>` : ''}</td><td>${c.checkpoint?.metadata ? `<button class="linkbtn" data-art="${h(c.checkpoint.metadata)}">Checkpoint</button> <button class="linkbtn" data-art="${h(c.checkpoint.transcript)}">Transcripción</button>` : 'Sin checkpoint'}${c.error ? `<div class="sub">${h(c.error)}</div>` : ''}</td></tr>`).join('')}</table></details>
+  <details open><summary>Pruebas compartidas · ${b.attacks.length} propuestas</summary>${b.attacks.map(a => `<div class="note"><b>${h(a.id)} · ${h(b.verdict.semantic?.invalidAttacks?.some(x => x.id === a.id) ? "excluido por el juez" : a.status)}</b><div>${h(a.hypothesis || a.mission)}</div><button class="linkbtn" data-art="${h(a.id)}.json">Escenario y defensa</button></div>`).join('')}<table><tr><th>Versión</th><th>Resultado</th><th>Tests</th></tr>${b.evidence.map(e => `<tr><td>${h(e.version)}<div class="sub">${h(e.scope)}</div></td><td>${h(e.status)} <button class="linkbtn" data-art="${h(e.artifact)}">Evidencia</button>${e.log ? ` <button class="linkbtn" data-art="${h(e.log)}">Log</button>` : ''}</td><td>${e.ran || 0}</td></tr>`).join('')}</table></details>
+  <details><summary>Explicación del juez</summary><p>${h(b.verdict.semantic?.explanation || 'Revisión semántica pendiente')}</p>${b.verdict.pending.map(p => `<p class="sub">· ${h(pendingMessage(p))}</p>`).join('')}${(b.verdict.auditWarnings || []).map(p => `<p class="sub">Observación: ${h(pendingMessage(p))}</p>`).join('')}<button class="linkbtn" data-art="pipeline.json">Expediente completo</button></details>`;
+}
+
 function renderBrief(keepScroll) {
-  const run = S.run; const b = run.brief; const so = run.signoff;
+  const run = S.run; const b = run.brief; const so = run.signatureValid === false ? null : run.signoff;
   const scrollWas = $('panel').scrollTop;
   const stale = S.cur.sha && !b.pr.head.startsWith(S.cur.sha);
   const req = b.requirement;
   const P = [];
   if (stale) P.push(so ? `<div class="banner">Firma caducada. ${h(so.signer)} firmó el commit <span class="mono">${h(so.head.slice(0, 9))}</span> y la rama ya está en <span class="mono">${h(S.cur.sha)}</span>. Lo que se comprobó valía para ese commit: vuelve a verificar y a firmar.</div>` : '<div class="banner">La rama ha cambiado desde esta verificación. El informe ya no corresponde al código actual: vuelve a verificar.</div>');
-  if (b.recommendation) { const rc = { cambios: 'bad', insuficiente: 'warn', lista: 'ok' }[b.recommendation.id]; P.push(`<div class="reco t-${rc}"><span class="sub">Recomendación</span><b>${h(b.recommendation.name)}</b><span class="sub">${h(b.recommendation.why)}</span></div>`); }
+  if (b.verdict?.score) P.push(scoreHTML(b));
+  if (b.recommendation) { const rc = { cambios: 'bad', insuficiente: 'warn', lista: 'ok' }[b.recommendation.id] || (b.verdict?.status === 'request-changes' ? 'bad' : b.verdict?.status === 'ready-for-human' ? 'ok' : 'warn'); P.push(`<div class="reco t-${rc}"><span class="sub">Recomendación</span><b>${h(b.recommendation.name)}</b><span class="sub">${h(b.recommendation.why)}</span></div>`); }
   P.push(`<span class="lane ${TONE[b.lane.tone]}">${h(b.lane.name)}</span>
     <div class="big">${b.residue.lines} <span style="color:var(--dim)">de ${b.totals.lines} líneas</span></div>
     <div class="sub">${h(b.lane.summary)}</div>
@@ -256,9 +324,10 @@ function renderBrief(keepScroll) {
       <dt>Procedencia</dt><dd>${b.provenance.status === 'none' ? '<span class="t-warn">sin prompt guardado</span>; intención reconstruida desde el requisito' : `<span class="t-ok">prompt original guardado con el commit</span> (${b.provenance.status === 'nota' ? 'git notes' : 'Entire'})`}</dd>
     </dl>`);
 
+  if (b.version >= 2) P.push(courtroomHTML(b));
   P.push('<h3>Por qué este carril</h3>');
   P.push(b.rules.fired.length ? b.rules.fired.map((r) => `<div class="item"><span class="dot ${r.lane === 'devolver' ? 'bad' : r.lane === 'residuo' ? 'ok' : 'warn'}"></span><div><div class="ttl">${h(r.title)}</div><div class="d">${h(r.detail)}</div>${r.evidence?.length ? `<div class="links">${r.evidence.map(ev).join('')}</div>` : ''}</div></div>`).join('') : '<p class="sub">No se ha disparado ninguna regla de riesgo.</p>');
-  P.push(`<details><summary><span class="sub">Reglas que no se han disparado (${b.rules.notFired.length})</span></summary><div class="sub" style="padding:6px 0 0 18px">${b.rules.notFired.map((r) => h(r.title)).join(' · ')}</div></details>`);
+  P.push(`<details><summary><span class="sub">Reglas que no se han disparado (${(b.rules.notFired || []).length})</span></summary><div class="sub" style="padding:6px 0 0 18px">${(b.rules.notFired || []).map((r) => h(r.title)).join(' · ')}</div></details>`);
 
   if (b.questions.length) {
     P.push(`<h3>Decides tú · ${b.questions.length}</h3>`);
@@ -315,16 +384,25 @@ function renderBrief(keepScroll) {
   }
 
   P.push('<h3>No comprobado</h3>');
-  P.push(b.notChecked.map((n) => `<div class="item"><span class="dot no"></span><div><div class="ttl">${h(n.what)}</div><div class="d">${h(n.why)}</div></div></div>`).join(''));
+  P.push(b.notChecked.map((n) => `<div class="item"><span class="dot no"></span><div><div class="ttl">${h(pendingMessage(n.what))}</div><div class="d">${h(pendingMessage(n.why))}</div></div></div>`).join(''));
 
   P.push(so ? signedHTML(run) : signFormHTML(b));
+  if (b.version >= 2 && b.contract && !stale) P.push('<h3>Ampliar la investigación</h3><p class="sub">Nueva ejecución Deep: hasta 15 minutos y 250.000 tokens. Recupera el contrato y las propuestas compatibles; vuelve a validar las pruebas sobre el entorno actual.</p><button class="act" id="continueRun">Continuar investigando</button>');
   P.push(`<h3>Volver a verificar</h3>${optionsHTML()}<button class="act quiet" id="run">Verificar de nuevo</button><div id="perr" class="err"></div>
-    <p class="sub" style="margin-top:14px">Duró ${secs(b.timing.totalMs)}${b.cost?.usd ? ` · ${b.cost.usd.toFixed(2)} $ en agentes` : ''} · ${b.options.mode === 'completo' ? `completa con ${b.options.agents.length} agentes` : 'rápida'} · <button type="button" class="linkbtn" id="mdlink">ver informe en Markdown</button></p>`);
+    <p class="sub" style="margin-top:14px">Duró ${secs(b.timing.totalMs)}${b.cost?.usd ? ` · ${b.cost.usd.toFixed(2)} $ en agentes` : ''} · ${h(PROFILES[b.options.profile]?.name || (b.options.mode === 'completo' ? 'reconstrucción' : 'rápida'))} · <button type="button" class="linkbtn" id="mdlink">ver informe en Markdown</button></p>`);
 
   $('panel').innerHTML = P.join('');
   $('panel').scrollTop = keepScroll ? scrollWas : 0;
   bindOptions(() => renderBrief(true));
   $('run').onclick = () => verify();
+  if ($('continueRun')) $('continueRun').onclick = async () => {
+    const button = $('continueRun'); button.disabled = true;
+    try {
+      const result = await api(`/projects/${pid()}/runs/${run.id}/continue`, { body: { profile: 'deep' } });
+      say('Amplío la investigación con Deep. El nuevo informe conservará la referencia a esta revisión y comprobará de nuevo la evidencia necesaria.');
+      attach(result.runId);
+    } catch (error) { $('perr').textContent = error.message; button.disabled = false; }
+  };
   $('mdlink').onclick = async () => showText('Informe en Markdown', await (await fetch(`/api/projects/${pid()}/runs/${run.id}/report`)).text());
   $('panel').querySelectorAll('[data-art]').forEach((el) => (el.onclick = async () => {
     try { showText(el.textContent, await (await fetch(`/api/projects/${pid()}/runs/${run.id}/artifact?name=${encodeURIComponent(el.dataset.art)}`)).text()); } catch (e) { showText('Evidencia', e.message); }
@@ -335,14 +413,14 @@ function renderBrief(keepScroll) {
 
 /* ── Sign-off ─────────────────────────────────────────────────────────── */
 function signFormHTML(b) {
-  const hard = b.rules.fired.some((r) => ['conflicto', 'no-compila', 'suite-rota', 'tests-propios-fallan'].includes(r.id));
+  const hard = (b.version >= 2 && b.verdict.status !== 'ready-for-human') || b.rules.fired.some((r) => ['conflicto', 'no-compila', 'suite-rota', 'tests-propios-fallan'].includes(r.id));
   return `<h3>Firma</h3>
     <p class="sub">La revisión automática es un consejo. Tu firma es la aprobación.${b.audit ? ' Esta área está en prueba: una segunda persona auditará el cambio.' : ''}</p>
     <div class="field"><label for="signer">Tu nombre</label><input type="text" id="signer" value="${h(localStorage.getItem('katse.signer') || '')}" placeholder="Nombre y apellidos"></div>
     ${b.residue.items.length ? `<label class="ck"><input type="checkbox" id="ckResidue"><span>He leído el residuo: ${b.residue.lines} líneas en ${b.residue.items.length} ${b.residue.items.length === 1 ? 'zona' : 'zonas'}</span></label>` : ''}
     <label class="ck"><input type="checkbox" id="ckNot"><span>He revisado las ${b.notChecked.length} cosas que no se han comprobado</span></label>
     <div class="field"><label for="risk">Riesgo residual que acepto</label><textarea id="risk" rows="3" placeholder="Con tus palabras: qué podría fallar todavía y por qué lo aceptas."></textarea></div>
-    <button class="act solid" id="sign" ${hard ? 'disabled title="No se puede aceptar un cambio que no compila o rompe tests"' : ''}>Firmar y aceptar</button>
+    <button class="act solid" id="sign" ${hard ? 'disabled title="Faltan comprobaciones o hay incumplimientos: revisa el informe"' : ''}>Firmar y aceptar</button>
     <button class="act quiet" id="sendBack">Devolver al autor</button>
     <div id="serr" class="err"></div>`;
 }
@@ -368,7 +446,7 @@ function copyBlock(title, text, id) {
   return `<div class="field copy"><label>${h(title)}</label><button type="button" data-copy="${id}">Copiar</button><pre id="${id}">${h(text)}</pre></div>`;
 }
 function signedHTML(run) {
-  const so = run.signoff; const s = run.signed || {};
+  const so = run.signatureValid === false ? null : run.signoff; const s = run.signed || {};
   const out = run.brief.pr.direction === 'outgoing';
   return `<h3>Firma</h3>
     <div class="item"><span class="dot ${so.decision === 'aprobar' ? 'ok' : 'no'}"></span><div><div class="ttl">${so.decision === 'aprobar' ? 'Aceptado' : 'Devuelto al autor'} por ${h(so.signer)}</div><div class="d">${new Date(so.ts).toLocaleString()} · informe sha256:${h(so.briefHash.slice(0, 16))}…${so.auditRequired ? ' · pendiente de auditoría por una segunda persona' : ''}</div><div class="d">Riesgo aceptado: ${h(so.residualRisk)}</div></div></div>
