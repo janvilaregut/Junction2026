@@ -1,0 +1,12 @@
+{
+  "name": "katse",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Review by reproduction: verifies agent-written pull requests with executable evidence and routes what is left to a named human.",
+  "scripts": {
+    "start": "node server/index.js",
+    "review": "node server/cli.js"
+  },
+  "engines": { "node": ">=20" }
+}
