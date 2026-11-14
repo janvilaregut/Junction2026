@@ -74,7 +74,8 @@
     const withTests = part.filter((a) => a.tests);
     const consOk = withTests.length ? withTests.every((a) => a.tests.ok) : null;
     const st = b.verdict?.status;
-    const win = st === 'ready-for-human' ? 'PR' : st === 'request-changes' ? 'CONS' : 'none';
+    const nodePending=b.graphReview?.nodes.some(n=>n.status!=='verified');
+    const win = st === 'ready-for-human' && !nodePending ? 'PR' : st === 'request-changes' ? 'CONS' : 'none';
     const L2 = [['PR', orig ? (orig.status === 'passed' ? `I pass all ${orig.ran} tests in the suite.` : `My suite run: ${orig.status}, ${orig.ran} tests.`) : 'The change, as written.']];
     if (part.length) L2.push(['CONS', consOk === false ? `Our rebuilds fail the suite. ${cut(part[0].summary, 70)}` : consOk ? `Ours pass too. ${cut(part[0].summary, 70)}` : cut(part[0].summary), atk ? null : 'badge']);
     if (atk) {
@@ -97,7 +98,7 @@
       atkOut: (f?.outcomes || []).map((o) => ({ label: `${o.version === 'original' ? 'PR' : o.version} ${o.outcome === 'passed' ? '✓' : o.outcome === 'failed' ? '✕' : '·'}`, tone: o.outcome === 'passed' ? 'ok' : o.outcome === 'failed' ? 'bad' : 'no' })),
       atk: atk ? { model: modelName(atk.attacker) } : null, prOk, consOk, spot: spotSummary(spot, built),
       fixFrom: win === 'CONS' && part.length ? part.find((a) => a.tests?.ok) || part[0] : null,
-      verdict: { score: b.verdict?.score?.value ?? null, label: VERDICT[st]?.[1] || b.verdict?.label || 'Pending', tone: VERDICT[st]?.[0] || 'warn', win, facts },
+      verdict: { score: b.verdict?.score?.value ?? null, label: b.graphReview && st==='ready-for-human' ? (nodePending?'Node evidence pending':'Selected scope checked') : VERDICT[st]?.[1] || b.verdict?.label || 'Pending', tone: nodePending && st==='ready-for-human' ? 'warn' : VERDICT[st]?.[0] || 'warn', win, facts },
     };
   }
   /* A review running right now: the agents we know of (or the ones the profile will start), growing. */
@@ -333,7 +334,7 @@
   }
 
   /* ── The verdict card: the result, then where you sign ── */
-  const canApprove = () => { const b = S.run?.brief; return !!b && b.version >= 2 && b.verdict?.status === 'ready-for-human' && !b.rules.fired.some((r) => HARD.includes(r.id)); };
+  const canApprove = () => { const b = S.run?.brief; return !!b && (!b.graphReview || (!b.graphReview.scope.partial && b.graphReview.scope.denominator.every(n=>b.graphReview.nodes.some(v=>v.id===n.id && v.status==='verified')))) && b.version >= 2 && b.verdict?.status === 'ready-for-human' && !b.rules.fired.some((r) => HARD.includes(r.id)); };
   function renderCard() {
     const s = F.story; if (!s) return;
     if (s.node) return renderNodeCard(s);
@@ -341,6 +342,14 @@
     const chip = so ? (so.decision === 'aprobar' ? ['ok', 'Signed'] : ['bad', 'Sent back']) : [v.tone, v.label];
     const H = [`<div class="fvk">${esc(s.spot ? s.spot.where : 'Review')}</div>
       <div class="fvs"><span class="fvn">${v.score ?? '–'}<small>/10</small></span><span class="fchip" style="background:${PAL[chip[0]] || PAL.warn}">${esc(chip[1])}</span></div>`];
+    if (!s.live && run?.brief?.graphReview) H.push(`<p class="fnote">${run.brief.graphReview.scope.partial?'Selected scope':'Changed executable scope'} · ${run.brief.graphReview.nodes.map(n=>esc(n.id.split('::').pop())+': '+esc(n.status)).join(' · ')}. Pending nodes have no verified support; this score is not a bug-free probability.</p>`);
+    if (!s.live && run?.brief?.verdict) {
+      const b=run.brief, j=b.verdict;
+      H.push(`<details class="fnote"><summary>Why this score · evidence and limits</summary><p>${esc(j.score?.explanation || '')}</p><ul>${(j.score?.components || []).map(c=>`<li>${esc(c.label)}: ${c.earned}/${c.max}. ${esc(c.reason)}</li>`).join('')}</ul><ul>${(j.pending || []).map(p=>`<li>Pending: ${esc(p)}</li>`).join('')}</ul><ul>${(j.auditWarnings || []).map(p=>`<li>${esc(p)}</li>`).join('')}</ul><p>${esc(j.semantic?.explanation || '')}</p></details>`);
+      H.push(`<details class="fnote"><summary>All alternatives · ${b.candidates?.length || 0}</summary><ul>${(b.candidates || []).map(c=>`<li>${esc(c.id)} · ${esc(modelName(c.model))} · ${esc(c.status)} · Entire: ${esc(c.checkpoint?.status || 'not captured')}${c.error?' · '+esc(c.error):''}</li>`).join('')}</ul></details>`);
+      H.push(`<p class="fnote">${esc(b.budget?.profile || '')} · ${secs(b.budget?.elapsedMs || 0)} · ${Number(b.budget?.tokens || 0).toLocaleString()} observed tokens${b.budget?.usageIncomplete?' (usage incomplete)':''}</p>`);
+    }
+    if (!s.live && run?.brief?.repair) { const r=run.brief.repair; H.push(`<p class="fnote">Repair: ${esc(r.status)} · ${esc(r.reason || r.summary || '')}</p>`); if(r.patch) H.push(`<a class="cta ghost" download href="/api/projects/${encodeURIComponent(S.pid)}/runs/${encodeURIComponent(run.id)}/artifact?name=${encodeURIComponent(r.patch)}">Download proposed patch</a>`); }
     if (s.spot?.text) H.push(`<p class="fvl"><i style="background:${PAL[s.spot.tone] || PAL.no}"></i>${esc(s.spot.text)}</p>`);
     if (F.code && F.card !== 'sign') H.push(`<pre class="fcode">${F.code}</pre>`);
     if (F.fix && !so) H.push(`<div class="fvh">The fix · ${esc(F.fix.from)}'s version</div><pre class="fcode">${F.fix.html}</pre>`);
@@ -359,7 +368,7 @@
     } else {
       H.push(`<ul>${v.facts.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`);
       const ok = canApprove();
-      H.push(`<div class="fvb">${ok ? '<button class="cta" id="fSign">Sign</button>' : ''}<button class="cta${ok ? ' ghost' : ''}" id="fSend">${F.fix ? 'Send back with the fix' : 'Send back'}</button></div>`);
+      H.push(`<div class="fvb">${ok ? '<button class="cta" id="fSign">Sign</button>' : ''}<button class="cta${ok ? ' ghost' : ''}" id="fSend" ${s.live?'disabled':''}>${s.live?'Review in progress':F.fix ? 'Send back with the fix' : 'Send back'}</button></div>`);
     }
     CARD.innerHTML = H.join('');
     if ($('fSign')) $('fSign').onclick = () => { F.card = 'sign'; F.signMode = 'aprobar'; renderCard(); };
@@ -654,14 +663,14 @@
   /* ── Open / close ── */
   async function openTree(target = {}) {
     if ($('full').hidden || !S.cur) return null;
-    if (target.node?.kind === 'sym' && S.math) return openNode(target.node, target.force); // one function of the mathematical graph, reviewed alone
+    const focusNodes = target.focusNodes || (target.node?.kind === 'sym' && S.math ? [target.node.id] : null); // one function of the mathematical graph, reviewed alone
     const seq = ++F.seq; clearTimeout(F.hideT); F.mode = 'full';
     const zone = target.node?.kind === 'zone' ? target.node : findZone(target.query);
     const n = zone || target.node || G.nodes.get('pr');
     F.origin = n ? toScreen(n.x, n.y) : [innerWidth / 2, innerHeight / 2];
     Object.assign(F, { zone, vers: null, code: '', fix: null, card: 'verdict', signMode: 'aprobar', answers: {}, stat: '', story: null, tl: null });
     const b = S.run?.brief, stale = !!(b && S.cur.sha && b.pr?.head && !b.pr.head.startsWith(S.cur.sha));
-    const real = b?.version >= 2 && !stale && !S.es;
+    const real = b?.version >= 2 && !stale && !S.es && !focusNodes && !target.force;
     F.live = !real; F.open = true;
     G.pin = null; G.hover = null; $('tip').classList.remove('on');
     $('g').style.transformOrigin = `${F.origin[0]}px ${F.origin[1]}px`;
@@ -677,7 +686,7 @@
     F.t = RM || signed ? F.tl.end : 0; F.playing = !(RM || signed); paintCtl();
     if (real) loadFix(F.story, seq);
     else if (!S.es && !S.starting) {
-      const ok = await verify();
+      const ok = await verify(focusNodes);
       if (!ok && seq === F.seq) { closeTree(); return { started: false, error: 'The review could not start. The bar says why.' }; }
     }
     return info();

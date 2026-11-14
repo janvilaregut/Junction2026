@@ -1051,12 +1051,23 @@ function renderBar(error, fatal) {
 /* ── Verification, streamed live ──────────────────────────────────────── */
 /* Starts a run for the open branch. Resolves true if it started. One at a time: a second click, or a
    call while one is streaming, does nothing. The server picks how many agents a Full run gets. */
-async function verify() {
+async function continueReview() {
+  if (!S.run?.id || S.es || S.starting) return false;
+  const seq=openSeq,pid=S.pid,prId=S.cur.id,runId=S.run.id;
+  S.starting=true;renderBar();
+  try {
+    const r=await api(`/projects/${pid}/runs/${runId}/continue`,{body:{profile:S.profile}});
+    S.starting=false;
+    if(alive(seq) && S.cur?.id===prId){S.cur.running=r.runId;attach(r.runId,seq);openTree({});}
+    reloadPRs().catch(()=>{});return true;
+  } catch(e) {S.starting=false;if(alive(seq))renderBar(e.message);return false;}
+}
+async function verify(focusNodes = null) {
   if (!S.cur || S.es || S.starting || $('full').hidden) return false;
   const seq = openSeq, p = S.cur;
   S.starting = true; renderBar();
   try {
-    const r = await api(`/projects/${S.pid}/verify`, { body: { pr: p.id, options: { mode: 'completo', profile: S.profile, mutants: 4 } } });
+    const r = await api(`/projects/${S.pid}/verify`, { body: { pr: p.id, options: { mode: 'completo', profile: S.profile, mutants: 4, focusNodes } } });
     S.starting = false;
     p.running = r.runId; // the tree and a reopen show it as running until the next reload
     if (S.cur?.id === p.id) S.cur.running = r.runId;
@@ -1071,6 +1082,8 @@ async function verify() {
 }
 /* What the real pipeline is doing right now, in a few words (its events: contract, candidate, debate, attack, result, judgment). */
 function liveText(e) {
+  if (e.type === 'node-probe') return `Executable node check: ${e.status}`;
+  if (e.type === 'repair') return `Proposed repair: ${e.status}`;
   if (e.type === 'contract') return `Contract: ${e.expectations?.length || 0} expectations`;
   if (e.type === 'candidate') return `Alternative ${e.id}: ${CAND[e.status] || e.status}`;
   if (e.type === 'debate') return `Debate: ${e.candidate} ${e.round === 'results' ? 'after the tests' : 'reviews the other proposal'}`;
@@ -1110,6 +1123,7 @@ function attach(runId, seq = openSeq) {
         const run = await api(`/projects/${S.pid}/runs/${runId}`);
         if (!alive(seq)) return;
         S.run = run;
+        try {const math=await api(`/projects/${S.pid}/math?pr=${encodeURIComponent(prId)}`); S.math=math; S.marks=math.marks || {};} catch {}
         if (!run.brief) { renderBar(`Verification failed: ${english(run.error) || 'unknown error'}`); if (typeof treeLiveDone === 'function') treeLiveDone(); return; }
         renderBar(); renderGraph(graphOf());
         if (typeof treeLiveDone === 'function') treeLiveDone();

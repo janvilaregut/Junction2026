@@ -120,7 +120,8 @@ body.dive .lane.pulse .tipring{animation-play-state:paused}
 .back:hover i{color:var(--fg)}
 .back b{font:600 18px var(--head)}
 .back small{display:block;font:400 12px var(--mono);color:var(--fg2);margin-top:2px}
-.fbar{position:absolute;left:50%;bottom:32px;transform:translateX(-50%);display:flex;align-items:center;gap:16px;padding:10px 10px 10px 24px;border-radius:999px;background:var(--card);border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.5);white-space:nowrap;z-index:2;min-height:64px}
+.fbar{position:absolute;left:50%;bottom:32px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:12px;width:max-content;max-width:calc(100vw - 40px);padding:10px 16px;border-radius:28px;background:var(--card);border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.5);white-space:nowrap;z-index:2;min-height:64px}
+.fbar select{font:inherit;color:var(--fg);background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:8px}
 body:has(#drawer:not([hidden])) .fbar{left:calc((100vw - min(520px,100vw - 24px) - 12px) / 2)} /* centre in the space left of the drawer */
 body:has(#drawer:not([hidden])) .flegend{display:none}
 .fbar .num{font:600 26px var(--head);letter-spacing:-.02em}

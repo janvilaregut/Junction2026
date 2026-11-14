@@ -1,3 +1,6 @@
+import {repairOriginal} from './repair.js';
+import { probeNode } from './node-probes.js';
+import { focusGroups, nodeResults } from '../graph-review.js';
 // The full pipeline owns one wall-clock budget. Models propose; execution supplies evidence.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +21,7 @@ import { analyzeSymbols, reconstructContract, behaviorGroups } from './contract.
 import { evaluate, runnerQueue, validateAttack, attackOutcome, chooseCandidates, adjudicate, isGrounded } from './evidence.js';
 import { harnessPath, harnessContent, scenarioInstructions, materializeScenario } from './messagepack-harness.js';
 import { PrivacyGateway, privacyMode } from '../privacy.js';
-import { populationPlan, allocateGroup, groupMission, updateGroups, unverifiedCritical } from '../planner.js';
+import { populationPlan, allocateGroup, groupMission, updateGroups, unverifiedCritical, finalValidationCandidates } from '../planner.js';
 import { decisionMissions } from '../decisions.js';
 
 const ID = ['-c', 'user.name=Katse', '-c', 'user.email=katse@localhost', '-c', 'commit.gpgsign=false'];
@@ -65,7 +68,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   async function candidate(index, parent = null) {
     const id = `C${index + 1}`, dir = path.join(tempRoot, id), requestedModel = index % 2 ? models().diverse : models().fast, model = availableModel(requestedModel);
     const group = allocateGroup(state.groups);
-    const c = { id, dir, version: 1, generation: parent ? 2 : 1, parents: parent ? [parent.id] : [], model, requestedModel, modelFallback: model !== requestedModel, group: group?.id, strategy: strategies[index % strategies.length], status: 'pending', reason: parent ? 'Correct observed failures or explore an unresolved decision in a surviving strategy' : 'Independent reconstruction from the historical base', isolation: { base: it.mergeBase, history: 'fresh single commit, no remotes', proposedPatchVisible: false, changedLocationsVisible: true, excerptSelection: 'prior source at changed locations and expressions cited in the requirement', osSandbox: false } };
+    const c = { scopeNodes: options.graphScope?.nodes.map(n=>n.id) || [], id, dir, version: 1, generation: parent ? 2 : 1, parents: parent ? [parent.id] : [], model, requestedModel, modelFallback: model !== requestedModel, group: group?.id, strategy: strategies[index % strategies.length], status: 'pending', reason: parent ? 'Correct observed failures or explore an unresolved decision in a surviving strategy' : 'Independent reconstruction from the historical base', isolation: { base: it.mergeBase, history: 'fresh single commit, no remotes', proposedPatchVisible: false, changedLocationsVisible: true, excerptSelection: 'prior source at changed locations and expressions cited in the requirement', osSandbox: false } };
     state.candidates.push(c); emit({ type: 'candidate', id, status: c.status }); save(); const begin = Date.now();
     c.mission = groupMission(group,state.contract,state.routing?.missions?.[group?.id]);
     c.priority = group?.priority;
@@ -80,6 +83,11 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       const feedback = parent ? state.evidence.filter(e => e.version === parent.id).map(e => ({ status: e.status, failures: e.tests?.filter(t => t.outcome === 'Failed'), log: e.log && fs.readFileSync(path.join(artifacts, e.log), 'utf8').slice(-7000) })) : [];
       let result = await session({ dir, artifacts, role: `build-${id}`, model, timeout: 75000, noTools: true, maxOutputTokens: 4096, maxInputTokens: 14000,
         prompt: `Independently solve this contract from PRE-CHANGE source. The proposed patch is hidden. NO tools, commands or full file rewrites. Return at most 4 block replacements as JSON {"summary":"brief","decisions":["brief"],"unresolved":[],"edits":[{"block":"B1","new":"COMPLETE replacement for that block, including its unchanged context lines"}]}. Select only supplied block IDs. Copy unchanged lines within each edited block exactly. Do NOT include block labels in new. Do not invent or edit methods outside these blocks. Return the complete replacement block. Preserve indentation. Strategy: ${c.strategy}. For descendants edit the current parent source. Original requirement (independent of the proposed patch): ${state.requirementContext}\nContract: ${JSON.stringify(state.contract.expectations.map(({testIdeas,symbols,...e})=>e))}\nSource excerpts: ${context}\nParent feedback: ${JSON.stringify(feedback)}${state.newSourcePaths?.length ? `\nFiles that do not exist yet and the change may need to create: ${JSON.stringify(state.newSourcePaths)}. To create one, add an edit {"path":"<that path>","old":"","new":"complete file content"}.` : ''}`, validate: x => typeof x.summary === 'string' && Array.isArray(x.edits) });
+      if (!parent && !result.result.edits.length && Date.now()+40000<generationEnd) {
+        recordSession(result);
+        result=await session({dir,artifacts,role:`build-${id}-empty-retry`,model,timeout:35000,noTools:true,maxOutputTokens:3000,
+          prompt:`Your previous answer proposed no edits: ${result.result.summary}. This is a bug-fix reconstruction from the historical base. Make one minimal repair if supported; otherwise explain the precise missing context in unresolved. No tools. Return JSON {"summary":"...","decisions":[],"unresolved":[],"edits":[{"block":"B1","new":"complete replacement of supplied block"}]}. Preserve unchanged context. Requirement:${state.requirementContext} Contract:${JSON.stringify(state.contract.expectations)} Source blocks:${context}`,validate:x=>typeof x.summary==='string'&&Array.isArray(x.edits)});
+      }
       // An explicit no-change answer is not malformed JSON. Do not spend another
       // model call asking it to invent a patch, especially for an unchanged parent.
       if (!result.result.edits.length) {
@@ -89,13 +97,20 @@ async function executeComplete(args, { intake, verifyBaseline }) {
         if (parent) c.duplicateOf = parent.id;
         return;
       }
-      try { applyProposal(dir, result.result.edits, state.sourcePaths, blocks); }
+      const beforeEdits=new Map(state.sourcePaths.map(p=>[p,fs.existsSync(path.join(dir,p))?fs.readFileSync(path.join(dir,p)):null]));
+      const syntaxCheck=async()=>{
+        const manifest=path.join(artifacts,`syntax-${id}.json`);writeJSON(manifest,{root:dir,files:state.sourcePaths,syntaxOnly:true});
+        const checked=await run('dotnet',[path.join(ROOT,'tools/Katse.Analyze/bin/Release/net8.0/Katse.Analyze.dll'),manifest],{timeout:15000});
+        if(checked.code) throw new Error(`Invalid C# syntax: ${checked.stdout.slice(0,1800)}`);
+      };
+      try { applyProposal(dir, result.result.edits, state.sourcePaths, blocks); await syntaxCheck(); }
       catch (error) {
+        for(const [p,bytes] of beforeEdits) {const abs=path.join(dir,p);if(bytes===null)fs.rmSync(abs,{force:true});else fs.writeFileSync(abs,bytes);}
         recordSession(result);
         const diagnostics = result.result.edits.map(e=>({path:e.path,old:e.old,count:state.sourcePaths.includes(e.path) && typeof e.old==='string' && fs.existsSync(path.join(dir,e.path)) ? fs.readFileSync(path.join(dir,e.path),'utf8').replaceAll('\r\n','\n').split(e.old.replaceAll('\r\n','\n')).length-1 : null}));
         result = await session({dir,artifacts,role:`build-${id}-repair`,model,timeout:35000,noTools:true,maxOutputTokens:4096,maxInputTokens:18000,
           prompt:`Your proposal was NOT applied: ${error.message}. One correction allowed. Return JSON {"summary":"...","decisions":[],"unresolved":[],"edits":[{"path":"src/...cs","old":"EXACT unique multiline substring","new":"replacement"}]}. No tools. Preserve whitespace. DO NOT join separate EXCERPTS. Include more unchanged context if count>1. Replace invented old substrings with actual source. ${state.newSourcePaths?.length ? `To create a file that does not exist yet (${JSON.stringify(state.newSourcePaths)}), use "old":"" and the complete content as "new". ` : ''}Diagnostics:${JSON.stringify(diagnostics)}\nPrevious proposal:${JSON.stringify(result.result)}\nOriginal requirement:${state.requirementContext}\nActual source excerpts:${context}`,validate:x=>typeof x.summary==='string'&&Array.isArray(x.edits)});
-        applyProposal(dir,result.result.edits,state.sourcePaths,blocks);
+        applyProposal(dir,result.result.edits,state.sourcePaths,blocks); await syntaxCheck();
       }
       c.application = 'Model proposed literal edits; local orchestrator applied and verified unique matches';
       recordSession(result); c.session = { id: result.sessionId, artifact: result.artifact }; c.summary = result.result.summary; c.decisions = result.result.decisions; c.unresolved = result.result.unresolved;
@@ -125,18 +140,23 @@ async function executeComplete(args, { intake, verifyBaseline }) {
     const allowed = state.contract.expectations.filter(isGrounded);
     const targets = unverifiedCritical(allowed,state.attacks,state.evidence,attackOutcome);
     const schema = (state.harness?.length ? scenarioInstructions : '{"hypothesis":"possible failing behavior","scenario":"valid input","expected":"required output","expectations":["E1"],"names":["KatseUniqueTest"],"files":[{"path":"tests/.../KatseUniqueTests.cs","content":"complete compilable C# test file"}]}')
+      .replace('{', '{'+ (options.graphScope ? '"nodeIds":'+JSON.stringify(options.graphScope.nodes.map(n=>n.id))+',' : ''))
       .replace('"expectations":["E1"]',`"expectations":${JSON.stringify(targets.length?targets:allowed.slice(0,1).map(e=>e.id))}`);
     const labels = final && state.frozen?.selected ? index % 2 ? { A: state.frozen.selected, B: 'original' } : { A: 'original', B: state.frozen.selected } : null;
     const patchFor = id => id === 'original' ? state.proposedPatch : fs.readFileSync(path.join(artifacts, state.candidates.find(c => c.id === id).patch), 'utf8');
     const blinded = labels ? `\nAnonymous frozen implementation A:\n${patchFor(labels.A)}\nAnonymous frozen implementation B:\n${patchFor(labels.B)}` : '';
     const context = `Debate suggestions (hypotheses, not facts): ${JSON.stringify(state.debate).slice(0,6000)}\nUse ONLY supplied context; no tools. Cite ONLY these allowed expectation IDs: ${allowed.map(e => e.id).join(', ')}. Choose one precise scenario and only expectations this test actually checks. Do NOT make assertions about pending/unspecified behaviors. Contract: ${JSON.stringify(allowed)}\nOriginal requirement: ${state.requirementContext}\nTest projects: ${JSON.stringify(it.toolchain.testProjects)}\nExisting test names (avoid repeating their simplest cases): ${JSON.stringify(state.testInventory || [])}. Test conventions and source excerpts: ${state.reviewContext}${blinded}\nExisting attacks (choose a NEW case): ${JSON.stringify(state.attacks.map(a => ({ hypothesis: a.hypothesis, scenario: a.scenario })))}`;
-    let a = { id, mission, riskKey: mission, targetExpectations: targets, origin: state.debate.length ? 'debate-informed' : 'independent-review', originCandidate: [...new Set(state.debate.filter(d=>d.round==='proposals'&&d.status!=='incomplete').map(d=>d.candidate))].join(', ') || null, final, attacker, requestedAttacker, modelFallback: attacker !== requestedAttacker, defender, labels, status: 'pending' }; state.attacks.push(a); save();
+    // The defender receives the actual injected infrastructure: its absence from
+    // the original repository is not a reason to invent a harness incompatibility.
+    const harnessContext=state.harness?.length ? `\nOrchestrator-owned harness, injected with every scenario (this code is available at execution):\n${harnessContent}` : '';
+    let a = { nodeIds: [], id, mission, riskKey: mission, targetExpectations: targets, origin: state.debate.length ? 'debate-informed' : 'independent-review', originCandidate: [...new Set(state.debate.filter(d=>d.round==='proposals'&&d.status!=='incomplete').map(d=>d.candidate))].join(', ') || null, final, attacker, requestedAttacker, modelFallback: attacker !== requestedAttacker, defender, labels, status: 'pending' }; state.attacks.push(a); save();
     try {
       const result = await call({ dir: reviewerDir, role: `attack-${id}`, model: attacker, timeout: 45000, noTools: true, maxOutputTokens: 2000,
-        prompt: `Design ONE executable adversarial C# test for mission: ${mission}. Untested critical expectations to prioritize: ${JSON.stringify(targets)}. Choose a scenario checking multiple critical expectations together when the supplied harness actually asserts them. The example expectation IDs are targets, NOT automatic coverage: return only IDs genuinely checked, and explain their asserted behavior in expected. Leave unrelated or unsupported expectations unlisted. Use the supplied test conventions. Do not edit or execute anything. Return JSON ${schema}. Use unique file/class/method prefix Katse${id.replace(/-/g, '')}. The expected result must follow the cited contract; NEVER assert outputs based on majority voting or candidate agreement. Use an existing test verifier API exactly as seen in tests. ${context}`, validate: x => { const a = state.harness?.length ? materializeScenario(x,id) : x; validateAttack(a,state.contract,it.toolchain.testProjects); return true; } });
-      Object.assign(a, attackContent(state.harness?.length ? materializeScenario(result, id) : result)); validateAttack(a, state.contract, it.toolchain.testProjects);
+        prompt: `Design ONE executable adversarial C# test for mission: ${mission}. Selected scope: ${JSON.stringify(options.graphScope?.nodes || [])}. Only claim nodeIds for functions this scenario exercises; return nodeIds in JSON. Untested critical expectations to prioritize: ${JSON.stringify(targets)}. Choose a scenario checking multiple critical expectations together when the supplied harness actually asserts them. The example expectation IDs are targets, NOT automatic coverage: return only IDs genuinely checked, and explain their asserted behavior in expected. Leave unrelated or unsupported expectations unlisted. Use the supplied test conventions. Do not edit or execute anything. Return JSON ${schema}. Use unique file/class/method prefix Katse${id.replace(/-/g, '')}. The expected result must follow the cited contract; NEVER assert outputs based on majority voting or candidate agreement. Use an existing test verifier API exactly as seen in tests. ${context}`, validate: x => { if(options.graphScope && (!Array.isArray(x.nodeIds) || !x.nodeIds.length || x.nodeIds.some(id=>!options.graphScope.nodes.some(n=>n.id===id)))) throw new Error('scenario-node-ids'); const a = state.harness?.length ? materializeScenario(x,id) : x; validateAttack(a,state.contract,it.toolchain.testProjects); return true; } });
+      Object.assign(a, attackContent(state.harness?.length ? materializeScenario(result, id) : result));
+      a.nodeIds = (result.nodeIds || []).filter(id=>options.graphScope?.nodes.some(n=>n.id===id)); validateAttack(a, state.contract, it.toolchain.testProjects);
       const defense = profile.id === 'deep' ? await call({ dir: reviewerDir, role: `defense-${id}`, model: defender, timeout: final ? 40000 : 60000,
-        prompt: `Validate the TEST: valid scenario, expectation grounded in contract, executable harness. Admit valid tests even when you expect the implementation to PASS. A hypothesis predicting a bug can be false while the test is useful. Lack of evidence for a bug is NEVER grounds to reject a test; execution must refute it. Reject only invalid input, unsupported expectation, incompatible harness or material requirement ambiguity. You are defending anonymous version ${index % 2 ? 'A' : 'B'}. A failure is NOT evidence until executed. Do not edit. Return {"admit":true|false,"reason":"...","revision":"..."}. ${context}\nAttack: ${JSON.stringify(a)}`, validate: x => typeof x.admit === 'boolean' }) : { admit: true, reason: 'Schema and source references checked locally; semantic validity reviewed at final judgment', mechanism: 'deterministic-provisional-admission' };
+        prompt: `Validate the TEST: valid scenario, expectation grounded in contract, executable harness. Admit valid tests even when you expect the implementation to PASS. A hypothesis predicting a bug can be false while the test is useful. Lack of evidence for a bug is NEVER grounds to reject a test; execution must refute it. Reject only invalid input, unsupported expectation, incompatible harness or material requirement ambiguity. You are defending anonymous version ${index % 2 ? 'A' : 'B'}. A failure is NOT evidence until executed. Do not edit. Return {"admit":true|false,"reason":"...","revision":"..."}. ${context}${harnessContext}\nAttack: ${JSON.stringify(a)}`, validate: x => typeof x.admit === 'boolean' }) : { admit: true, reason: 'Schema and source references checked locally; semantic validity reviewed at final judgment', mechanism: 'deterministic-provisional-admission' };
       a.defense = defense;
       if (!defense.admit && defense.revision) {
         const revised = await call({ dir: reviewerDir, role: `revise-${id}`, model: attacker, timeout: 40000, prompt: `One permitted revision to this attack. Return ${schema}. Address the defense or return {"withdraw":true}. Do not edit files. ${context}\nAttack:${JSON.stringify(a)}\nDefense:${JSON.stringify(defense)}`, validate: x => x.withdraw === true || (state.harness?.length ? !!x.test : Array.isArray(x.files)) });
@@ -196,7 +216,8 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       const preparation = await Promise.allSettled([resume ? Promise.resolve(resume.state.contract) : reconstructContract(it, contractDir, artifacts, emit), analyzeSymbols(it, contractDir, artifacts)]);
       const failedPreparation = preparation.find(r=>r.status==='rejected'); if(failedPreparation) throw failedPreparation.reason;
       const [contract, analysis] = preparation.map(r=>r.value);
-      state.contract = contract; state.analysis = analysis; state.groups = behaviorGroups(it, analysis, contract);
+      state.contract = contract; state.analysis = analysis; state.groups = focusGroups(behaviorGroups(it, analysis, contract), options.graphScope);
+      if (options.graphScope && (options.graphScope.head !== it.headSha || options.graphScope.base !== it.mergeBase)) throw new Error('Graph changed before execution; refresh the review');
       state.budget.population = populationPlan(state.groups,profile,{remainingMs:finalEnd-Date.now(),tokens:execution.getStore().tokenBudget.snapshot().remaining});
       state.budget.initialCandidates = state.budget.population.admitted;
       state.budget.maxCandidates = state.budget.initialCandidates + profile.maxDescendants;
@@ -208,7 +229,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       if (!resume) state.sessions.push(...(contract.sessionRecords || []));
       state.reviewContext = ''; state.baseContext = ''; state.baseBlocks = []; state.testInventory = [];
       state.requirementContext = state.contract.sources.filter(s=>s.kind==='requirement').map(s=>s.text).join('\n').slice(0,12000);
-      state.sourceChanges = it.files.filter(f=>f.kind==='source' && f.path.endsWith('.cs')).map(f=>({path:f.path,hunks:f.hunks}));
+      state.sourceChanges = it.files.filter(f=>f.kind==='source' && f.path.endsWith('.cs')).map(f=>({path:f.path,hunks: options.graphScope ? f.hunks.filter(h=>state.groups.some(g=>g.file===f.path && h.oldStart<=g.end && h.oldStart+Math.max(1,h.oldLines)>=g.start)) : f.hunks})).filter(f=>f.hunks.length);
       // A file the PR creates does not exist at the base: its base text is empty, and agents may create it.
       const baseText = (p) => out(it.repo, ['show', `${it.mergeBase}:${p}`]).catch(() => null);
       const sourceFiles = (await Promise.all(state.sourceChanges.map(async f => ({ ...f, text: await baseText(f.path) })))).map(f => ({ ...f, isNew: f.text === null, text: f.text ?? '' }));
@@ -230,7 +251,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       state.environment = { platform: process.platform, arch: process.arch, node: process.version, sdk: (await run('dotnet', ['--version'], { cwd: contractDir, timeout: 10000 })).stdout.trim(), projects: it.toolchain.testProjects, scope: 'C# relevant tests, default build configuration', runnerHash: sha256(fs.readFileSync(path.join(ROOT, 'server/pipeline/toolchain.js'))), dependencies: it.headSha };
       original = { id: 'original', dir: path.join(tempRoot, 'baseline/merged'), tree: await out(it.repo, ['rev-parse', `${it.headSha}^{tree}`]), commit: it.headSha };
       save();
-      if (resume) for(const previous of resume.state.candidates.filter(c=>c.status==='built')) {
+      if (resume) for(const previous of resume.state.candidates.filter(c=>c.status==='built' && !resume.state.evidence.some(e=>e.version===c.id && ['build-error','runner-error'].includes(e.status)))) {
         const dir = path.join(tempRoot,previous.id); await blindCopy(it.repo,dir,it.mergeBase);
         await git(dir,['apply','--whitespace=nowarn',path.join(artifacts,previous.patch)]); await git(dir,['add','-A']);
         const tree = await out(dir,['write-tree']); if(tree!==previous.tree) throw new Error('Continuation candidate hash mismatch');
@@ -291,13 +312,17 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       await within(finalEnd, async () => {
         if (!finalAttackTask) await prepareFinalAttacks();
         const originalResult = await test(original, true);
-        for (const c of state.candidates.filter(c=>c.status==='built' && (profile.id!=='deep' || c.id===state.frozen.selected)).slice(0,2)) {
+        // Always validate the frozen finalist, even when it is a later descendant.
+        const finalists=finalValidationCandidates(state.candidates,state.frozen.selected,{profile:profile.id,scoped:!!options.graphScope});
+        for (const c of finalists) {
           if(Date.now()+20000<finalEnd) await test(c,true);
           else state.pending.push({where:`validation-${c.id}`,text:'Candidate validation was not started: execution budget insufficient'});
         }
         const failures = state.attacks.filter(a => a.status === 'admitted' && attackOutcome(a, originalResult) === 'failed');
         if (failures.length) {
-          await test(original, false, true);
+          const repeated=await test(original, false, true);
+          if (failures.some(a=>attackOutcome(a,repeated)==='failed') && Date.now()+90000<finalEnd) state.repair=await repairOriginal({it,original,state,artifacts,tempRoot,emit});
+          else state.repair={status:'pending',reason:'Repair needs a reproducible failure and at least 90 seconds remaining',appliedToOriginal:false};
           const baseDir = path.join(tempRoot, 'repro-base'); await blindCopy(it.repo, baseDir, it.mergeBase);
           await test({ id: 'historical-base', dir: baseDir, tree: await out(it.repo, ['rev-parse', `${it.mergeBase}^{tree}`]) });
         }
@@ -305,7 +330,14 @@ async function executeComplete(args, { intake, verifyBaseline }) {
         const unchecked = state.candidates.filter(c=>required.includes(c.id)).filter(c=>!state.evidence.some(e=>e.version===c.id&&e.scope==='relevant-suite'&&e.executionComplete));
         state.budget.candidateValidation = {complete:unchecked.length===0,pending:unchecked.map(c=>c.id)};
         for(const c of unchecked) if(!state.pending.some(p=>p.where===`validation-${c.id}`)) state.pending.push({where:`validation-${c.id}`,text:'Candidate validation did not complete; the full comparison remains pending'});
-        await deliberate(true);
+        state.nodeProbes = [];
+        for(const node of options.graphScope?.nodes || []) {
+          if(Date.now()+35000<finalEnd) state.nodeProbes.push(await probeNode({node,original,originalResult,state,tc:it.toolchain,artifacts,emit,suiteOverlay:[...state.harness,...state.suiteOverlay]}));
+          else state.nodeProbes.push({node:node.id,status:'pending',reason:'Insufficient time for deterministic node probe'});
+          emit({type:'node-probe',...state.nodeProbes.at(-1)}); save();
+        }
+        if (!options.graphScope) await deliberate(true); // Execution and attribution take precedence over a second debate.
+
         complete = true;
       });
     } catch (e) { pending('final-attacks', e); }
@@ -347,6 +379,8 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   const fallback = { version: 1, createdAt: new Date().toISOString(), project: { id: project.id, name: project.name }, provenance: { status: 'none' }, pr: { id: pr.id, branch: pr.branch, direction: pr.direction, title: pr.title, head: it?.headSha || pr.sha || '', base: project.base, baseSha: it?.baseSha, commits: [] }, totals: it?.totals || { lines: 0, files: 0, added: 0, removed: 0 }, kinds: it?.kinds || {}, files: [], claims: [], questions: [], residue: { lines: it?.totals.lines || 0, total: it?.totals.lines || 0, items: [] }, notChecked: [], rules: { fired: [] }, timing: { stages: [] }, areas: [], toolchain: { kind: it?.toolchain.kind || 'none' }, options, cost: { usd: 0 } };
   const brief = { ...(baseline || fallback), version: 2, contract: state.contract, candidates: state.candidates.map(stripCandidate), attacks: state.attacks, evidence: state.evidence, budget: state.budget, verdict: state.verdict, input: state.input, environment: state.environment, finalMissions: state.finalMissions, analysis: state.analysis, providers: state.providers, continuation: state.continuation, debate: state.debate, intentComparison: state.intentComparison };
   brief.options = options; brief.timing.totalMs = Date.now() - started; brief.pr.base = project.base;
+  brief.graphReview = options.graphScope ? {scope:options.graphScope,nodes:nodeResults(options.graphScope,state),probes:state.nodeProbes || []} : null;
+  brief.repair = state.repair || null;
   brief.privacy = state.privacy; brief.allocation = state.allocation;
   brief.claims = brief.claims.filter(c => c.id !== 'replicas');
   brief.notChecked = brief.notChecked.filter(c => c.what !== 'Réplicas independientes');
@@ -356,7 +390,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   brief.recommendation = { id: state.verdict.status === 'ready-for-human' ? 'lista' : state.verdict.status === 'request-changes' ? 'cambios' : 'insuficiente', lista: state.verdict.status === 'ready-for-human', name: state.verdict.label, why: state.verdict.semantic?.explanation || 'Comprobaciones deterministas y alcance pendiente', text: state.verdict.label };
   brief.notChecked.push(...state.verdict.pending.map(what => ({ what, why: 'Evidencia pendiente del pipeline completo' })));
   brief.claims.push({ id: 'courtroom', text: 'Veredicto basado en ejecución y contrato versionado', status: state.verdict.status === 'ready-for-human' ? 'reproducido' : 'parcial', detail: state.verdict.label, evidence: [{ label: 'Contrato y trazabilidad', artifact: 'pipeline.json' }] });
-  brief.binding = sha256(JSON.stringify({ head: brief.pr.head, contract: state.contract?.hash, evidence: state.evidence.map(e => e.id), tests: state.attacks.map(a => a.hash), intent: state.intentComparison }));
+  brief.binding = sha256(JSON.stringify({ graphReview: brief.graphReview, head: brief.pr.head, contract: state.contract?.hash, evidence: state.evidence.map(e => e.id), tests: state.attacks.map(a => a.hash), intent: state.intentComparison }));
   save(); brief.artifactManifest = artifactManifest(artifacts); writeJSON(path.join(artifacts, 'brief.json'), brief); emit({ type: 'judgment', verdict: state.verdict, artifact: 'brief.json' });
   // No active workers remain. Retain candidate repositories with captured checkpoints for audit.
   return brief;

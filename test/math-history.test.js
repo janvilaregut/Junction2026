@@ -22,6 +22,8 @@ import {
 //   c7  2024-07-01 12:00Z  bob    Remove b, add logo          src/b.js -4, assets/logo.bin (binary)      <- main, the ref
 //   c8  2024-08-01 12:00Z  carol  Fix bug in a, add new       src/a.js +1, src/new.js +3                 <- pr
 // ---------------------------------------------------------------------------------------------------------------
+const ODD_TAB = process.platform==='win32' ? 'tab unicode-é.txt' : 'tab\there.txt';
+const ODD_LINE = process.platform==='win32' ? 'line unicode-ø.txt' : 'line\nbreak.txt';
 const MAIL = { alice: 'alice@example.com', ALICE: 'Alice@Example.COM', bob: 'bob@example.com', carol: 'carol@example.com' };
 const lines = (n, tag) => Array.from({ length: n }, (_, i) => `${tag} ${i}\n`).join('');
 let dir, shallowDir, home, sha, odd, oddSha;
@@ -79,22 +81,23 @@ function build() {
 //   s1  2024-01-05  Add side            side.txt +1                                   <- side, branched from o3
 //   o5  2024-01-06  Merge branch 'side' merge of o4 and s1 that ALSO appends a line to root.txt     <- main
 // ---------------------------------------------------------------------------------------------------------------
-const ODD = { accents: 'dir with space/\u00f1and\u00fa caf\u00e9.txt', tab: 'tab\there.txt', nl: 'new\nline.txt', quote: 'quote".txt', dash: '-dash.txt' };
+const ODD = { accents: 'dir with space/\u00f1and\u00fa caf\u00e9.txt', tab: ODD_TAB, nl: process.platform==='win32' ? 'new line.txt' : 'new\nline.txt', quote: process.platform==='win32' ? 'quote name.txt' : 'quote".txt', dash: '-dash.txt' };
 
 function buildOdd(cfg) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'katse-history-odd-')), env = cleanEnv(cfg);
   const git = (args, extra = {}) => execFileSync('git', args, { cwd: root, env: { ...env, ...extra }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   const on = (day) => { const d = `2024-01-0${day}T12:00:00Z`; return { GIT_AUTHOR_NAME: 'alice', GIT_AUTHOR_EMAIL: MAIL.alice, GIT_COMMITTER_NAME: 'alice', GIT_COMMITTER_EMAIL: MAIL.alice, GIT_AUTHOR_DATE: d, GIT_COMMITTER_DATE: d }; };
   const write = (rel, content) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), content); };
-  const commit = (day, subject) => { git(['add', '-A']); git(['commit', '-q', '--no-gpg-sign', '-m', subject], on(day)); return git(['rev-parse', 'HEAD']); };
+  let symbolic = false;
+  const commit = (day, subject) => { git(['add', '-A']); if(symbolic && process.platform==='win32') {const blob=execFileSync('git',['hash-object','-w','--stdin'],{cwd:root,env,input:'../root.txt',encoding:'utf8'}).trim();git(['update-index','--cacheinfo',`120000,${blob},src/app.js`]);} git(['commit', '-q', '--no-gpg-sign', '-m', subject], on(day)); return git(['rev-parse', 'HEAD']); };
   const s = {};
   git(['init', '-q', '-b', 'main']);
   write('root.txt', 'root\n'); write('src/app.js', lines(2, 'app')); write('gen/data.js', lines(2, 'data')); write('.gitattributes', 'gen/* -diff\n');
   for (const p of Object.values(ODD)) write(p, 'x\n');
   s.o1 = commit(1, 'Initial import');
-  fs.rmSync(path.join(root, 'src/app.js')); fs.symlinkSync('../root.txt', path.join(root, 'src/app.js'));
+  fs.rmSync(path.join(root, 'src/app.js')); if(process.platform==='win32') {write('src/app.js','../root.txt');symbolic=true;} else fs.symlinkSync('../root.txt', path.join(root, 'src/app.js'));
   s.o2 = commit(2, 'Pr\u00e4fix f\u00fcr Links');
-  fs.chmodSync(path.join(root, 'root.txt'), 0o755);
+  fs.chmodSync(path.join(root, 'root.txt'), 0o755); if(process.platform==='win32') git(['update-index','--chmod=+x','root.txt']);
   s.o3 = commit(3, 'Make root runnable');
   git(['branch', 'side']);
   fs.appendFileSync(path.join(root, 'gen/data.js'), 'data 2\n');
@@ -348,7 +351,7 @@ test('the ref must name one commit: a range would read as a complete history and
   for (const [ok, commits] of [['main~1', 7], ['main^', 7], ['main^{commit}', 8], ['main~1^2', 5], [sha.c7, 8], ['HEAD', 8]]) assert.equal((await fileHistoryStats(dir, ok)).window.commits, commits, ok);
 });
 
-test('a git too old for --attr-source: the log runs again without it and gives the same numbers', async () => {
+test('a git too old for --attr-source: the log runs again without it and gives the same numbers', {skip:process.platform==='win32' ? 'POSIX executable wrapper; other history controls run on Windows' : false}, async () => {
   const real = execFileSync('/bin/sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'katse-history-oldgit-')), calls = path.join(bin, 'calls');
   // A stand-in for git 2.39: it refuses the option the way git does and passes everything else on.

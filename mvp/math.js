@@ -12,12 +12,15 @@ const MARK_WORD = { reproduced: 'Agents reproduced it', read: 'You read it', dif
 const mathNodes = () => (S.math?.nodes || []).filter((n) => n.verdict !== 'context');
 /* What a node counts as now: the mathematics, unless an agent review or a person has since settled it. */
 function nodeState(n) {
+  const executed = S.math?.trust?.nodes?.find(x=>x.id===n.id);
+  if (executed?.status==='verified') return 'settled';
+  if (executed?.status==='failed') return 'risky';
   const m = S.marks?.[n.id]?.state;
-  return m === 'reproduced' || m === 'read' ? 'settled' : m === 'differs' ? 'risky' : n.verdict;
+  return m === 'differs' ? 'risky' : n.verdict;
 }
 /* The nodes still waiting for someone: most pressing first (flagged before unflagged, then by exposure x impact). */
 function mathOpen() {
-  return mathNodes().filter((n) => ['uncertain', 'risky'].includes(nodeState(n)))
+  return mathNodes().filter((n) => ['uncertain', 'risky'].includes(nodeState(n)) || S.math?.trust?.nodes?.some(t=>t.id===n.id && t.status!=='verified'))
     .sort((a, b) => (nodeState(b) === 'risky') - (nodeState(a) === 'risky') || b.priority - a.priority || (a.lines.added + a.lines.removed) - (b.lines.added + b.lines.removed));
 }
 const linesOfNode = (n) => (n.lines?.added || 0) + (n.lines?.removed || 0);
@@ -95,7 +98,7 @@ function proofView(d, v) {
   const mark = S.marks?.[d.id];
   const [tone, title, sub] = v === 'proved' ? ['ok', 'Proved: it behaves as before', d.claim]
     : v === 'cleared' ? ['ok', `Green: meets all ${g.applicable} criteria`, 'Each one below was measured on the code and passed. Not a proof that the new behaviour is right: that is what the agents check.']
-    : v === 'settled' ? ['ok', mark?.state === 'read' ? 'Read by a person' : 'Reproduced by the agents', `${mark?.note ? mark.note + ' ' : ''}${g.passed} of ${g.applicable} criteria met on their own; the rest was settled by review.`]
+    : v === 'settled' ? ['ok', mark?.state === 'read' ? 'Read by a person' : 'Checked with executable evidence', `${mark?.note ? mark.note + ' ' : ''}${g.passed} of ${g.applicable} criteria met on their own; the rest was settled by review.`]
     : failing.length ? [failing.some((p) => p.state === 'fail') || v === 'risky' ? 'bad' : 'warn', `Misses ${failing.length === 1 ? 'one criterion' : failing.length + ' criteria'}`, failing.map((p) => esc(p.name)).join(' · ')]
     : [v === 'risky' ? 'bad' : 'warn', `Meets all ${g.applicable} criteria, but not green`, mark && MARK_WORD[mark.state] ? `${esc(MARK_WORD[mark.state])}. ${esc(mark.note || '')}` : esc(d.claim)];
   const head = `<div class="pv-sum ${tone}"><b>${title}</b><span>${v === 'proved' || v === 'cleared' || v === 'settled' ? esc(sub) : sub}</span></div>`;
@@ -132,7 +135,7 @@ function showNodeCard(n, proof) {
     <div class="nt"><span>${esc(d.qname || d.name)}</span><em class="fchip" style="background:${ctx ? 'var(--card3)' : PAL[VTONE[v]]};${ctx ? 'color:var(--fg2)' : ''}">${VWORD[v]}</em></div>
     ${ncProof ? '' : `<p class="ncl">${mark && MARK_WORD[mark.state] ? `<b>${esc(MARK_WORD[mark.state])}.</b> ` : ''}${esc(mark?.note || d.claim)}</p>`}
     ${ncProof ? proofView(d, v) : rows || sens ? `<div class="nrows">${rows}${sens}</div>` : ''}
-    ${ctx ? '' : `<div class="nb">${prove}${code ? `<button class="cta${open ? '' : ' ghost'}" id="nReview">${byAgents ? 'See the agents\' review' : open ? 'Review this spot' : 'Review anyway'}</button>` : ''}${open ? '<button class="cta ghost" id="nRead">I read it</button>' : mark?.state === 'read' ? '<button class="cta ghost" id="nUnread">Undo</button>' : ''}</div>`}`;
+    ${ctx ? '' : `<div class="nb">${prove}${code ? `<button class="cta${open ? '' : ' ghost'}" id="nReview">${open ? 'Review this spot' : 'Review with tests'}</button>` : ''}${open ? '<button class="cta ghost" id="nRead">I read it</button>' : mark?.state === 'read' ? '<button class="cta ghost" id="nUnread">Undo</button>' : ''}</div>`}`;
   if ($('nProve')) $('nProve').onclick = () => { ncProof = !ncProof; showNodeCard(n); };
   if ($('nReview')) $('nReview').onclick = () => openReview({ node: n });
   if ($('nRead')) $('nRead').onclick = () => markNode(d.id, 'read');
@@ -180,50 +183,33 @@ function mathBar() {
   const b = S.run?.brief, so = S.run?.signoff;
   const lv = !open.length ? ['ok', 'Settled'] : open.some((n) => nodeState(n) === 'risky') ? ['bad', `${open.filter((n) => nodeState(n) === 'risky').length} risky`] : ['warn', `${open.length} uncertain`];
   const target = S.fixTarget?.m;
-  const full = so ? 'View sign-off' : b ? 'Review & sign' : 'Full review';
+  const trust = M.trust;
+  const progress = trust ? `<span class="txt" title="Impact-weighted executable scope. Not probability of correctness.">${trust.percent ?? '—'}% backed by tests · ${trust.failed} failed · ${trust.pending} pending</span>` : '';
+  const profiles = `<select id="graphProfile" aria-label="Review depth">${Object.entries(PROFILE).map(([id,[name]])=>`<option value="${id}" ${S.profile===id?'selected':''}>${name}</option>`).join('')}</select>`;
+  const full = b?.graphReview ? 'View scoped report' : so ? 'View sign-off' : b ? 'Review & sign' : 'Full review';
   const todo = reviewable(open);
   if (BUSY.size || BUSY.total) return `<span class="spin"></span><span class="txt live" style="color:var(--fg)">Agents rebuild ${BUSY.total - BUSY.done > 1 ? `${BUSY.total - BUSY.done} spots` : 'the last spot'} blind</span><span class="txt">${BUSY.done} / ${BUSY.total}</span><button class="cta" disabled>Reviewing…</button>`;
-  const cta = target ? `${['reproduced', 'differs', 'unclear'].includes(S.marks?.[target.id]?.state) ? 'See the review' : 'Review this spot'} <small class="spot">${esc(short(target.name, 18))}</small>` : todo.length ? `Review all <small class="spot">${todo.length} ${todo.length === 1 ? 'spot' : 'spots'}</small>` : open.length ? `Next <small class="spot">${open.length} left for you</small>` : full;
-  return `<span class="num">${need}<small> / ${total}</small></span><span class="txt">${need === 1 ? 'line needs' : 'lines need'} a look</span><span class="chip ${lv[0]}" style="background:${PAL[lv[0]]}">${lv[1]}</span>`
-    + (target || open.length ? `<button class="cta ghost" id="bFull">${full}</button>` : '') + `<button class="cta" id="bReview">${cta}</button>`;
+  const cta = target ? `Review this spot <small class="spot">${esc(short(target.name, 18))}</small>` : todo.length ? `Review next <small class="spot">${todo.length} ${todo.length === 1 ? 'spot' : 'spots'}</small>` : open.length ? `Next <small class="spot">${open.length} left for you</small>` : full;
+  return progress + profiles + `<span class="num">${need}<small> / ${total}</small></span><span class="txt">${need === 1 ? 'line needs' : 'lines need'} a look</span><span class="chip ${lv[0]}" style="background:${PAL[lv[0]]}">${lv[1]}</span>`
+    + (b?.contract && !so ? '<button class="cta ghost" id="bContinue">Continue investigation</button>' : '') + (b?.graphReview ? '<button class="cta ghost" id="bGlobal">Review whole PR</button>' : '') + (target || open.length ? `<button class="cta ghost" id="bFull">${full}</button>` : '') + `<button class="cta" id="bReview">${cta}</button>`;
 }
 function bindMathBar() {
   const open = mathOpen(), target = S.fixTarget;
-  if ($('bFull')) $('bFull').onclick = () => { hideNodeCard(); openReview({ full: true }); };
+  if ($('graphProfile')) $('graphProfile').onchange=e=>{S.profile=e.target.value;store.set('katse.profile',S.profile);};
+  if ($('bContinue')) $('bContinue').onclick=()=>{hideNodeCard();continueReview();};
+  if ($('bGlobal')) $('bGlobal').onclick=()=>{hideNodeCard();openTree({force:true,focusNodes:'all'});};
+  if ($('bFull')) $('bFull').onclick = () => { hideNodeCard(); S.run?.brief ? openReview({full:true}) : openTree({focusNodes:'all'}); };
   if ($('bReview')) $('bReview').onclick = () => (target ? openReview({ node: target }) : reviewable(open).length ? reviewAll() : open.length ? reviewNext() : openReview({ full: true }));
 }
 /* ── Review all: every open function goes to the agents at once, three at a time; the graph settles live ── */
 const BUSY = new Set(); BUSY.total = 0; BUSY.done = 0;
 /* What agents can rebuild: functions with code at the head that they have not reviewed yet. */
-const reviewable = (open) => open.filter((n) => !['doc', 'config', 'generated', 'type', 'test'].includes(n.kind) && n.status !== 'removed' && !['differs', 'unclear'].includes(S.marks?.[n.id]?.state));
+const reviewable = (open) => open.filter((n) => !['doc', 'config', 'generated', 'type', 'test'].includes(n.kind) && n.status !== 'removed');
 function paintBusy() { for (const n of G.nodes.values()) if (n.el) n.el.classList.toggle('busy', BUSY.has(n.id)); }
 async function reviewAll() {
-  if (BUSY.total || !S.math || !S.cur) return false;
-  const seq = openSeq, pid = S.pid, pr = S.cur.id, queue = reviewable(mathOpen()).map((n) => n.id);
-  if (!queue.length) return false;
-  hideNodeCard(); zoomGraph('fit');
-  BUSY.total = queue.length; BUSY.done = 0;
-  const failed = [];
-  const worker = async () => {
-    for (let id = queue.shift(); id; id = queue.shift()) {
-      BUSY.add(id); paintBusy(); renderBar();
-      try {
-        const r = await api(`/projects/${pid}/math/review`, { body: { pr, node: id } });
-        if (alive(seq) && S.cur?.id === pr && r.marks) S.marks = r.marks;
-      } catch (e) { failed.push(e.message); }
-      BUSY.delete(id); BUSY.done++;
-      if (!alive(seq) || S.cur?.id !== pr) continue;
-      renderGraph(graphModel()); paintBusy(); renderBar();
-    }
-  };
-  await Promise.all([worker(), worker(), worker()]);
-  const reviewed = BUSY.done;
-  BUSY.total = 0; BUSY.done = 0; BUSY.clear();
-  if (!alive(seq) || S.cur?.id !== pr) return false;
-  paintBusy(); renderBar(failed.length ? `${failed.length} ${failed.length === 1 ? 'spot' : 'spots'} could not be reviewed: ${failed[0]}` : undefined);
-  const left = mathOpen();
-  if (left.length && !failed.length) { const n = G.nodes.get(left[0].id); if (n) setTimeout(() => alive(seq) && mathTap(n), 700); } // straight to what is left for the person
-  return { reviewed, left: left.length };
+  if (!S.math || !S.cur || S.es) return false;
+  const next=reviewable(mathOpen()).sort((a,b)=>b.priority-a.priority)[0];
+  return next ? openTree({focusNodes:[next.id]}) : false;
 }
 /* For the voice assistant and for keys: where to look, in order. */
 function mathQueue() {
