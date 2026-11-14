@@ -612,11 +612,12 @@ function layout({ N, L }, W, H) {
   order.forEach((id) => { const ks = kids[id]; if (!ks) return; const sp = Math.min(1.3, .32 * ks.length); ks.forEach((k, j) => (by[k].ang = by[id].ang + (ks.length > 1 ? (j / (ks.length - 1) - .5) * sp : 0))); });
   const P = Object.values(by);
   P.forEach((n) => { n.x = Math.cos(n.ang) * n.depth * 160; n.y = Math.sin(n.ang) * n.depth * 160; });
-  const len = (l) => (l.a.kind === 'core' || l.b.kind === 'core' ? 170 : l.a.kind === 'zone' || l.b.kind === 'zone' ? 80 : 140);
+  const small = (n) => n.kind === 'zone' || n.kind === 'sym' || n.kind === 'ctx';
+  const len = (l) => (l.t && l.t.startsWith('dep') ? 120 : l.a.kind === 'core' || l.b.kind === 'core' ? 170 : small(l.a) || small(l.b) ? 80 : 140);
   for (let it = 0; it < 600; it++) {
     const t = 1 - it / 600;
     for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
-      const a = P[i], b = P[j]; let dx = b.x - a.x, dy = b.y - a.y; const d2 = Math.max(dx * dx + dy * dy, 100), d = Math.sqrt(d2); const f = (a.kind === 'zone' && b.kind === 'zone' ? 1800 : 4800) / d2; dx /= d; dy /= d;
+      const a = P[i], b = P[j]; let dx = b.x - a.x, dy = b.y - a.y; const d2 = Math.max(dx * dx + dy * dy, 100), d = Math.sqrt(d2); const f = (small(a) && small(b) ? 2100 : 4800) / d2; dx /= d; dy /= d;
       a.vx -= dx * f; a.vy -= dy * f; b.vx += dx * f; b.vy += dy * f;
     }
     links.forEach((l) => { const dx = l.b.x - l.a.x, dy = l.b.y - l.a.y; const d = Math.sqrt(dx * dx + dy * dy) || 1; const f = ((d - len(l)) / d) * .08; l.a.vx += dx * f; l.a.vy += dy * f; l.b.vx -= dx * f; l.b.vy -= dy * f; });
@@ -650,7 +651,8 @@ function spring(o, key, target, K, dt, z = 1) {
   o[v] = (o[v] || 0) + ((target - o[key]) * K - (o[v] || 0) * 2 * z * Math.sqrt(K)) * dt;
   o[key] += o[v] * dt;
 }
-const radius = (n) => (n.kind === 'core' ? CORE_R : n.kind === 'zone' ? 6 : n.kind === 'file' ? 9 + Math.min(n.deg || 0, 6) * 0.8 : 10);
+/* In the mathematical graph (math.js) a changed function is as big as what depends on it (impact, 0..1). */
+const radius = (n) => (n.kind === 'core' ? CORE_R : n.kind === 'sym' ? 5 + 15 * Math.sqrt(n.impact || 0) : n.kind === 'ctx' ? 3.5 + 8 * Math.sqrt(n.impact || 0) : n.kind === 'grp' ? 8 : n.kind === 'zone' ? 6 : n.kind === 'file' ? (S.math ? 4 : 9 + Math.min(n.deg || 0, 6) * 0.8) : 10);
 const toScreen = (x, y) => [x * G.cam.k + G.cam.x, y * G.cam.k + G.cam.y];
 const toWorld = (x, y) => [(x - G.cam.x) / G.cam.k, (y - G.cam.y) / G.cam.k];
 /* The middle of the free area, between the header and the bar.
@@ -667,18 +669,25 @@ function resetGraph() {
   const svg = $('g'); svg.innerHTML = ''; svg.classList.remove('hl', 'panning');
   Object.assign(G, { nodes: new Map(), links: [], focus: null, pin: null, hover: null, drag: null, pan: null });
   Object.assign(G.cam, { x: 0, y: 0, k: 1, tx: 0, ty: 0, tk: 1, vx: 0, vy: 0, vk: 0 });
+  const defs = mk('defs', {}, svg); // arrow head of a dependency edge: it points at what is used
+  mk('path', { d: 'M0 0L6 3L0 6z', fill: 'rgba(255,255,255,.42)' }, mk('marker', { id: 'arr', viewBox: '0 0 6 6', refX: 5.4, refY: 3, markerWidth: 5, markerHeight: 5, orient: 'auto' }, defs));
   G.camEl = mk('g', {}, svg); G.gl = mk('g', {}, G.camEl); G.gn = mk('g', {}, G.camEl);
 }
 /* A node is a group that only moves (translate) holding a shape that grows (scale) and a label that never scales.
    Blink lays out and reshapes SVG text again whenever the scale above it changes: with the label inside the scaled
    group, every frame of the bloom and of the collapse re-laid out every label. */
 function nodeEl(n) {
-  const g = mk('g', { class: `nd ${n.kind}${n.kind !== 'zone' ? ' big' : ''}` });
+  const mathKind = n.kind === 'sym' || n.kind === 'ctx' || n.kind === 'grp';
+  const g = mk('g', { class: `nd ${n.kind}${mathKind || n.kind === 'zone' || (n.kind === 'file' && S.math) ? '' : ' big'}${n.verdict ? ' v-' + n.verdict : ''}${n.quiet ? ' quiet' : ''}` });
   const sh = (n.sh = mk('g', {}, g));
   const c = PAL[n.tone] || PAL.no, r = radius(n);
   if (n.kind === 'core') { mk('circle', { r: r + 12, fill: 'none', stroke: '#f5f5f7', 'stroke-opacity': 0.1 }, sh); n.body = mk('circle', { r, class: 'body', style: `fill:${c}` }, sh); }
-  else if (n.kind === 'check' || n.kind === 'agent') mk('rect', { x: -r, y: -r, width: 2 * r, height: 2 * r, rx: r * 0.5, fill: c }, sh);
-  else mk('circle', { r, fill: c }, sh);
+  else if (n.kind === 'check' || n.kind === 'agent' || n.kind === 'grp' || n.test) mk('rect', { x: -r, y: -r, width: 2 * r, height: 2 * r, rx: r * 0.5, fill: c, 'fill-opacity': n.verdict === 'cleared' ? 0.55 : 1 }, sh);
+  else mk('circle', { r, fill: c, 'fill-opacity': n.verdict === 'cleared' ? 0.55 : 1 }, sh);
+  // A proof is sealed with a ring; a spot settled later (by agents or by you) carries their colour; a risky one glows.
+  if (n.verdict === 'proved') mk('circle', { r: r + 3.5, fill: 'none', stroke: PAL.ok, 'stroke-width': 1.3, 'stroke-opacity': 0.75 }, sh);
+  else if (n.verdict === 'settled') mk('circle', { r: r + 3.5, fill: 'none', stroke: n.mark === 'read' ? PAL.core : PAL.agent, 'stroke-width': 1.3, 'stroke-opacity': 0.8 }, sh);
+  else if (n.verdict === 'risky') mk('circle', { r: r + 5, fill: 'none', stroke: PAL.bad, 'stroke-width': 1.5, class: 'halo' }, sh);
   mk('text', { y: r + 17, 'text-anchor': 'middle' }, g).textContent = n.label;
   g.onmouseenter = () => hoverNode(n);
   g.onmouseleave = () => hoverNode(null);
@@ -705,6 +714,8 @@ function renderGraph(m) {
   const { P, links } = layout(m, svg.clientWidth, svg.clientHeight);
   const prev = G.nodes, core0 = prev.get('pr'), now = performance.now();
   const first = prev.size <= 1; // only the seeded core so far: the whole graph grows out of it
+  const crowded = P.length > 26; // many nodes: the settled, unimportant ones keep their names for hover
+  if (typeof mathLegend === 'function') mathLegend();
   const deg = {}; links.forEach((l) => { deg[l.a.id] = (deg[l.a.id] || 0) + 1; deg[l.b.id] = (deg[l.b.id] || 0) + 1; });
   G.links.forEach((l) => l.el.remove());
   prev.forEach((n) => { if (n !== core0) n.el.remove(); });
@@ -712,7 +723,8 @@ function renderGraph(m) {
   P.forEach((p, i) => {
     const o = prev.get(p.id);
     const n = p.id === 'pr' && core0 ? core0 : { s: 0 };
-    Object.assign(n, { id: p.id, label: p.label, kind: p.kind, tone: p.tone, info: p.info, file: p.file, start: p.start, depth: p.depth, parent: p.parent, deg: deg[p.id] || 0, i, bx: p.x, by: p.y, ts: 1, follow: null, K: 0.02 });
+    Object.assign(n, { id: p.id, label: p.label, kind: p.kind, tone: p.tone, info: p.info, file: p.file, start: p.start, depth: p.depth, parent: p.parent, deg: deg[p.id] || 0, i, bx: p.x, by: p.y, ts: 1, follow: null, K: 0.02,
+      verdict: p.verdict, mark: p.mark, impact: p.impact, test: p.test, path: p.path, end: p.end, m: p.m, quiet: (p.kind === 'ctx' && crowded) || (p.kind === 'sym' && crowded && (p.impact || 0) < 0.3 && !['risky', 'uncertain'].includes(p.verdict)) });
     if (o) { // already on screen: keep where it is and move smoothly to its new place
       if (n !== o) Object.assign(n, { x: o.x, y: o.y, s: o.s, vx: o.vx, vy: o.vy, vs: o.vs });
       n.at = 0;
@@ -725,7 +737,7 @@ function renderGraph(m) {
   });
   const core = G.nodes.get('pr');
   if (core) G.gn.appendChild(core.el); // on top: the rest of the graph comes out from behind it
-  G.links = links.map((l) => ({ a: G.nodes.get(l.a.id), b: G.nodes.get(l.b.id), t: l.t, op: -1, el: mk('line', { class: 'lk ' + l.t }, G.gl) }));
+  G.links = links.map((l) => ({ a: G.nodes.get(l.a.id), b: G.nodes.get(l.b.id), t: l.t, dep: !!l.t && l.t.startsWith('dep'), op: -1, el: mk('line', { class: 'lk ' + l.t }, G.gl) }));
   if (G.focus) G.focus.ids = G.focus.ids.filter((id) => G.nodes.has(id));
   if (G.focus && !G.focus.ids.length) G.focus = null;
   paintHL();
@@ -767,7 +779,10 @@ function frame(now) {
   }
   for (const l of G.links) {
     setA(l.el, 'x1', l.a.x.toFixed(1)); setA(l.el, 'y1', l.a.y.toFixed(1));
-    setA(l.el, 'x2', l.b.x.toFixed(1)); setA(l.el, 'y2', l.b.y.toFixed(1));
+    if (l.dep) { // stops at the rim of what it points at, so the arrow head shows
+      const dx = l.b.x - l.a.x, dy = l.b.y - l.a.y, d = Math.hypot(dx, dy) || 1, cut = Math.min(d * 0.5, radius(l.b) * l.b.s + 3);
+      setA(l.el, 'x2', (l.b.x - (dx / d) * cut).toFixed(1)); setA(l.el, 'y2', (l.b.y - (dy / d) * cut).toFixed(1));
+    } else { setA(l.el, 'x2', l.b.x.toFixed(1)); setA(l.el, 'y2', l.b.y.toFixed(1)); }
     const o = Math.max(0, Math.min(1, l.a.s, l.b.s));
     setS(l.el, 'opacity', o > 0.98 ? '' : o.toFixed(2));
   }
@@ -824,7 +839,7 @@ function focusOn(ids, opts = {}) {
   const [px, py] = focusPoint();
   let k;
   if (opts.k) k = opts.k;
-  else if (list.length === 1) k = list[0].kind === 'zone' ? 2.6 : list[0].kind === 'core' ? 1.6 : 2.1;
+  else if (list.length === 1) k = list[0].kind === 'zone' ? 2.6 : list[0].kind === 'core' ? 1.6 : list[0].kind === 'sym' || list[0].kind === 'ctx' ? 1.45 : 2.1;
   else {
     const xs = list.map((n) => n.bx), ys = list.map((n) => n.by);
     const w = Math.max(...xs) - Math.min(...xs) + 220, h = Math.max(...ys) - Math.min(...ys) + 180;
@@ -861,7 +876,7 @@ const GROUPS = [
   [/reproduc|green|verde|consensus|safe/i, (n) => n.tone === 'ok' && n.kind !== 'file'],
   [/check|verif|comprob|prueba/i, (n) => n.kind === 'check'],
   [/agent|replica|réplica|agente/i, (n) => n.kind === 'agent'],
-  [/zone|zona|region|región|line|línea/i, (n) => n.kind === 'zone'],
+  [/zone|zona|region|región|line|línea|function|función|method|método/i, (n) => n.kind === 'zone' || n.kind === 'sym'],
   [/file|fichero|archivo/i, (n) => n.kind === 'file'],
   [/whole|all|todo|overview|core|^pr$/i, (n) => n.kind === 'core'],
 ];
@@ -870,7 +885,7 @@ function findNodes(q) {
   const all = [...G.nodes.values()];
   const loc = s.match(/([\w.-]+\.\w+)\s*:\s*(\d+)/);
   if (loc) {
-    const z = all.filter((n) => n.kind === 'zone' && n.file?.toLowerCase() === loc[1]).sort((a, b) => Math.abs(a.start - loc[2]) - Math.abs(b.start - loc[2]))[0];
+    const z = all.filter((n) => (n.kind === 'zone' || n.kind === 'sym') && n.file?.toLowerCase() === loc[1]).sort((a, b) => Math.abs(a.start - loc[2]) - Math.abs(b.start - loc[2]))[0];
     if (z) return [z];
   }
   const exact = all.filter((n) => n.label.toLowerCase() === s || n.id.toLowerCase() === s);
@@ -944,7 +959,9 @@ async function openGraph(p, x, y) {
   clearTimeout(closeTimer); clearTimeout(renderTimer); stopStream();
   if (x == null) [x, y] = tipOf(p.id) || [innerWidth / 2, innerHeight * 0.55];
   $('card').classList.remove('on'); $('tip').classList.remove('on');
-  Object.assign(S, { cur: p, run: null, plan: null, model: null, starting: false, hl: [], origin: [x, y], openedAt: performance.now() });
+  Object.assign(S, { cur: p, run: null, plan: null, model: null, math: null, marks: {}, starting: false, hl: [], origin: [x, y], openedAt: performance.now() });
+  // The mathematical pass (server/math): about a second, no model, nothing executed. It decides what the graph shows.
+  const mathP = api(`/projects/${S.pid}/math?pr=${encodeURIComponent(p.id)}`).catch(() => null);
   const full = $('full');
   if (typeof closeTree === 'function') closeTree(true);
   Object.assign(S, { fixTarget: null });
@@ -957,19 +974,21 @@ async function openGraph(p, x, y) {
   void full.offsetWidth; full.classList.add('open');
   try {
     if (p.running) {
-      const plan = await fetchPlan(p);
+      const [plan, math] = await Promise.all([fetchPlan(p), mathP]);
       if (!alive(seq)) return;
-      S.plan = plan; scheduleGraph(seq, model(null, plan));
+      Object.assign(S, { plan, math, marks: math?.marks || {} }); scheduleGraph(seq, graphOf());
       attach(p.running, seq); return;
     }
     const run = p.last ? await api(`/projects/${S.pid}/runs/${p.last.runId}`) : null;
-    const plan = run?.brief ? null : await fetchPlan(p);
+    const [plan, math] = await Promise.all([run?.brief ? null : fetchPlan(p), mathP]);
     if (!alive(seq)) return;
-    Object.assign(S, { run, plan });
+    Object.assign(S, { run, plan, math, marks: math?.marks || {} });
   } catch (e) { if (alive(seq)) renderBar(e.message, true); return; }
   renderBar();
-  scheduleGraph(seq, model(S.run?.brief, S.plan));
+  scheduleGraph(seq, graphOf());
 }
+/* What the open branch's graph shows: the dependency graph coloured by mathematics, or (if that pass failed) the files and checks of the report. */
+const graphOf = () => (S.math && typeof mathModel === 'function' ? mathModel(S.math) : model(S.run?.brief, S.plan));
 function closeGraph() {
   const full = $('full');
   if (full.hidden || !full.classList.contains('open')) return;
@@ -981,7 +1000,8 @@ function closeGraph() {
   full.classList.remove('open');
   collapseGraph(S.origin || [innerWidth / 2, innerHeight / 2], S.cur ? state(S.cur).tone : 'core');
   document.body.classList.remove('dive');
-  Object.assign(S, { run: null, plan: null, model: null, starting: false });
+  Object.assign(S, { run: null, plan: null, model: null, math: null, marks: {}, starting: false });
+  if (typeof hideNodeCard === 'function') hideNodeCard();
   clearTimeout(closeTimer);
   closeTimer = setTimeout(() => { if (!full.classList.contains('open')) { full.hidden = true; stopLoop(); resetGraph(); } }, 760);
   // Reload once the home has zoomed back in: redrawing the tree mid-move costs a layout and a full repaint.
@@ -992,6 +1012,8 @@ $('back').onclick = () => (typeof treeOpen === 'function' && treeOpen() ? closeT
 function setView(mode) { return mode === 'graph'; }
 /* A click on a node (not a drag) flies the camera to it; a code region also becomes the spot Review & sign opens on. */
 function nodeTap(n) {
+  if (typeof mathTap === 'function' && mathTap(n)) return; // a node of the mathematical graph opens its evidence
+  if (typeof hideNodeCard === 'function') hideNodeCard();
   focusOn([n.id]);
   S.fixTarget = n.kind === 'zone' ? n : null;
   renderBar();
@@ -1007,6 +1029,7 @@ function renderBar(error, fatal) {
   if (error) h = `<span class="txt" style="color:var(--bad);white-space:normal;max-width:520px">${esc(error)}</span>${fatal ? '<button class="cta ghost" id="bBack">Back</button>' : '<button class="cta ghost" id="bOk">OK</button>'}`;
   else if (S.starting) h = '<span class="spin"></span><span class="txt" style="color:var(--fg)">Starting…</span><button class="cta" disabled>Verifying…</button>';
   else if (S.es) h = `<span class="spin"></span><span class="txt live" style="color:var(--fg)">${esc(S.stage)}</span><span class="txt">${secs(Date.now() - S.t0)}</span><button class="cta" id="bReview">Watch the review</button>`;
+  else if (S.math && typeof mathBar === 'function') h = mathBar();
   else if (b) {
     const stale = p.sha && !b.pr.head.startsWith(p.sha);
     const so = S.run.signoff;
@@ -1019,7 +1042,8 @@ function renderBar(error, fatal) {
   else h = '<span class="txt">Loading…</span>';
   $('fbar').innerHTML = h;
   $('fbar').querySelectorAll('[data-p]').forEach((x) => (x.onclick = () => { S.profile = x.dataset.p; store.set('katse.profile', S.profile); renderBar(); }));
-  if ($('bReview')) $('bReview').onclick = () => openReview();
+  if (!error && !S.starting && !S.es && S.math && typeof bindMathBar === 'function') bindMathBar();
+  else if ($('bReview')) $('bReview').onclick = () => openReview();
   if ($('bBack')) $('bBack').onclick = closeGraph;
   if ($('bOk')) $('bOk').onclick = () => renderBar();
 }
@@ -1087,7 +1111,7 @@ function attach(runId, seq = openSeq) {
         if (!alive(seq)) return;
         S.run = run;
         if (!run.brief) { renderBar(`Verification failed: ${english(run.error) || 'unknown error'}`); if (typeof treeLiveDone === 'function') treeLiveDone(); return; }
-        renderBar(); renderGraph(model(run.brief));
+        renderBar(); renderGraph(graphOf());
         if (typeof treeLiveDone === 'function') treeLiveDone();
       } catch (err) { if (alive(seq)) renderBar(err.message); }
     }
@@ -1102,7 +1126,7 @@ function attach(runId, seq = openSeq) {
 
 /* ── Review & sign: the review is the agents' tree (review.js), growing out of the spot you clicked; the
    verdict card at its end is where you sign. No review yet: it starts one and the tree grows live. */
-function openReview(target) { return typeof openTree === 'function' ? openTree(target || { node: S.fixTarget }) : null; }
+function openReview(target) { return typeof openTree === 'function' ? openTree(target?.full ? {} : target || { node: S.fixTarget }) : null; }
 
 /* ── Modal ────────────────────────────────────────────────────────────── */
 function modal(html) { $('mbody').innerHTML = html; $('modal').hidden = false; }

@@ -336,6 +336,7 @@
   const canApprove = () => { const b = S.run?.brief; return !!b && b.version >= 2 && b.verdict?.status === 'ready-for-human' && !b.rules.fired.some((r) => HARD.includes(r.id)); };
   function renderCard() {
     const s = F.story; if (!s) return;
+    if (s.node) return renderNodeCard(s);
     const v = s.verdict, run = S.run, so = !s.live && run?.signoff;
     const chip = so ? (so.decision === 'aprobar' ? ['ok', 'Signed'] : ['bad', 'Sent back']) : [v.tone, v.label];
     const H = [`<div class="fvk">${esc(s.spot ? s.spot.where : 'Review')}</div>
@@ -501,7 +502,7 @@
       CARD.style.top = (F.phone ? Math.min(H - ch - 16, Math.max(ey + 52, P(0, tl.maxY)[1] + 16)) : Math.max(84, Math.min(H - ch - 110, ey - ch / 2))) + 'px';
     }
     let st = '';
-    if (F.live) st = S.es ? `${S.stage} · ${secs(Date.now() - S.t0)}` : 'Starting the review…';
+    if (F.live) st = F.mode === 'node' ? `Three agents rebuild ${F.nodeName} blind · ${secs(Date.now() - F.nodeT0)}` : S.es ? `${S.stage} · ${secs(Date.now() - S.t0)}` : 'Starting the review…';
     else for (const [t0, txt] of tl.status) if (t >= t0) st = txt;
     if (st !== F.stat) { F.stat = st; $('fstat').textContent = st; }
   }
@@ -563,10 +564,98 @@
     } catch { /* no fix to show */ }
   }
 
+  /* ── One node of the mathematical graph, reviewed alone (server/math/nodereview.js) ──
+     Three agents rebuild that one function from the requirement without seeing the PR; mathematics compares
+     the rebuilds with it; a judge may only argue with sentences quoted from the requirement. Seconds, not
+     minutes. The tree is the same story, told for one function. */
+  const NODE_TONE = { reproduced: 'ok', differs: 'bad', unclear: 'warn' };
+  const NODE_WORD = { reproduced: 'Reproduced', differs: 'Differs', unclear: 'You decide' };
+  const NODE_STRATEGY = ['To the letter', 'Edge cases first', 'Smallest change'];
+  function nodeStory(node, r) {
+    const d = node.m, uniq = (a) => [...new Set(a)];
+    const agents = (r ? r.agents : NODE_STRATEGY.map((x, i) => ({ id: 'A' + (i + 1) }))).slice(0, 3).map((a, i) => ({
+      id: a.id, model: r ? modelName(a.model) : '…', strategy: a.strategy || NODE_STRATEGY[i], color: COL.cands[i], built: r ? !!a.ok : true, fail: r && !a.ok ? 'could not rebuild it' : null,
+      tests: null, summary: a.summary || '', here: true, decisions: 0, same: !!a.equivalent,
+      files: r && a.ok ? [a.equivalent ? 'same tokens' : a.similarity != null ? `${Math.round(a.similarity * 100)}% alike` : 'different'] : [],
+    }));
+    const built = agents.filter((a) => a.built), says = r?.says || {};
+    const v = r?.verdict, win = v === 'reproduced' ? 'PR' : v === 'differs' ? 'CONS' : 'none';
+    const diff = r?.differences?.find((x) => x.grounded && x.right === 'replica') || r?.differences?.[0];
+    const L2 = [];
+    if (r && built.length) {
+      L2.push(['PR', cut(says.PR || 'The change, as written.')]);
+      if (v === 'reproduced') L2.push(['CONS', cut(r.explanation || 'We wrote the same thing from the requirement.'), 'badge'], ['CONS', 'It holds up. Take it.']);
+      else if (diff) {
+        L2.push(['CONS', cut(`${diff.input}: you give ${diff.pr}, we give ${diff.other}.`, 120), 'badge']);
+        if (diff.rule) L2.push(['CONS', cut(`The requirement says: “${diff.rule}”`, 130)]);
+        L2.push(win === 'CONS' ? ['PR', 'Fair. I need that change.'] : ['PR', 'The requirement does not say. A person decides.']);
+      } else L2.push(['CONS', cut(r.explanation || 'We could not settle it.')]);
+    }
+    const facts = !r ? [] : [
+      `${built.length} of ${agents.length} agents rebuilt it blind from ${String(r.requirement?.label || 'the requirement').toLowerCase()}`,
+      ...built.map((a) => `${a.id} · ${a.strategy} · ${a.files[0] || ''}`),
+      r.differences.length ? `${r.differences.length} behavioural ${r.differences.length === 1 ? 'difference' : 'differences'} · ${r.differences.filter((x) => x.grounded).length} decided by a quoted rule` : built.length ? 'No behavioural difference found' : null,
+      r.decision?.status === 'used' ? `Decision model · ${r.decision.choice} · ${Math.round(r.decision.confidence * 100)}% confident` : null,
+    ].filter(Boolean);
+    return {
+      node: true, result: r || null, live: !r, agents, prTests: null,
+      j1: built.length >= 2 ? { a: built[0].id, b: built[1].id, lines: r ? [[built[0].id, cut(says[built[0].id] || built[0].summary)], [built[1].id, cut(says[built[1].id] || built[1].summary)]].filter((l) => l[1]) : [], badgeAt: 9 } : null,
+      j2: { lines: L2 },
+      prFiles: [{ label: cut(base(d.file), 18), tone: 'file', regions: [{ label: ':' + d.start, tone: r ? NODE_TONE[v] : node.tone === 'ctx' ? 'no' : node.tone }] }],
+      checks: (d.evidence || []).slice(0, 5).map((e) => ({ label: cut(`${e.label} ${e.value}`, 24), tone: e.tone })),
+      roots: r ? uniq(r.agents.flatMap((a) => a.rules || [])).slice(0, 4).map((x) => cut(x, 28)) : [],
+      atkOut: [], atk: null, prOk: r ? (v === 'reproduced' ? true : v === 'differs' ? false : null) : null, consOk: r && v !== 'unclear' ? true : null,
+      spot: { where: `${base(d.file)}:${d.start}`, text: r ? r.explanation : d.claim, tone: r ? NODE_TONE[v] : node.tone === 'bad' ? 'bad' : 'warn' },
+      fixFrom: r?.fix ? { id: r.fix.from } : null,
+      verdict: { score: null, label: r ? NODE_WORD[v] : 'Reviewing', tone: r ? NODE_TONE[v] : 'warn', win, facts },
+    };
+  }
+  function renderNodeCard(s) {
+    const r = s.result; if (!r) { CARD.innerHTML = ''; return; }
+    const built = s.agents.filter((a) => a.built), v = r.verdict, id = r.id;
+    const against = new Set(r.differences.filter((x) => x.grounded && x.right === 'replica').map((x) => x.replica));
+    const agree = v === 'reproduced' ? built.length : v === 'differs' ? Math.max(0, built.length - Math.max(1, against.size)) : null;
+    const d = r.differences.find((x) => x.grounded && x.right === 'replica') || r.differences[0];
+    const H = [`<div class="fvk">${esc(s.spot.where)} · ${esc(r.node.name)}</div>
+      <div class="fvs"><span class="fvn">${agree ?? '?'}<small>/${built.length}</small></span><span class="fvcap">agents wrote<br>what the PR did</span><span class="fchip" style="background:${PAL[NODE_TONE[v]]}">${NODE_WORD[v]}</span></div>
+      <p class="fvl"><i style="background:${PAL[NODE_TONE[v]]}"></i>${esc(r.explanation || (v === 'reproduced' ? 'The agents wrote the same function.' : 'The agents could not settle it.'))}</p>`];
+    if (d && v !== 'reproduced') H.push(`<div class="fdiff"><code>${esc(d.input)}</code><div><span>The PR</span><b>${esc(d.pr)}</b></div><div><span>${esc(d.replica || 'Agents')}</span><b>${esc(d.other)}</b></div>${d.rule ? `<p>${d.grounded ? '' : 'Not found in the requirement: '}“${esc(d.rule)}”</p>` : '<p>The requirement does not decide this.</p>'}</div>`);
+    if (r.fix) H.push(`<div class="fvh">The fix · ${esc(r.fix.from)}'s version</div><pre class="fcode">${r.fix.diff.map((x) => `<span class="${x.t === '+' ? 'a' : 'r'}">${x.t} ${esc(x.l.slice(0, 96))}</span>`).join('\n')}</pre>`);
+    H.push(`<ul>${s.verdict.facts.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`);
+    H.push(`<div class="fvb">${v === 'reproduced' ? '<button class="cta" id="fnDone">Done</button>' : r.fix ? '<button class="cta" id="fnCopy">Copy the fix</button><button class="cta ghost" id="fnKeep">Keep the PR\'s</button>' : '<button class="cta" id="fnKeep">I read it: it is right</button><button class="cta ghost" id="fnDone">Leave it open</button>'}</div><button type="button" class="fnagain" id="fnAgain">Ask the agents again</button>`);
+    CARD.innerHTML = H.join('');
+    if ($('fnDone')) $('fnDone').onclick = () => closeTree();
+    if ($('fnKeep')) $('fnKeep').onclick = async () => { await markNode(id, 'read'); closeTree(); };
+    if ($('fnCopy')) $('fnCopy').onclick = async () => { try { await navigator.clipboard.writeText(r.fix.code); $('fnCopy').textContent = 'Copied'; } catch { showText(`The fix · ${r.fix.from}'s version`, r.fix.code); } };
+    if ($('fnAgain')) $('fnAgain').onclick = () => { const n = G.nodes.get(id); if (n) openNode(n, true); };
+  }
+  async function openNode(node, force) {
+    const seq = ++F.seq; clearTimeout(F.hideT);
+    F.origin = toScreen(node.x, node.y);
+    Object.assign(F, { mode: 'node', nodeName: node.label, nodeT0: Date.now(), zone: null, vers: null, code: '', fix: null, card: 'verdict', answers: {}, stat: '', spotRaw: null, live: true, open: true });
+    G.pin = null; G.hover = null; $('tip').classList.remove('on');
+    $('g').style.transformOrigin = `${F.origin[0]}px ${F.origin[1]}px`;
+    $('full').classList.add('infix'); sec.hidden = false; void sec.offsetWidth; sec.classList.add('on');
+    F.story = nodeStory(node, null); build();
+    F.t = RM ? F.tl.hold : 0; F.playing = true; paintCtl();
+    if (!F.raf) { F.last = 0; F.raf = requestAnimationFrame(frame); }
+    const pid = S.pid, pr = S.cur.id;
+    let r;
+    try { r = await api(`/projects/${pid}/math/review`, { body: { pr, node: node.id, force: !!force } }); }
+    catch (e) { if (seq === F.seq && F.open) { closeTree(); renderBar(e.message); } return { started: false, error: e.message }; }
+    if (r.marks && S.cur?.id === pr && S.pid === pid) { S.marks = r.marks; if (!$('full').hidden) renderGraph(graphModel()); } // the node is repainted under the tree
+    if (seq !== F.seq || !F.open) return null;
+    F.live = false; F.story = nodeStory(G.nodes.get(node.id) || node, r); build();
+    if (RM || r.cached) { F.t = r.cached && !RM ? Math.max(F.t, 1300) : F.tl.end; }
+    F.playing = !RM; paintCtl();
+    return info();
+  }
+
   /* ── Open / close ── */
   async function openTree(target = {}) {
     if ($('full').hidden || !S.cur) return null;
-    const seq = ++F.seq; clearTimeout(F.hideT);
+    if (target.node?.kind === 'sym' && S.math) return openNode(target.node, target.force); // one function of the mathematical graph, reviewed alone
+    const seq = ++F.seq; clearTimeout(F.hideT); F.mode = 'full';
     const zone = target.node?.kind === 'zone' ? target.node : findZone(target.query);
     const n = zone || target.node || G.nodes.get('pr');
     F.origin = n ? toScreen(n.x, n.y) : [innerWidth / 2, innerHeight / 2];
@@ -604,12 +693,12 @@
   }
   /* Live: every candidate, attack or test result redraws the tree where it is. */
   function onEvent(e) {
-    if (!F.open || !F.live || !F.tl || !['candidate', 'attack', 'result'].includes(e.type)) return;
+    if (!F.open || !F.live || F.mode === 'node' || !F.tl || !['candidate', 'attack', 'result'].includes(e.type)) return;
     F.story = liveStory(); build();
   }
   /* The review finished: the tree goes on from where it waits, now with the real debate and verdict. */
   async function liveDone() {
-    if (!F.open || !F.live) return;
+    if (!F.open || !F.live || F.mode === 'node') return;
     const b = S.run?.brief, seq = F.seq;
     if (!(b?.version >= 2)) { closeTree(); return; }
     F.live = false;
