@@ -1,41 +1,50 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Katse</title>
 <link rel="icon" type="image/svg+xml" href="brand/katse-favicon.svg">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
 
-<aside class="side">
-  <div class="brand"><img src="brand/katse-logo.svg" alt="Katse"><span>Review workspace</span></div>
-  <div class="row">
-    <select id="project" aria-label="Proyecto"></select>
-    <button class="icon" id="addProject" title="Abrir otro proyecto" aria-label="Abrir otro proyecto">+</button>
-    <button class="icon" id="settings" title="Ajustes del proyecto" aria-label="Ajustes del proyecto">⚙</button>
-  </div>
-  <div id="env" class="env"></div>
-  <div class="tabs" role="tablist">
-    <button id="tIn" class="on" role="tab">Recibir <span id="nIn"></span></button>
-    <button id="tOut" role="tab">Enviar <span id="nOut"></span></button>
-  </div>
-  <div id="list" class="list"></div>
-  <button id="openLedger" class="ghost">Libro de confianza</button>
-</aside>
+<header class="top">
+  <div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z"/><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z" transform="translate(32) scale(-1 1)"/><circle cx="16" cy="16" r="3.5"/></svg>Katse</div>
+  <button class="proj" id="proj" title="Switch project"><i></i><span id="projName">…</span></button>
+</header>
 
-<section class="main">
-  <div class="orbwrap"><div id="orb" class="eye" aria-hidden="true"><svg viewBox="0 0 32 32"><g class="lids"><path class="lid" d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z"/><path class="lid" d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z" transform="translate(32) scale(-1 1)"/></g><circle class="ring" cx="16" cy="16" r="4"/><circle class="pupil" cx="16" cy="16" r="3.5"/></svg></div><div id="status" class="status">EN ESPERA</div></div>
-  <div id="chat" class="chat" aria-live="polite"></div>
-  <div id="chips" class="chips"></div>
-  <form id="f"><input id="q" placeholder="Pregunta sobre este PR…" autocomplete="off" aria-label="Pregunta"><button>Enviar</button></form>
+<section class="hero">
+  <h1>Don't read the change.<br><span>Reproduce it.</span></h1>
+  <p class="sum" id="sum">&nbsp;</p>
 </section>
 
-<aside class="right" id="panel"></aside>
+<section class="git">
+  <svg id="tree" aria-label="Branches"></svg>
+  <div class="gfoot">
+    <div class="legend"><span><i style="background:var(--ok)"></i>Reproduced</span><span><i style="background:var(--warn)"></i>You decide</span><span><i style="background:var(--bad)"></i>Send back</span><span><i style="background:var(--no)"></i>Not verified</span><span><i class="dash"></i>Pending merge</span></div>
+    <button class="more" id="more" hidden></button>
+  </div>
+</section>
+<div class="card" id="card"></div>
 
-<div id="modal" class="modal" hidden><div class="sheet"><button class="close" id="modalClose" aria-label="Cerrar">×</button><div id="modalBody"></div></div></div>
+<section class="full" id="full" hidden>
+  <svg id="g" aria-label="Change graph"></svg>
+  <button class="back" id="back" aria-label="Back"><i>←</i><span><b id="fid"></b><small id="fbr"></small></span></button>
+  <div class="flegend"><span><i style="background:var(--file)"></i>File</span><span><i style="background:var(--ok)"></i>Reproduced</span><span><i style="background:var(--warn)"></i>You decide</span><span><i style="background:var(--bad)"></i>You read it</span></div>
+  <div class="fbar" id="fbar"></div>
+</section>
+
+<aside class="drawer" id="drawer" hidden>
+  <div class="dhead"><div><div class="k" id="dk"></div><h2 id="dt"></h2></div><button class="x" id="dx" aria-label="Close">×</button></div>
+  <div class="dbody" id="dbody"></div>
+</aside>
+
+<div class="modal" id="modal" hidden><div class="sheet"><button class="x" id="mx" aria-label="Close">×</button><div id="mbody"></div></div></div>
+<div class="tip" id="tip"></div>
 
 <script src="app.js"></script>
 </body>

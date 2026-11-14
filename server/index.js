@@ -66,6 +66,7 @@ async function planFor(project, pr, mode) {
     toolchain: it.toolchain.describe,
     areas: areaStates(project.id, areasOf(it.files)),
     will, wont, budget,
+    files: it.files.map((f) => ({ path: f.path, kind: f.kind, add: f.add, del: f.del })),
   };
 }
 

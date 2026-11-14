@@ -1,467 +1,466 @@
 /* Katse UI. Plain JavaScript, no build step. Everything shown comes from the API; text from
-   repositories is always escaped before it reaches the page. */
+   repositories is always escaped before it reaches the page.
+   Three views: the branch tree (home), the full-screen graph of one branch, the review drawer. */
 const $ = (id) => document.getElementById(id);
-const h = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const base = (p) => String(p).split('/').pop();
 const secs = (ms) => (ms >= 60000 ? `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s` : `${Math.round(ms / 1000)} s`);
+const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
 
 async function api(path, opts) {
   const init = opts ? { method: opts.method || 'POST', headers: { 'Content-Type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined } : undefined;
   const r = await fetch('/api' + path, init);
   const data = (r.headers.get('content-type') || '').includes('json') ? await r.json() : await r.text();
-  if (!r.ok) throw new Error(data.error || data || 'Error');
+  if (!r.ok) throw new Error(data.error || data || 'Request failed');
   return data;
 }
 
-const S = { projects: [], agents: [], clis: {}, project: null, status: null, prs: { incoming: [], outgoing: [] }, side: 'incoming', cur: null, plan: null, run: null, mode: 'rapido', agents_sel: null, mutants: 4, es: null, stageEls: {} };
-const pid = () => S.project.id;
-const TONE = { ok: 't-ok', warn: 't-warn', no: 't-no', bad: 't-bad' };
-const CLAIM = { reproducido: ['ok', 'Reproducido'], parcial: ['warn', 'Parcial'], fallo: ['bad', 'Falla'], 'no-ejecutado': ['no', 'No ejecutado'] };
+const NS = 'http://www.w3.org/2000/svg';
+const mk = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const PAL = { ok: '#bfe3d0', warn: '#f3e2a6', bad: '#f2a99f', no: '#55555c', file: '#cde4ee', filedim: '#4d585d', agent: '#e3dcf4', core: '#f5f5f7' };
+const S = { projects: [], agents: [], pid: null, prs: { incoming: [], outgoing: [] }, base: '', expanded: false, cur: null, run: null, plan: null, mode: 'quick', es: null, stage: '', t0: 0, timer: 0 };
 
-/* ── Chat ─────────────────────────────────────────────────────────────── */
-function say(html, who = 'ai', src) {
-  const d = document.createElement('div');
-  d.className = 'msg ' + who;
-  d.innerHTML = html + (src ? `<span class="src">${h(src)}</span>` : '');
-  $('chat').appendChild(d);
-  $('chat').scrollTop = 1e9;
-  return d;
-}
-function busy(on, label) {
-  const eye = $('orb');
-  if (!on && eye.classList.contains('busy')) { eye.classList.add('blink'); setTimeout(() => eye.classList.remove('blink'), 300); }
-  eye.classList.toggle('busy', !!on);
-  $('status').textContent = label || (on ? 'TRABAJANDO' : 'EN ESPERA');
-}
-function chips(list) {
-  $('chips').innerHTML = list.map((x) => `<button type="button">${h(x)}</button>`).join('');
-  $('chips').querySelectorAll('button').forEach((b) => (b.onclick = () => ask(b.textContent)));
-}
-async function ask(q) {
-  if (!S.cur) return;
-  say(h(q), 'me');
-  busy(true, 'PENSANDO');
-  try {
-    const r = await api(`/projects/${pid()}/chat`, { body: { pr: S.cur.id, runId: S.run?.brief ? S.run.id : null, mode: S.mode, question: q } });
-    say(h(r.text), 'ai', r.source === 'modelo' ? 'Redactado por un modelo a partir del informe. La evidencia está en el panel.' : '');
-  } catch (e) { say(h(e.message)); }
-  busy(!!S.es, S.es ? 'VERIFICANDO' : null);
-}
+/* The backend reports with fixed ids; these give them English names. */
+const LANE = {
+  reproducido: ['Reproduced', 'Everything checkable is checked. Light sign-off.'],
+  residuo: ['Residue only', 'Read only what could not be reproduced.'],
+  decision: ['You decide', 'Read the residue and answer the questions. The rest is reproduced.'],
+  completa: ['Full read', 'It touches something with no shortcut. The report only orders the reading.'],
+  devolver: ['Send back', 'It cannot be reviewed like this. Back to the author or the requirement.'],
+};
+const RECO = { cambios: 'Request changes', insuficiente: 'Not enough evidence', lista: 'Ready for human approval' };
+const STAGE = { entrada: 'Reading the PR and its requirement', l1: 'Derived files', merge: 'Merging onto the base', build: 'Building', l2: 'Tests: red before, green after', mutacion: 'Seeding defects', rebobinar: 'Rewinding each change', l3: 'Blind replicas', cruce: 'Cross-testing', juez: 'Writing what the AI won’t decide' };
+const OPTION = {
+  'Aceptar tal cual': 'Accept as is', 'Devolver al autor': 'Send back to the author', 'Separar en otro cambio': 'Split into another change',
+  'Aceptar el diseño': 'Accept the design', 'Pedir revisión de diseño': 'Ask for a design review',
+  'Aclarar el requisito y volver a verificar': 'Clarify the requirement and verify again', 'Aceptar con el requisito actual': 'Accept with the current requirement',
+  'Está justificado sin test': 'It is justified without a test', 'Pedir un test que lo cubra': 'Ask for a test that covers it', 'Pedir que se quite': 'Ask to remove it',
+  'Lo he probado yo': 'I tested it myself', 'Los he ejecutado yo y pasan': 'I ran them myself and they pass', 'Acepto no tener esa evidencia': 'I accept not having that evidence',
+  'No falta: el PR es correcto así': 'Nothing is missing: the PR is right as it is',
+};
+const CLAIM = { reproducido: ['ok', 'Reproduced'], parcial: ['warn', 'Partial'], fallo: ['bad', 'Fails'], 'no-ejecutado': ['no', 'Not run'] };
+const HARD = ['conflicto', 'no-compila', 'suite-rota', 'tests-propios-fallan'];
+const laneName = (id, fallback) => LANE[id]?.[0] || fallback || id;
+const laneTone = (id, tone) => (id === 'devolver' ? 'bad' : tone === 'ok' ? 'ok' : 'warn');
 
-/* ── Projects and PR list ─────────────────────────────────────────────── */
+function state(p) {
+  const l = p.last;
+  if (p.running) return { tone: 'no', label: 'Verifying', end: 'open' };
+  if (!l) return { tone: 'no', label: 'Not verified', end: 'open' };
+  if (l.signedBy && !l.stale) return l.decision === 'devolver' ? { tone: 'bad', label: 'Sent back', end: 'cut' } : { tone: 'ok', label: 'Signed', end: 'merged' };
+  if (l.stale) return { tone: 'no', label: 'Out of date', end: 'open' };
+  return { tone: laneTone(l.lane, l.tone), label: laneName(l.lane, l.laneName), end: 'open' };
+}
+const name = (p) => (p.requirement && /^ju26|fix|issue/i.test(base(p.branch)) ? '#' + p.requirement : base(p.branch).slice(0, 16));
+
+/* ── Projects ─────────────────────────────────────────────────────────── */
 async function init() {
   const st = await api('/state');
-  Object.assign(S, { projects: st.projects, agents: st.agents, clis: st.clis, workspace: st.workspace });
-  renderProjects();
-  if (!S.projects.length) return openAddProject(true);
-  const saved = localStorage.getItem('katse.project');
+  Object.assign(S, { projects: st.projects, agents: st.agents, workspace: st.workspace });
+  if (!S.projects.length) return projectsModal(true);
+  const saved = store.get('katse.project');
   await loadProject(S.projects.find((p) => p.id === saved)?.id || S.projects[0].id);
 }
-function renderProjects() {
-  $('project').innerHTML = S.projects.map((p) => `<option value="${h(p.id)}">${h(p.name)}</option>`).join('');
-  if (S.project) $('project').value = S.project.id;
+async function loadProject(id) {
+  S.pid = id; store.set('katse.project', id);
+  $('projName').textContent = S.projects.find((p) => p.id === id)?.name || id;
+  $('sum').innerHTML = '&nbsp;';
+  await reloadPRs();
 }
-async function loadProject(id, keep) {
-  S.project = S.projects.find((p) => p.id === id);
-  localStorage.setItem('katse.project', id);
-  $('project').value = id;
-  $('list').innerHTML = '<div class="empty">Cargando ramas…</div>';
-  const [prs, status] = await Promise.all([api(`/projects/${id}/prs`), api(`/projects/${id}/status`)]);
-  S.prs = prs; S.status = status;
-  renderEnv();
-  if (!S.prs[S.side].length && S.prs[S.side === 'incoming' ? 'outgoing' : 'incoming'].length) S.side = S.side === 'incoming' ? 'outgoing' : 'incoming';
-  renderList();
-  const all = [...prs.incoming, ...prs.outgoing];
-  const again = keep && S.cur && all.find((p) => p.id === S.cur.id);
-  if (again) { S.cur = again; renderList(); return; }
-  const first = S.prs[S.side][0];
-  if (first) selectPR(first); else { S.cur = null; $('panel').innerHTML = `<h3>Sin cambios pendientes</h3><p class="sub">No hay ramas por delante de <code>${h(prs.base)}</code>. Crea una rama o cambia la rama base en los ajustes.</p>`; $('chat').innerHTML = ''; chips([]); }
+async function reloadPRs() {
+  const prs = await api(`/projects/${S.pid}/prs`);
+  S.prs = prs; S.base = prs.base;
+  if (S.cur) S.cur = [...prs.incoming, ...prs.outgoing].find((p) => p.id === S.cur.id) || S.cur;
+  renderTree();
 }
-function renderEnv() {
-  const s = S.status;
-  const e = s.entire.enabled ? ['ok', 'Entire activo'] : s.entire.installed ? ['warn', 'Entire sin activar'] : ['no', 'Entire no instalado'];
-  const n = S.agents.length;
-  $('env').innerHTML = `<span class="pill">base ${h(S.prs.base)}</span><span class="pill ${e[0]}" title="Entire guarda el prompt de cada commit">${e[1]}</span><span class="pill ${n ? 'ok' : 'warn'}">${n} agentes</span>`;
+function projectsModal(first) {
+  modal(`<h2>${first ? 'Pick a project' : 'Projects'}</h2><p class="lead">Katse works on a git repository. It never writes inside it: it uses throwaway copies.</p>
+    ${S.projects.length ? `<div class="plist">${S.projects.map((p) => `<button data-id="${esc(p.id)}">${esc(p.name)}</button>`).join('')}</div>` : ''}
+    <div class="field"><label for="ppath">Open a local repository</label><input type="text" id="ppath" placeholder="/path/to/repo"></div>
+    <div class="field"><label for="purl">Or clone from a URL</label><input type="text" id="purl" placeholder="https://github.com/org/repo"></div>
+    <div class="btns"><button class="cta" id="padd">Open</button></div><div class="err" id="merr"></div>`);
+  $('mbody').querySelectorAll('.plist button').forEach((b) => (b.onclick = () => { closeModal(); loadProject(b.dataset.id); }));
+  $('padd').onclick = async () => {
+    const path = $('ppath').value.trim(), url = $('purl').value.trim();
+    if (!path && !url) return ($('merr').textContent = 'Give a path or a URL.');
+    $('merr').textContent = url ? 'Cloning…' : 'Opening…';
+    try {
+      const p = await api('/projects', { body: url ? { url } : { path } });
+      if (!S.projects.find((x) => x.id === p.id)) S.projects.push(p);
+      closeModal(); await loadProject(p.id);
+    } catch (e) { $('merr').textContent = e.message; }
+  };
 }
-function renderList() {
-  $('tIn').classList.toggle('on', S.side === 'incoming');
-  $('tOut').classList.toggle('on', S.side === 'outgoing');
-  $('nIn').textContent = S.prs.incoming.length || '';
-  $('nOut').textContent = S.prs.outgoing.length || '';
-  const list = S.prs[S.side];
-  if (!list.length) {
-    $('list').innerHTML = `<div class="empty">${S.side === 'incoming' ? 'No hay ramas remotas pendientes de revisar.' : 'No tienes ramas locales por enviar. Crea una rama, haz commit y aparecerá aquí.'}</div>`;
+$('proj').onclick = () => projectsModal(false);
+
+/* ── Home: left = history, centre = you, right = merges still to come ── */
+function renderTree() {
+  const svg = $('tree'); svg.innerHTML = '';
+  const W = Math.max(svg.parentElement.clientWidth, 760);
+  const recent = S.prs.incoming.filter((p) => p.last || p.running || (!p.behind && Date.now() - new Date(p.date) < 30 * 864e5));
+  const old = S.prs.incoming.filter((p) => !recent.includes(p));
+  const inc = S.expanded ? [...recent, ...old] : recent;
+  const out = S.prs.outgoing;
+  if (!inc.length && !out.length && !old.length) {
+    svg.style.height = '0px';
+    $('sum').innerHTML = `No branches ahead of <b>${esc(base(S.base))}</b>. Push one and it shows up here.`;
+    $('more').hidden = true;
     return;
   }
-  $('list').innerHTML = list.map((p, i) => {
-    const l = p.last;
-    const chip = p.running ? '<span class="pill warn">verificando…</span>'
-      : l ? `<span class="pill ${l.tone === 'ok' ? 'ok' : l.tone === 'warn' ? 'warn' : 'no'}">${h(l.laneName)}</span><span class="pill">${l.residue}/${l.total} líneas</span>${l.signedBy ? (l.stale ? '<span class="pill bad">firma caducada</span>' : `<span class="pill ok">${l.decision === 'devolver' ? 'devuelto' : 'firmado'}</span>`) : l.stale ? '<span class="pill bad">desactualizado</span>' : ''}`
-        : '<span class="pill">sin verificar</span>';
-    return `<button type="button" class="pr ${S.cur?.id === p.id ? 'on' : ''}" data-i="${i}"><div class="id">${p.requirement ? '#' + h(p.requirement) + ' · ' : ''}${h(p.branch)}</div><div class="t">${h(p.title)}</div><div class="meta">${chip}</div></button>`;
-  }).join('');
-  $('list').querySelectorAll('.pr').forEach((el) => (el.onclick = () => selectPR(list[el.dataset.i])));
-}
+  const GAP = S.expanded ? 36 : 58;
+  const mainY = 40 + inc.length * GAP + 14, H = mainY + out.length * GAP + 40;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.style.height = H + 'px';
+  const xNow = Math.round(W * 0.4);
 
-async function selectPR(pr) {
-  if (S.es) { S.es.close(); S.es = null; }
-  Object.assign(S, { cur: pr, run: null, plan: null, signed: null });
-  renderList();
-  $('chat').innerHTML = '';
-  $('panel').innerHTML = '<p class="sub">Cargando…</p>';
-  busy(false);
-  try {
-    if (pr.running) return attach(pr.running);
-    if (pr.last) {
-      S.run = await api(`/projects/${pid()}/runs/${pr.last.runId}`);
-      if (S.run.brief) { renderBrief(); greetBrief(); return; }
-    }
-    await loadPlan();
-  } catch (e) { $('panel').innerHTML = `<p class="err">${h(e.message)}</p>`; }
-}
+  mk('line', { x1: xNow, y1: 8, x2: xNow, y2: H - 8, stroke: 'rgba(255,255,255,.06)', 'stroke-dasharray': '2 6' }, svg);
+  mk('line', { x1: 8, y1: mainY, x2: xNow, y2: mainY, stroke: '#f5f5f7', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-opacity': .8 }, svg);
+  mk('line', { x1: xNow, y1: mainY, x2: W - 8, y2: mainY, stroke: 'rgba(255,255,255,.16)', 'stroke-width': 2, 'stroke-dasharray': '3 6', 'stroke-linecap': 'round' }, svg);
+  for (let x = xNow - 64; x > 40; x -= 64) mk('circle', { cx: x, cy: mainY, r: 3.6, fill: '#0c0c0e', stroke: '#f5f5f7', 'stroke-opacity': .55, 'stroke-width': 1.6 }, svg);
+  mk('text', { x: 8, y: mainY - 14, class: 'mono' }, svg).textContent = base(S.base || 'main');
 
-/* ── Plan (before verifying) ──────────────────────────────────────────── */
-async function loadPlan() {
-  S.plan = await api(`/projects/${pid()}/plan?pr=${encodeURIComponent(S.cur.id)}&mode=${S.mode}`);
-  renderPlan();
-  const p = S.plan;
-  say(`<b>${h(S.cur.branch)}</b> — ${h(S.cur.title)}\n${p.totals.files} ficheros, +${p.totals.added} −${p.totals.removed}. Todavía no lo he verificado. A la derecha tienes lo que voy a comprobar y lo que no.`);
-  chips(['¿Qué vas a hacer?', '¿Qué no vas a comprobar?']);
-}
-function optionsHTML() {
-  const full = S.mode === 'completo';
-  const sel = S.agents_sel || S.agents.slice(0, 3).map((a) => a.id);
-  return `<div class="seg"><button type="button" data-mode="rapido" class="${full ? '' : 'on'}">Rápida · sin agentes</button><button type="button" data-mode="completo" class="${full ? 'on' : ''}">Completa · con réplicas</button></div>
-  ${full ? (S.agents.length ? `<div class="agents">${S.agents.map((a) => `<label><input type="checkbox" value="${h(a.id)}" ${sel.includes(a.id) ? 'checked' : ''}>${h(a.label)}</label>`).join('')}</div><p class="sub" style="margin:6px 0 0">Cada agente rehace el cambio sin ver el PR. Varios modelos distintos evitan que compartan los mismos puntos ciegos. Tarda varios minutos.</p>` : '<p class="err">No hay ningún agente disponible. Instala opencode o inicia sesión con «claude auth login».</p>') : ''}
-  ${!S.clis.claude && S.clis.claudeInstalled && full ? '<p class="sub" style="margin:6px 0 0">Claude no aparece porque su sesión ha caducado: ejecuta <code>claude auth login</code>.</p>' : ''}`;
-}
-function bindOptions(rerender) {
-  $('panel').querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; rerender(); }));
-  $('panel').querySelectorAll('.agents input').forEach((c) => (c.onchange = () => { S.agents_sel = [...$('panel').querySelectorAll('.agents input:checked')].map((x) => x.value); }));
-}
-function renderPlan() {
-  const p = S.plan;
-  const req = p.requirement;
-  const li = (items, cls) => items.map((x) => `<div class="item"><span class="dot ${cls}"></span><div><div class="ttl">${h(x.what || x)}</div>${x.why ? `<div class="d">${h(x.why)}</div>` : ''}</div></div>`).join('');
-  $('panel').innerHTML = `
-    <h3>${S.cur.direction === 'incoming' ? 'PR recibido' : 'Tu rama, antes de enviarla'}</h3>
-    <div class="big">${p.totals.files} ficheros</div>
-    <div class="sub">+${p.totals.added} −${p.totals.removed} · ${Object.entries(p.kinds).map(([k, v]) => `${v.files} ${kindName(k)}`).join(' · ')}</div>
-    <dl class="kv" style="margin-top:12px">
-      <dt>Requisito</dt><dd>${req?.title ? `${req.url ? `<a href="${h(req.url)}" target="_blank" rel="noopener">${h(req.id)}</a>` : h(req.id)} — ${h(req.title)}` : '<span class="t-warn">no encontrado</span>'}</dd>
-      <dt>Procedencia</dt><dd>${p.provenance === 'none' ? 'sin prompt guardado (se usará el requisito)' : p.provenance === 'nota' ? '<span class="t-ok">prompt original guardado con el commit</span> (git notes)' : '<span class="t-ok">prompt original guardado con el commit</span> (Entire)'}</dd>
-      <dt>Tests</dt><dd>${h(p.toolchain)}</dd>
-    </dl>
-    ${p.provenance === 'none' ? `<details style="margin-top:8px"><summary><span class="sub">Añadir el prompt con el que se generó este cambio</span></summary>
-      <p class="sub" style="margin:6px 0">Se guarda con el commit como nota de git. Las réplicas recibirán este mismo prompt en lugar de solo la issue. Con Entire activo esto ocurre solo.</p>
-      <textarea id="prompt" rows="4" placeholder="Pega aquí el prompt original que recibió el agente"></textarea>
-      <button class="act quiet" id="savePrompt">Guardar con el commit</button><div id="prerr" class="err"></div></details>` : ''}
-    <h3>Voy a comprobar</h3>${li(p.will, 'ok')}
-    <h3>No voy a comprobar</h3>${li(p.wont, 'no')}
-    <h3>Verificación</h3>${optionsHTML()}
-    <button class="act solid" id="run">${S.cur.direction === 'incoming' ? 'Verificar' : 'Verificar antes de enviar'}</button>
-    <div id="perr" class="err"></div>`;
-  bindOptions(async () => { await refreshPlan(); });
-  $('run').onclick = () => verify();
-  if ($('savePrompt')) $('savePrompt').onclick = async () => {
-    try { await api(`/projects/${pid()}/prompt`, { body: { pr: S.cur.id, prompt: $('prompt').value } }); await refreshPlan(); say('Prompt guardado con el commit. Las réplicas lo usarán como instrucción original.'); }
-    catch (e) { $('prerr').textContent = e.message; }
+  const lanes = mk('g', {}, svg);
+  const draw = (list, dir) => {
+    const step = Math.min(46, Math.max(14, (W - xNow - 300) / Math.max(list.length - 1, 1)));
+    list.forEach((p, i) => {
+      const st = state(p); const col = PAL[st.tone];
+      const y = mainY + dir * (i + 1) * GAP; const dy = Math.abs(y - mainY);
+      const xf = p.behind ? Math.max(40, xNow - (30 + 34 * Math.log2(1 + p.behind))) : xNow;
+      const R = 34 + dy * 0.8;
+      const tipX = Math.max(xNow + 150 + i * step, xf + R + 40);
+      const M = Math.min(44 + dy * 0.45, W - 16 - tipX);
+      const mx = tipX + M;
+      const faint = !recent.includes(p) && dir < 0;
+      const g = mk('g', { class: 'lane' + (st.tone === 'warn' || st.tone === 'bad' ? ' pulse' : '') }, lanes);
+      const fork = `M${xf} ${mainY} C ${xf + R * .55} ${mainY}, ${xf + R * .45} ${y}, ${xf + R} ${y} L ${tipX} ${y}`;
+      const merge = `M${tipX} ${y} C ${tipX + M * .55} ${y}, ${mx - M * .45} ${mainY}, ${mx} ${mainY}`;
+      mk('path', { d: fork, fill: 'none', stroke: col, 'stroke-width': faint ? 1.4 : 2.2, 'stroke-linecap': 'round', 'stroke-opacity': faint ? .5 : .95 }, g);
+      if (st.end !== 'cut') {
+        mk('path', { d: merge, fill: 'none', stroke: col, 'stroke-width': 1.6, 'stroke-opacity': st.end === 'merged' ? .9 : .45, 'stroke-dasharray': st.end === 'merged' ? '' : '3 5', 'stroke-linecap': 'round' }, g);
+        mk('circle', { cx: mx, cy: mainY, r: 5, fill: st.end === 'merged' ? col : '#0c0c0e', stroke: col, 'stroke-width': 1.8, 'stroke-opacity': st.end === 'merged' ? 1 : .6 }, g);
+      }
+      const c = Math.min(p.ahead || 1, 4) - 1; const a = xf + R + 16, b = tipX - 22;
+      for (let k = 0; k < c && b > a; k++) mk('circle', { cx: a + ((b - a) * (k + 1)) / (c + 1), cy: y, r: 3.2, fill: '#0c0c0e', stroke: col, 'stroke-width': 1.6 }, g);
+      if (st.end === 'cut') {
+        const s = 5.5; mk('path', { d: `M${tipX - s} ${y - s}L${tipX + s} ${y + s}M${tipX + s} ${y - s}L${tipX - s} ${y + s}`, stroke: col, 'stroke-width': 2.2, 'stroke-linecap': 'round' }, g);
+      } else {
+        mk('circle', { cx: tipX, cy: y, r: faint ? 4 : 6.5, fill: col }, g);
+        mk('circle', { cx: tipX, cy: y, r: faint ? 7 : 11, fill: 'none', stroke: col, 'stroke-opacity': .25, class: 'tipring' }, g);
+      }
+      mk('text', { x: tipX, y: dir < 0 ? y - (faint ? 11 : 17) : y + 25, 'text-anchor': 'middle', class: 'lbl' + (faint ? ' old' : '') }, g).textContent = dir > 0 ? name(p) + ' · yours' : name(p);
+      mk('path', { d: fork + ' ' + merge, fill: 'none', stroke: 'transparent', 'stroke-width': Math.max(GAP - 8, 18) }, g);
+      g.onmouseenter = () => { svg.classList.add('hl'); g.classList.add('on'); showCard(p, st, tipX, y, dir); };
+      g.onmouseleave = () => { svg.classList.remove('hl'); g.classList.remove('on'); $('card').classList.remove('on'); };
+      g.onclick = () => { const r = svg.getBoundingClientRect(); openGraph(p, r.left + (tipX * r.width) / W, r.top + (y * r.height) / H); };
+    });
   };
-}
-async function refreshPlan() { S.plan = await api(`/projects/${pid()}/plan?pr=${encodeURIComponent(S.cur.id)}&mode=${S.mode}`); renderPlan(); }
-const kindName = (k) => ({ source: 'de código', test: 'de test', doc: 'de docs', config: 'de config', derived: 'derivados' }[k] || k);
+  draw(inc, -1); draw(out, 1);
+  mk('circle', { cx: xNow, cy: mainY, r: 16, fill: 'none', stroke: '#f5f5f7', 'stroke-opacity': .12 }, svg);
+  mk('circle', { cx: xNow, cy: mainY, r: 7.5, fill: '#f5f5f7' }, svg);
+  mk('text', { x: xNow - 24, y: mainY - 14, 'text-anchor': 'end', class: 'here' }, svg).textContent = 'you are here';
 
-/* ── Verification (live) ──────────────────────────────────────────────── */
-async function verify() {
-  const options = { mode: S.mode, mutants: S.mutants };
-  if (S.mode === 'completo' && S.agents_sel) options.agents = S.agents_sel;
-  try {
-    const r = await api(`/projects/${pid()}/verify`, { body: { pr: S.cur.id, options } });
-    say(`Empiezo. Trabajo en una copia aislada: tu repositorio no se toca.`);
-    attach(r.runId);
-  } catch (e) {
-    const el = $('perr') || $('panel');
-    el.innerHTML = `<span class="err">${h(e.message)}</span>`;
+  $('more').hidden = !old.length;
+  $('more').textContent = S.expanded ? 'Hide older branches' : `+${old.length} older branches`;
+  const pend = recent.filter((p) => state(p).end === 'open').length;
+  $('sum').innerHTML = `<b>${pend} ${pend === 1 ? 'branch wants' : 'branches want'} in.</b> ${out.length ? `${out.length} of yours ${out.length === 1 ? 'wants' : 'want'} out.` : ''}`;
+}
+function showCard(p, st, x, y, dir) {
+  const svg = $('tree'); const r = svg.getBoundingClientRect(); const vb = svg.viewBox.baseVal;
+  const l = p.last; const card = $('card');
+  card.innerHTML = `<div class="k">${esc(p.branch)}</div><div class="t">${esc(p.title)}</div>
+    <div class="r"><span class="chip ${st.tone}" style="background:${PAL[st.tone]}">${esc(st.label)}</span><span>${l ? `${l.residue} of ${l.total} lines for you` : 'Open it to verify'}</span></div>`;
+  const px = r.left + (x * r.width) / vb.width, py = r.top + (y * r.height) / vb.height;
+  card.style.left = Math.min(Math.max(px - 150, 12), innerWidth - 312) + 'px';
+  card.style.top = (dir < 0 ? py - card.offsetHeight - 34 : py + 40) + 'px';
+  card.classList.add('on');
+}
+$('more').onclick = () => { S.expanded = !S.expanded; renderTree(); };
+addEventListener('resize', () => S.pid && renderTree());
+
+/* ── Graph model, from the real report (or the plan if not verified yet) ── */
+const overlaps = (a, b) => a.file === b.file && a.start <= b.end && b.start <= a.end;
+const short = (s, n = 26) => (s.length <= n ? s : s.slice(0, 10) + '…' + s.slice(-(n - 11)));
+const KIND = { source: 'Code', test: 'Tests', doc: 'Docs', config: 'Config', derived: 'Generated from code' };
+function model(b, plan) {
+  const N = [], L = []; const add = (n) => (N.push(n), n); const link = (a, c, t = '') => L.push([a, c, t]);
+  add({ id: 'pr', label: 'PR', kind: 'core', tone: 'core', info: 'The whole change' });
+  const raw = (b || plan)?.files || [];
+  const der = raw.filter((f) => f.kind === 'derived');
+  const files = raw.filter((f) => f.kind !== 'derived').sort((x, y) => y.add + y.del - (x.add + x.del)).slice(0, 9);
+  if (der.length) files.push({ path: '__der', kind: 'derived', label: `${der.length} generated`, add: der.reduce((s, f) => s + f.add, 0), del: der.reduce((s, f) => s + f.del, 0) });
+  files.forEach((f) => { add({ id: 'f:' + f.path, label: f.label || short(base(f.path)), kind: 'file', tone: f.kind === 'doc' || f.kind === 'derived' ? 'filedim' : 'file', info: `${KIND[f.kind] || f.kind} · +${f.add} −${f.del}` }); link('pr', 'f:' + f.path); });
+  const derSet = new Set(der.map((f) => f.path));
+  const fid = (p) => 'f:' + (derSet.has(p) ? '__der' : p);
+  const has = (id) => N.some((n) => n.id === id);
+  if (b) {
+    const res = b.residue.items.map((i) => ({ file: i.file, start: i.start, end: i.end, why: i.why.join(' · ') }));
+    const regs = (b.l3?.regions || []).map((r) => ({ rid: r.id, file: r.file, start: r.newStart, end: r.newEnd, verdict: r.verdict }));
+    const zones = [...regs, ...res.filter((x) => !regs.some((r) => overlaps(r, x)))].slice(0, 16);
+    zones.forEach((z) => {
+      const r = res.find((x) => overlaps(x, z));
+      const tone = r ? 'bad' : z.verdict === 'consensus' ? 'ok' : z.verdict === 'divergent' ? 'warn' : 'no';
+      const id = 'z:' + z.file + ':' + z.start; z.nid = id;
+      add({ id, label: ':' + z.start, kind: 'zone', tone, file: base(z.file), start: z.start, info: r ? `You read it · ${r.why}` : tone === 'ok' ? 'The replicas did the same' : tone === 'warn' ? 'The replicas did it differently' : 'Not compared' });
+      link(id, has(fid(z.file)) ? fid(z.file) : 'pr', tone === 'bad' ? 'bad' : '');
+    });
+    b.questions.forEach((q) => {
+      const m = q.text.match(/([\w.]+\.\w+):(\d+)/); if (!m) return;
+      const z = N.filter((n) => n.kind === 'zone' && n.file === m[1]).sort((x, y) => Math.abs(x.start - m[2]) - Math.abs(y.start - m[2]))[0];
+      if (z) { z.tone = 'warn'; z.info = 'You decide · ' + q.text; }
+    });
+    const claim = (re) => b.claims.find((c) => re.test(c.text));
+    const ct = (c) => (c ? CLAIM[c.status][0] : 'no');
+    const src = files.filter((f) => f.kind === 'source').map((f) => 'f:' + f.path), tst = files.filter((f) => f.kind === 'test').map((f) => 'f:' + f.path);
+    [['v:build', 'Builds', /compila|build/i, ['pr']], ['v:tests', 'Tests', /tests nuevos|rompe|new tests|breaks/i, tst.length ? tst : ['pr']], ['v:mut', 'Mutation', /defecto|defect/i, src.length ? src : ['pr']]].forEach(([id, label, re, to]) => {
+      const c = claim(re); add({ id, label, kind: 'check', tone: ct(c), info: c ? `${CLAIM[c.status][1]} · ${c.text}` : 'Not run' }); to.forEach((t) => link(id, t, ct(c) === 'bad' ? 'bad' : ''));
+    });
+    (b.l3?.replicas || []).forEach((r) => {
+      const id = 'r:' + r.id; add({ id, label: r.label.split(' ')[0], kind: 'agent', tone: r.ok ? 'agent' : 'no', info: r.ok ? 'Replica: redid the change blind' : 'Replica did not finish' });
+      let any = false;
+      if (r.ok) (b.l3.regions || []).forEach((g) => { const c = g.cells.find((x) => x.replica === r.id)?.status; const z = zones.find((x) => x.rid === g.id); if (z && (c === 'same' || c === 'different')) { link(id, z.nid, c === 'different' ? 'warn' : ''); any = true; } });
+      if (!any) link(id, 'pr');
+    });
+  } else {
+    ['Builds', 'Tests', 'Mutation'].forEach((l, i) => { add({ id: 'v' + i, label: l, kind: 'check', tone: 'no', info: 'Waiting for verification' }); link('v' + i, 'pr'); });
   }
+  return { N, L };
+}
+
+/* Layout is computed before anything is drawn (no jitter), then fitted to the screen. */
+function layout({ N, L }, W, H) {
+  const by = Object.fromEntries(N.map((n) => [n.id, { ...n, vx: 0, vy: 0 }]));
+  const links = L.filter(([a, b]) => by[a] && by[b]).map(([a, b, t]) => ({ a: by[a], b: by[b], t }));
+  const adj = {}; Object.keys(by).forEach((k) => (adj[k] = []));
+  links.forEach((l) => { adj[l.a.id].push(l.b.id); adj[l.b.id].push(l.a.id); });
+  const order = ['pr']; by.pr.depth = 0;
+  for (let i = 0; i < order.length; i++) for (const v of adj[order[i]]) if (by[v].depth == null) { by[v].depth = by[order[i]].depth + 1; by[v].parent = order[i]; order.push(v); }
+  Object.values(by).forEach((n) => { if (n.depth == null) { n.depth = 1; order.push(n.id); } });
+  const d1 = order.filter((id) => by[id].depth === 1);
+  d1.forEach((id, i) => (by[id].ang = (i / d1.length) * Math.PI * 2 - Math.PI / 2));
+  by.pr.ang = 0;
+  const kids = {}; order.filter((id) => by[id].depth > 1).forEach((id) => (kids[by[id].parent] = kids[by[id].parent] || []).push(id));
+  order.forEach((id) => { const ks = kids[id]; if (!ks) return; const sp = Math.min(1.3, .32 * ks.length); ks.forEach((k, j) => (by[k].ang = by[id].ang + (ks.length > 1 ? (j / (ks.length - 1) - .5) * sp : 0))); });
+  const P = Object.values(by);
+  P.forEach((n) => { n.x = Math.cos(n.ang) * n.depth * 160; n.y = Math.sin(n.ang) * n.depth * 160; });
+  const len = (l) => (l.a.kind === 'core' || l.b.kind === 'core' ? 170 : l.a.kind === 'zone' || l.b.kind === 'zone' ? 80 : 140);
+  for (let it = 0; it < 600; it++) {
+    const t = 1 - it / 600;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const a = P[i], b = P[j]; let dx = b.x - a.x, dy = b.y - a.y; const d2 = Math.max(dx * dx + dy * dy, 100), d = Math.sqrt(d2); const f = (a.kind === 'zone' && b.kind === 'zone' ? 1800 : 4800) / d2; dx /= d; dy /= d;
+      a.vx -= dx * f; a.vy -= dy * f; b.vx += dx * f; b.vy += dy * f;
+    }
+    links.forEach((l) => { const dx = l.b.x - l.a.x, dy = l.b.y - l.a.y; const d = Math.sqrt(dx * dx + dy * dy) || 1; const f = ((d - len(l)) / d) * .08; l.a.vx += dx * f; l.a.vy += dy * f; l.b.vx -= dx * f; l.b.vy -= dy * f; });
+    P.forEach((n) => { n.vx -= n.x * .004; n.vy -= n.y * .004; if (n.kind === 'core') { n.vx -= n.x * .2; n.vy -= n.y * .2; } n.x += n.vx * t; n.y += n.vy * t; n.vx *= .55; n.vy *= .55; });
+  }
+  const xs = P.map((n) => n.x), ys = P.map((n) => n.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const L0 = 110, R0 = W - 110, T0 = 120, B0 = H - 150;
+  const s = Math.min((R0 - L0) / Math.max(maxX - minX, 1), (B0 - T0) / Math.max(maxY - minY, 1), 1.5);
+  const ox = (L0 + R0) / 2 - ((minX + maxX) / 2) * s, oy = (T0 + B0) / 2 - ((minY + maxY) / 2) * s;
+  P.forEach((n) => { n.x = n.x * s + ox; n.y = n.y * s + oy; n.bx = n.x; n.by = n.y; });
+  return { P, links };
+}
+
+/* ── Full-screen graph ────────────────────────────────────────────────── */
+let raf = 0;
+function renderGraph(m) {
+  const svg = $('g'); svg.innerHTML = '';
+  $('full').classList.remove('ready');
+  const W = svg.clientWidth, H = svg.clientHeight;
+  const { P, links } = layout(m, W, H);
+  const deg = (n) => links.filter((l) => l.a === n || l.b === n).length;
+  const R = (n) => (n.kind === 'core' ? 22 : n.kind === 'zone' ? 6 : n.kind === 'file' ? 9 + Math.min(deg(n), 6) * .8 : 10);
+  const gl = mk('g', {}, svg), gn = mk('g', {}, svg);
+  links.forEach((l) => {
+    const d = Math.hypot(l.b.x - l.a.x, l.b.y - l.a.y);
+    l.el = mk('line', { class: 'lk ' + l.t, x1: l.a.x, y1: l.a.y, x2: l.b.x, y2: l.b.y, 'stroke-dasharray': d, 'stroke-dashoffset': d, style: `--d:${Math.max(l.a.depth, l.b.depth) * 160 - 80}ms` }, gl);
+  });
+  const tip = $('tip'); let drag = null;
+  const els = P.map((n, i) => {
+    const g = mk('g', { class: 'nd' + (n.kind !== 'zone' ? ' big' : ''), transform: `translate(${n.x},${n.y})` }, gn);
+    const inn = mk('g', { class: 'in', style: `--d:${n.depth * 160 + (i % 7) * 25}ms` }, g);
+    const c = PAL[n.tone] || PAL.no; const r = R(n);
+    if (n.kind === 'core') { mk('circle', { r: r + 12, fill: 'none', stroke: '#f5f5f7', 'stroke-opacity': .1 }, inn); mk('circle', { r, fill: c }, inn); }
+    else if (n.kind === 'check' || n.kind === 'agent') mk('rect', { x: -r, y: -r, width: 2 * r, height: 2 * r, rx: r * .5, fill: c }, inn);
+    else mk('circle', { r, fill: c }, inn);
+    mk('text', { y: r + 17, 'text-anchor': 'middle' }, inn).textContent = n.label;
+    g.onmouseenter = () => {
+      if (drag) return;
+      svg.classList.add('hl'); const on = new Set([n]);
+      links.forEach((l) => { const hit = l.a === n || l.b === n; l.el.classList.toggle('on', hit); if (hit) { on.add(l.a); on.add(l.b); } });
+      els.forEach((e) => e.g.classList.toggle('on', on.has(e.n)));
+      tip.innerHTML = `${esc(n.label)}<small>${esc(n.info)}</small>`; tip.style.left = n.x + 'px'; tip.style.top = n.y - r + 'px'; tip.classList.add('on');
+    };
+    g.onmouseleave = () => { svg.classList.remove('hl'); tip.classList.remove('on'); };
+    g.onpointerdown = (e) => { drag = n; svg.setPointerCapture(e.pointerId); tip.classList.remove('on'); };
+    return { n, g };
+  });
+  svg.onpointermove = (e) => { if (drag) { drag.bx = e.clientX; drag.by = e.clientY; } };
+  svg.onpointerup = () => { drag = null; };
+  setTimeout(() => $('full').classList.add('ready'), 60);
+  setTimeout(() => links.forEach((l) => { l.el.removeAttribute('stroke-dasharray'); l.el.removeAttribute('stroke-dashoffset'); }), 3200);
+  cancelAnimationFrame(raf);
+  (function idle() {
+    const t = performance.now() / 1000;
+    P.forEach((n, i) => { const k = n.kind === 'core' ? 0 : 1.6; n.x += (n.bx + Math.sin(t * .7 + i * 1.3) * k - n.x) * .2; n.y += (n.by + Math.cos(t * .6 + i * .9) * k - n.y) * .2; });
+    els.forEach(({ n, g }) => g.setAttribute('transform', `translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`));
+    links.forEach((l) => { l.el.setAttribute('x1', l.a.x); l.el.setAttribute('y1', l.a.y); l.el.setAttribute('x2', l.b.x); l.el.setAttribute('y2', l.b.y); });
+    raf = requestAnimationFrame(idle);
+  })();
+}
+
+async function openGraph(p, x, y) {
+  $('card').classList.remove('on');
+  Object.assign(S, { cur: p, run: null, plan: null });
+  const full = $('full');
+  full.classList.remove('ready', 'open');
+  full.style.setProperty('--cx', x + 'px'); full.style.setProperty('--cy', y + 'px');
+  $('fid').textContent = name(p); $('fbr').textContent = p.branch;
+  $('g').innerHTML = '';
+  renderBar();
+  full.hidden = false; void full.offsetWidth; full.classList.add('open');
+  try {
+    if (p.running) { await loadPlan(); setTimeout(() => renderGraph(model(null, S.plan)), 380); return attach(p.running); }
+    if (p.last) S.run = await api(`/projects/${S.pid}/runs/${p.last.runId}`);
+    if (!S.run?.brief) await loadPlan();
+  } catch (e) { return renderBar(e.message); }
+  renderBar();
+  setTimeout(() => renderGraph(model(S.run?.brief, S.plan)), 380);
+}
+const loadPlan = async () => { S.plan = await api(`/projects/${S.pid}/plan?pr=${encodeURIComponent(S.cur.id)}&mode=${S.mode === 'full' ? 'completo' : 'rapido'}`); };
+function closeGraph() {
+  const full = $('full'); if (full.hidden) return;
+  if (S.es) { S.es.close(); S.es = null; clearInterval(S.timer); }
+  full.classList.remove('open'); $('tip').classList.remove('on');
+  setTimeout(() => { full.hidden = true; full.classList.remove('ready'); cancelAnimationFrame(raf); }, 700);
+  reloadPRs().catch(() => {});
+}
+$('back').onclick = closeGraph;
+
+/* The one bar at the bottom of the graph: a number, a state, one action. */
+function renderBar(error) {
+  const p = S.cur, b = S.run?.brief;
+  const seg = `<div class="seg" title="Full: ${S.agents.length ? `${Math.min(3, S.agents.length)} agents redo the change blind. Takes minutes.` : 'no agents available'}"><button data-m="quick" class="${S.mode === 'quick' ? 'on' : ''}">Quick</button><button data-m="full" class="${S.mode === 'full' ? 'on' : ''}" ${S.agents.length ? '' : 'disabled'}>Full</button></div>`;
+  let h;
+  if (error) h = `<span class="txt" style="color:var(--bad)">${esc(error)}</span><button class="cta ghost" id="bBack">Back</button>`;
+  else if (S.es) h = `<span class="spin"></span><span class="txt" style="color:var(--fg)">${esc(S.stage)}</span><span class="txt">${secs(Date.now() - S.t0)}</span><button class="cta" disabled>Verifying…</button>`;
+  else if (b) {
+    const stale = p.sha && !b.pr.head.startsWith(p.sha);
+    const tone = stale ? 'no' : laneTone(b.lane.id, b.lane.tone);
+    h = `<span class="num">${b.residue.lines}<small> / ${b.totals.lines}</small></span><span class="txt">lines are yours</span><span class="chip ${tone}" style="background:${PAL[tone]}">${stale ? 'Out of date' : esc(laneName(b.lane.id, b.lane.name))}</span>`
+      + (stale ? `${seg}<button class="cta" id="bVerify">Verify again</button>` : `<button class="cta" id="bReview">${S.run.signoff ? 'View sign-off' : 'Review & sign'}</button>`);
+  } else if (S.plan) h = `<span class="num">${S.plan.totals.files}<small> files</small></span><span class="txt">+${S.plan.totals.added} −${S.plan.totals.removed} · not verified yet</span>${seg}<button class="cta" id="bVerify">Verify</button>`;
+  else h = '<span class="txt">Loading…</span>';
+  $('fbar').innerHTML = h;
+  $('fbar').querySelectorAll('[data-m]').forEach((x) => (x.onclick = async () => { S.mode = x.dataset.m; renderBar(); }));
+  if ($('bVerify')) $('bVerify').onclick = verify;
+  if ($('bReview')) $('bReview').onclick = openReview;
+  if ($('bBack')) $('bBack').onclick = closeGraph;
+}
+
+/* ── Verification, streamed live ──────────────────────────────────────── */
+async function verify() {
+  const options = { mode: S.mode === 'full' ? 'completo' : 'rapido', mutants: 4 };
+  if (S.mode === 'full') options.agents = S.agents.slice(0, 3).map((a) => a.id);
+  try { const r = await api(`/projects/${S.pid}/verify`, { body: { pr: S.cur.id, options } }); attach(r.runId); }
+  catch (e) { renderBar(e.message); }
 }
 function attach(runId) {
-  S.stageEls = {};
-  busy(true, 'VERIFICANDO');
-  chips([]);
-  $('panel').innerHTML = '<h3>Verificando</h3><p class="sub">Puedes seguir cada paso en el centro. Al terminar verás aquí el informe.</p><div id="steps"></div>';
   const prId = S.cur.id;
-  const es = new EventSource(`/api/projects/${pid()}/runs/${runId}/events`);
-  S.es = es;
+  Object.assign(S, { stage: 'Starting in an isolated copy', t0: Date.now() });
+  const es = new EventSource(`/api/projects/${S.pid}/runs/${runId}/events`);
+  S.es = es; renderBar();
+  clearInterval(S.timer); S.timer = setInterval(() => S.es && renderBar(), 1000);
   es.onmessage = async (m) => {
     const e = JSON.parse(m.data);
-    if (e.type === 'stage') stageLine(e);
-    else if (e.type === 'log') line('start', '·', h(e.text));
-    else if (e.type === 'error') line('fail', '✗', h(e.text));
+    if (e.type === 'stage' && e.status === 'start') { S.stage = STAGE[e.id] || e.name; renderBar(); }
     else if (e.type === 'end') {
-      es.close(); S.es = null; busy(false);
-      await loadProject(pid(), true);
-      if (S.cur?.id !== prId) return;
-      S.run = await api(`/projects/${pid()}/runs/${runId}`);
-      if (S.run.brief) { renderBrief(); const b = S.run.brief; say(`Listo en ${secs(b.timing.totalMs)}. Carril <b>${h(b.lane.name)}</b>: te quedan <b>${b.residue.lines} de ${b.totals.lines}</b> líneas por leer${b.questions.length ? ` y <b>${b.questions.length}</b> ${b.questions.length === 1 ? 'pregunta' : 'preguntas'} por responder` : ''}. La decisión es tuya.`); briefChips(); }
-      else $('panel').innerHTML = `<p class="err">La verificación falló: ${h(S.run.error || 'error desconocido')}</p><button class="act" id="retry">Volver</button>`, ($('retry').onclick = () => loadPlan());
+      es.close(); S.es = null; clearInterval(S.timer);
+      await reloadPRs();
+      if (S.cur?.id !== prId || $('full').hidden) return;
+      S.run = await api(`/projects/${S.pid}/runs/${runId}`);
+      if (!S.run.brief) return renderBar(`Verification failed: ${S.run.error || 'unknown error'}`);
+      renderBar(); renderGraph(model(S.run.brief));
     }
   };
-  es.onerror = () => { if (S.es === es) { es.close(); S.es = null; busy(false); } };
-}
-function line(cls, icon, html) {
-  const d = document.createElement('div');
-  d.className = 'ev ' + cls;
-  d.innerHTML = `<i>${icon}</i><span>${html}</span>`;
-  $('chat').appendChild(d);
-  $('chat').scrollTop = 1e9;
-  return d;
-}
-function stageLine(e) {
-  let el = S.stageEls[e.id];
-  const icon = { start: '◌', done: '●', skip: '○', fail: '✗' }[e.status];
-  const html = `${h(e.name)}${e.detail ? ` <small>— ${h(e.detail)}</small>` : ''}${e.ms ? ` <small>(${secs(e.ms)})</small>` : ''}`;
-  if (!el) el = S.stageEls[e.id] = line(e.status, icon, html);
-  el.className = 'ev ' + (e.status === 'skip' ? '' : e.status);
-  el.innerHTML = `<i>${icon}</i><span>${html}</span>`;
-  const steps = $('steps');
-  if (steps) steps.innerHTML = Object.values(S.stageEls).map((x) => `<div class="${x.className}">${x.innerHTML}</div>`).join('');
+  es.onerror = () => { if (S.es === es) { es.close(); S.es = null; clearInterval(S.timer); renderBar(); } };
 }
 
-/* ── Brief ────────────────────────────────────────────────────────────── */
-function greetBrief() {
-  const b = S.run.brief;
-  say(`<b>${h(S.cur.branch)}</b> — ${h(S.cur.title)}\nVerificado ${new Date(b.createdAt).toLocaleString()}. Carril <b>${h(b.lane.name)}</b>: lees <b>${b.residue.lines} de ${b.totals.lines}</b> líneas${b.questions.length ? ` y respondes ${b.questions.length} ${b.questions.length === 1 ? 'pregunta' : 'preguntas'}` : ''}.${S.run.signoff ? `\nFirmado por ${h(S.run.signoff.signer)}.` : ''}`);
-  briefChips();
-}
-const briefChips = () => chips(['¿Qué recomiendas?', '¿Qué has comprobado?', '¿Qué no has comprobado?', '¿Qué tengo que decidir?', '¿Qué tengo que leer?', '¿Qué pasa si quito cada cambio?']);
-const ev = (e) => e.artifact ? `<button type="button" class="linkbtn" data-art="${h(e.artifact)}">${h(e.label)}</button>` : e.url ? `<a href="${h(e.url)}" target="_blank" rel="noopener">${h(e.label)}</a>` : `<span class="mono" style="color:var(--dim)">${h(e.label)}</span>`;
+/* ── Review drawer: decide, read, sign ────────────────────────────────── */
 function codeHTML(item) {
   if (!item.code?.length) return '';
-  return `<pre class="code">${item.code.map((c) => `<span class="h">@@ línea ${c.at}</span>\n${c.removed.map((l) => `<span class="r">- ${h(l)}</span>`).join('\n')}${c.removed.length && c.added.length ? '\n' : ''}${c.added.map((l) => `<span class="a">+ ${h(l)}</span>`).join('\n')}`).join('\n')}</pre>`;
+  return `<pre class="code">${item.code.map((c) => `<span class="h">@@ line ${c.at}</span>\n${c.removed.map((l) => `<span class="r">- ${esc(l)}</span>`).join('\n')}${c.removed.length && c.added.length ? '\n' : ''}${c.added.map((l) => `<span class="a">+ ${esc(l)}</span>`).join('\n')}`).join('\n')}</pre>`;
 }
-function renderBrief(keepScroll) {
-  const run = S.run; const b = run.brief; const so = run.signoff;
-  const scrollWas = $('panel').scrollTop;
-  const stale = S.cur.sha && !b.pr.head.startsWith(S.cur.sha);
-  const req = b.requirement;
-  const P = [];
-  if (stale) P.push(so ? `<div class="banner">Firma caducada. ${h(so.signer)} firmó el commit <span class="mono">${h(so.head.slice(0, 9))}</span> y la rama ya está en <span class="mono">${h(S.cur.sha)}</span>. Lo que se comprobó valía para ese commit: vuelve a verificar y a firmar.</div>` : '<div class="banner">La rama ha cambiado desde esta verificación. El informe ya no corresponde al código actual: vuelve a verificar.</div>');
-  if (b.recommendation) { const rc = { cambios: 'bad', insuficiente: 'warn', lista: 'ok' }[b.recommendation.id]; P.push(`<div class="reco t-${rc}"><span class="sub">Recomendación</span><b>${h(b.recommendation.name)}</b><span class="sub">${h(b.recommendation.why)}</span></div>`); }
-  P.push(`<span class="lane ${TONE[b.lane.tone]}">${h(b.lane.name)}</span>
-    <div class="big">${b.residue.lines} <span style="color:var(--dim)">de ${b.totals.lines} líneas</span></div>
-    <div class="sub">${h(b.lane.summary)}</div>
-    <dl class="kv" style="margin-top:12px">
-      <dt>Requisito</dt><dd>${req?.title ? `${req.url ? `<a href="${h(req.url)}" target="_blank" rel="noopener">${h(req.id)}</a>` : h(req.id)} — ${h(req.title)}` : '<span class="t-warn">sin requisito enlazado</span>'}</dd>
-      <dt>Cambio</dt><dd><span class="mono">${h(b.pr.branch)} → ${h(b.pr.base)} · ${h(b.pr.head.slice(0, 9))}</span> · ${b.totals.files} ficheros · +${b.totals.added} −${b.totals.removed}</dd>
-      <dt>Procedencia</dt><dd>${b.provenance.status === 'none' ? '<span class="t-warn">sin prompt guardado</span>; intención reconstruida desde el requisito' : `<span class="t-ok">prompt original guardado con el commit</span> (${b.provenance.status === 'nota' ? 'git notes' : 'Entire'})`}</dd>
-    </dl>`);
-
-  P.push('<h3>Por qué este carril</h3>');
-  P.push(b.rules.fired.length ? b.rules.fired.map((r) => `<div class="item"><span class="dot ${r.lane === 'devolver' ? 'bad' : r.lane === 'residuo' ? 'ok' : 'warn'}"></span><div><div class="ttl">${h(r.title)}</div><div class="d">${h(r.detail)}</div>${r.evidence?.length ? `<div class="links">${r.evidence.map(ev).join('')}</div>` : ''}</div></div>`).join('') : '<p class="sub">No se ha disparado ninguna regla de riesgo.</p>');
-  P.push(`<details><summary><span class="sub">Reglas que no se han disparado (${b.rules.notFired.length})</span></summary><div class="sub" style="padding:6px 0 0 18px">${b.rules.notFired.map((r) => h(r.title)).join(' · ')}</div></details>`);
-
-  if (b.questions.length) {
-    P.push(`<h3>Decides tú · ${b.questions.length}</h3>`);
-    P.push(b.questions.map((q) => `<div class="q" data-q="${h(q.id)}">
-      <div class="text">${h(q.text)}</div>
-      ${q.why?.length ? `<ul>${q.why.map((w) => `<li>${h(w)}</li>`).join('')}</ul>` : ''}
-      ${q.differ?.length ? `<div class="note"><b>Cómo lo resolvió cada réplica</b>\n${q.differ.map((d) => '· ' + h(d)).join('\n')}</div>` : ''}
-      ${q.evidence?.length ? `<div class="links">${q.evidence.map(ev).join('')}</div>` : ''}
-      ${q.options.map((o) => `<label class="opt"><input type="radio" name="q-${h(q.id)}" value="${h(o)}" ${so?.answers?.[q.id] === o ? 'checked' : ''} ${so ? 'disabled' : ''}><span>${h(o)}</span></label>`).join('')}
-      <div class="tag" style="margin-top:6px">${q.source === 'modelo' ? 'Pregunta redactada por un modelo. La evidencia son los diffs enlazados.' : 'Pregunta generada por una regla.'}</div>
-    </div>`).join(''));
-  }
-
-  if (b.residue.items.length) {
-    P.push(`<h3>Residuo · lo que lees tú</h3>`);
-    P.push(b.residue.items.map((i) => `<details><summary><span><span class="mono">${h(base(i.file))}:${i.start}${i.end !== i.start ? '–' + i.end : ''}</span> <span class="sub">· ${i.lines} ${i.lines === 1 ? 'línea' : 'líneas'}</span><span class="why">${h(i.why.join(' · '))}</span></span></summary>${codeHTML(i)}<div class="sub mono" style="margin-top:4px;overflow-wrap:anywhere">${h(i.file)}</div></details>`).join(''));
-  }
-
-  P.push('<h3>Comprobado · con evidencia ejecutada</h3>');
-  P.push(b.claims.map((c) => `<div class="item"><span class="dot ${CLAIM[c.status][0]}" title="${CLAIM[c.status][1]}"></span><div><div class="ttl">${h(c.text)} <span class="pill ${CLAIM[c.status][0]}">${CLAIM[c.status][1]}</span></div><div class="d">${h(c.detail)}</div>${c.evidence?.length ? `<div class="links">${c.evidence.map(ev).join('')}</div>` : ''}</div></div>`).join(''));
-
-  if (b.l2?.newTests?.length) {
-    const o = { Passed: 'pasa', Failed: 'falla', NoCompila: 'no compila', NoEjecutado: 'no ejecutado' };
-    P.push(`<details><summary><span class="sub">Tests nuevos, uno a uno (${b.l2.newTests.length})</span></summary><table style="margin-top:6px"><tr><th>Test</th><th>Sin el cambio</th><th>Con el cambio</th></tr>${b.l2.newTests.map((t) => `<tr><td class="mono">${h(t.name)}</td><td class="${t.red === 'Passed' ? 't-warn' : ''}">${o[t.red] || h(t.red)}</td><td class="${t.green === 'Failed' ? 't-bad' : ''}">${o[t.green] || h(t.green)}</td></tr>`).join('')}</table></details>`);
-  }
-  if (b.mutation?.mutants?.length) {
-    P.push(`<details><summary><span class="sub">Defectos sembrados, uno a uno (${b.mutation.mutants.length})</span></summary><table style="margin-top:6px"><tr><th>Dónde</th><th>Defecto</th><th>Resultado</th></tr>${b.mutation.mutants.map((m) => `<tr><td class="mono">${h(base(m.file))}:${m.line}</td><td>${h(m.op)}</td><td class="${m.status === 'sobrevive' ? 't-warn' : ''}">${m.status === 'detectado' ? `detectado por ${m.killerCount} test(s)` : m.status === 'sobrevive' ? `sobrevive${m.inResidue ? ' · está en lo que lees' : ''}` : h(m.status)}</td></tr>`).join('')}</table></details>`);
-  }
-
-  if (b.rewind?.steps?.length) {
-    const R = { necesario: (x) => `necesario · fallan ${x.testCount} test(s) sin él`, 'sin-test': () => 'ningún test lo nota', 'no-compila-sin-el': () => 'sin él no compila', 'no-aplicado': () => 'no se pudo quitar' };
-    P.push(`<details><summary><span class="sub">Rebobinar: cada cambio quitado de uno en uno (${b.rewind.steps.length})</span></summary><table style="margin-top:6px"><tr><th>Cambio</th><th>Sin él…</th></tr>${b.rewind.steps.map((x) => `<tr><td><span class="mono">${h(base(x.file))}:${x.start}${x.end !== x.start ? '–' + x.end : ''}</span><div class="sub mono">${h(x.label)}</div></td><td class="${x.status === 'sin-test' ? 't-warn' : x.status === 'necesario' ? 't-ok' : ''}">${(R[x.status] || (() => h(x.status)))(x)}</td></tr>`).join('')}</table></details>`);
-  }
-
-  if (b.l3) {
-    const reps = b.l3.replicas.filter((r) => r.ok);
-    P.push(`<h3>Réplicas · ${reps.length} de ${b.l3.replicas.length} válidas</h3>`);
-    if (!reps.length) P.push('<p class="sub">Ninguna réplica cuenta como segunda opinión. Abajo tienes el motivo de cada una.</p>');
-    if (reps.length) {
-      const code = b.l3.regions;
-      const V = { consensus: ['t-ok', (r) => `coinciden ${r.same}/${r.n}`], divergent: ['t-warn', (r) => `solo ${r.same}/${r.n}`], surplus: ['t-warn', () => 'ninguna'], trivial: ['t-no', () => 'comentario'], unknown: ['t-no', () => '—'] };
-      const G = { same: '=', different: '≠', absent: '–' };
-      P.push(`<div class="matrix" style="grid-template-columns:minmax(110px,1fr) repeat(${reps.length},30px) auto"><div class="hd" style="text-align:left">Zona del PR</div>${reps.map((r) => `<div class="hd" title="${h(r.label)}">${h(r.label.slice(0, 3))}</div>`).join('')}<div class="hd"></div>
-        ${code.map((r) => `<div class="rg" title="${h(r.file)} · ${h(r.label)}">${h(base(r.file))}:${r.newStart}</div>${reps.map((rep) => { const c = r.cells.find((x) => x.replica === rep.id)?.status || 'absent'; return `<div class="cell ${c}" title="${h(rep.label)}">${G[c]}</div>`; }).join('')}<div class="vd ${V[r.verdict][0]}">${V[r.verdict][1](r)}</div>`).join('')}</div>
-        <div class="legend"><span>= mismo cambio que el PR</span><span>≠ tocó la zona de otra forma</span><span>– no tocó esa zona</span></div>
-        <p class="sub" style="margin:8px 0 0">Que coincidan no prueba que el código esté bien. Solo indica dónde el requisito no dejaba elegir.</p>`);
-    }
-    if (b.l3.omissions?.length) P.push(`<div class="note"><b>Cambios que hicieron las réplicas y el PR no</b>\n${b.l3.omissions.map((o) => `· ${h(base(o.file))}:${o.lines[0]} (${o.replicas.length} réplicas) ${h(o.sample)}`).join('\n')}</div>`);
-    if (b.l3.cross?.length) {
-      const cell = (x) => !x ? '—' : x.status !== 'ok' ? 'no compila' : `${x.passed}/${x.ran} pasan`;
-      P.push(`<details><summary><span class="sub">Tests cruzados</span></summary><table style="margin-top:6px"><tr><th>Réplica</th><th>Tests del PR sobre su código</th><th>Sus tests sobre el PR</th></tr>${b.l3.cross.map((c) => `<tr><td>${h(c.label)}</td><td class="${c.prTestsOnReplica?.failed ? 't-warn' : ''}">${cell(c.prTestsOnReplica)}${c.prTestsOnReplica?.failedNames?.length ? `<div class="sub mono">${c.prTestsOnReplica.failedNames.slice(0, 4).map((n) => h(n.split('.').pop())).join(', ')}</div>` : ''}</td><td class="${c.replicaTestsOnPr?.failed ? 't-warn' : ''}">${cell(c.replicaTestsOnPr)}</td></tr>`).join('')}</table></details>`);
-    }
-    P.push(`<details><summary><span class="sub">Cada réplica: estado y lo que dice (sus afirmaciones no son evidencia)</span></summary>${b.l3.replicas.map((r) => `<div class="note"><b>${h(r.label)}</b>${r.mission ? ` <span class="sub">(${h(r.mission)})</span>` : ''} · <span class="${r.ok ? 't-ok' : 't-warn'}">${h(r.status)}</span>${r.lines ? ` · ${r.files} ficheros, ${r.lines} líneas, ${secs(r.ms)}` : ''}${r.patchFile ? ` · <button type="button" class="linkbtn" data-art="${h(r.patchFile)}">ver su parche</button>` : ''}${r.summary ? `\n${h(r.summary)}` : ''}${r.decisions && !/^none\.?$/i.test(r.decisions) ? `\n<b>Decisiones que dice haber tomado:</b> ${h(r.decisions)}` : ''}</div>`).join('')}</details>`);
-  }
-
-  P.push('<h3>No comprobado</h3>');
-  P.push(b.notChecked.map((n) => `<div class="item"><span class="dot no"></span><div><div class="ttl">${h(n.what)}</div><div class="d">${h(n.why)}</div></div></div>`).join(''));
-
-  P.push(so ? signedHTML(run) : signFormHTML(b));
-  P.push(`<h3>Volver a verificar</h3>${optionsHTML()}<button class="act quiet" id="run">Verificar de nuevo</button><div id="perr" class="err"></div>
-    <p class="sub" style="margin-top:14px">Duró ${secs(b.timing.totalMs)}${b.cost?.usd ? ` · ${b.cost.usd.toFixed(2)} $ en agentes` : ''} · ${b.options.mode === 'completo' ? `completa con ${b.options.agents.length} agentes` : 'rápida'} · <button type="button" class="linkbtn" id="mdlink">ver informe en Markdown</button></p>`);
-
-  $('panel').innerHTML = P.join('');
-  $('panel').scrollTop = keepScroll ? scrollWas : 0;
-  bindOptions(() => renderBrief(true));
-  $('run').onclick = () => verify();
-  $('mdlink').onclick = async () => showText('Informe en Markdown', await (await fetch(`/api/projects/${pid()}/runs/${run.id}/report`)).text());
-  $('panel').querySelectorAll('[data-art]').forEach((el) => (el.onclick = async () => {
-    try { showText(el.textContent, await (await fetch(`/api/projects/${pid()}/runs/${run.id}/artifact?name=${encodeURIComponent(el.dataset.art)}`)).text()); } catch (e) { showText('Evidencia', e.message); }
-  }));
-  if (!so) bindSign();
-  else bindSigned();
+const copyBlock = (title, text, id) => `<div class="copy"><label>${esc(title)}</label><button type="button" data-copy="${id}">Copy</button><pre id="${id}">${esc(text)}</pre></div>`;
+function openReview() {
+  const run = S.run, b = run.brief, so = run.signoff;
+  $('dk').textContent = `${name(S.cur)} · ${S.cur.branch}`;
+  $('dt').textContent = so ? (so.decision === 'aprobar' ? 'Signed' : 'Sent back') : laneName(b.lane.id, b.lane.name);
+  const H = [`<p class="lead">${esc(LANE[b.lane.id]?.[1] || b.lane.summary)}</p>`];
+  if (b.recommendation) H.push(`<p class="lead" style="margin-top:6px">Recommendation: <b style="color:var(--fg);font-weight:500">${esc(RECO[b.recommendation.id] || b.recommendation.name)}</b></p>`);
+  if (b.questions.length) H.push(`<div class="sec"><h3>Decide <span>${b.questions.length}</span></h3>${b.questions.map((q) => `<div class="q"><p>${esc(q.text)}</p>${q.options.map((o) => `<label class="opt"><input type="radio" name="q-${esc(q.id)}" value="${esc(o)}" ${so?.answers?.[q.id] === o ? 'checked' : ''} ${so ? 'disabled' : ''}>${esc(OPTION[o] || o)}</label>`).join('')}</div>`).join('')}</div>`);
+  if (b.residue.items.length) H.push(`<div class="sec"><h3>Read <span>${b.residue.lines} lines</span></h3>${b.residue.items.map((i) => `<details class="res"><summary>${esc(base(i.file))}:${i.start}${i.end !== i.start ? '–' + i.end : ''}<span>${i.lines} ${i.lines === 1 ? 'line' : 'lines'}</span></summary>${codeHTML(i)}</details>`).join('')}</div>`);
+  H.push(`<div class="sec"><h3>Checked</h3><div class="list">${b.claims.map((c) => `<div class="li"><i style="background:${PAL[CLAIM[c.status][0]]}"></i><span><b>${CLAIM[c.status][1]}</b> · ${esc(c.text)}</span></div>`).join('')}</div></div>`);
+  H.push(`<div class="sec"><details class="more2"><summary>Not checked · ${b.notChecked.length} ›</summary><div class="list">${b.notChecked.map((n) => `<div class="li"><i></i><span><b>${esc(n.what)}</b> · ${esc(n.why)}</span></div>`).join('')}</div></details></div>`);
+  H.push(so ? signedHTML(run) : signHTML(b));
+  H.push(`<div class="foot"><button class="link" id="mdlink">Full report</button><span>${secs(b.timing.totalMs)}${b.cost?.usd ? ` · $${b.cost.usd.toFixed(2)} in agents` : ''}</span></div>`);
+  $('dbody').innerHTML = H.join('');
+  $('dbody').scrollTop = 0;
+  $('drawer').hidden = false;
+  $('mdlink').onclick = async () => showText('Full report', await (await fetch(`/api/projects/${S.pid}/runs/${run.id}/report`)).text());
+  if (so) bindSigned(); else bindSign();
 }
-
-/* ── Sign-off ─────────────────────────────────────────────────────────── */
-function signFormHTML(b) {
-  const hard = b.rules.fired.some((r) => ['conflicto', 'no-compila', 'suite-rota', 'tests-propios-fallan'].includes(r.id));
-  return `<h3>Firma</h3>
-    <p class="sub">La revisión automática es un consejo. Tu firma es la aprobación.${b.audit ? ' Esta área está en prueba: una segunda persona auditará el cambio.' : ''}</p>
-    <div class="field"><label for="signer">Tu nombre</label><input type="text" id="signer" value="${h(localStorage.getItem('katse.signer') || '')}" placeholder="Nombre y apellidos"></div>
-    ${b.residue.items.length ? `<label class="ck"><input type="checkbox" id="ckResidue"><span>He leído el residuo: ${b.residue.lines} líneas en ${b.residue.items.length} ${b.residue.items.length === 1 ? 'zona' : 'zonas'}</span></label>` : ''}
-    <label class="ck"><input type="checkbox" id="ckNot"><span>He revisado las ${b.notChecked.length} cosas que no se han comprobado</span></label>
-    <div class="field"><label for="risk">Riesgo residual que acepto</label><textarea id="risk" rows="3" placeholder="Con tus palabras: qué podría fallar todavía y por qué lo aceptas."></textarea></div>
-    <button class="act solid" id="sign" ${hard ? 'disabled title="No se puede aceptar un cambio que no compila o rompe tests"' : ''}>Firmar y aceptar</button>
-    <button class="act quiet" id="sendBack">Devolver al autor</button>
-    <div id="serr" class="err"></div>`;
+function signHTML(b) {
+  const hard = b.rules.fired.some((r) => HARD.includes(r.id));
+  return `<div class="sec"><h3>Sign</h3><p class="lead">The automatic review is advice. Your signature is the approval.${b.audit ? ' This area is on probation: a second person will audit it.' : ''}</p>
+    <div class="field"><label for="signer">Your name</label><input type="text" id="signer" value="${esc(store.get('katse.signer') || '')}" placeholder="Full name"></div>
+    ${b.residue.items.length ? `<label class="ck"><input type="checkbox" id="ckRes"><span>I read the residue: ${b.residue.lines} lines</span></label>` : ''}
+    <label class="ck"><input type="checkbox" id="ckNot"><span>I reviewed the ${b.notChecked.length} things that were not checked</span></label>
+    <div class="field"><label for="risk">Residual risk I accept</label><textarea id="risk" rows="3" placeholder="In your words: what could still go wrong, and why you accept it."></textarea></div>
+    <div class="btns"><button class="cta ghost" id="sendBack">Send back</button><button class="cta" id="sign" ${hard ? 'disabled title="A change that does not build or breaks tests cannot be accepted"' : ''}>Accept &amp; sign</button></div>
+    <div class="err" id="serr"></div></div>`;
 }
 function bindSign() {
   const submit = async (decision) => {
-    const b = S.run.brief;
-    const answers = {};
-    for (const q of b.questions) { const c = $('panel').querySelector(`input[name="q-${CSS.escape(q.id)}"]:checked`); if (c) answers[q.id] = c.value; }
-    const signer = $('signer').value.trim();
-    localStorage.setItem('katse.signer', signer);
+    const b = S.run.brief; const answers = {};
+    for (const q of b.questions) { const c = $('dbody').querySelector(`input[name="q-${CSS.escape(q.id)}"]:checked`); if (c) answers[q.id] = c.value; }
+    const signer = $('signer').value.trim(); store.set('katse.signer', signer);
     try {
-      const r = await api(`/projects/${pid()}/runs/${S.run.id}/signoff`, { body: { signer, decision, answers, residualRisk: $('risk').value, checks: { residue: !!$('ckResidue')?.checked, notChecked: !!$('ckNot')?.checked } } });
+      const r = await api(`/projects/${S.pid}/runs/${S.run.id}/signoff`, { body: { signer, decision, answers, residualRisk: $('risk').value, checks: { residue: !!$('ckRes')?.checked, notChecked: !!$('ckNot')?.checked } } });
       S.run.signoff = r.signoff; S.run.signed = r;
-      renderBrief();
-      say(decision === 'aprobar' ? `Firma registrada a nombre de <b>${h(signer)}</b>. Yo no hago el merge: abajo tienes los comandos para hacerlo tú.` : `Devuelto al autor a nombre de <b>${h(signer)}</b>.`);
-      $('panel').scrollTop = $('panel').scrollHeight;
+      openReview(); renderBar(); reloadPRs().catch(() => {});
     } catch (e) { $('serr').textContent = e.message; }
   };
   $('sign').onclick = () => submit('aprobar');
   $('sendBack').onclick = () => submit('devolver');
 }
-function copyBlock(title, text, id) {
-  return `<div class="field copy"><label>${h(title)}</label><button type="button" data-copy="${id}">Copiar</button><pre id="${id}">${h(text)}</pre></div>`;
-}
 function signedHTML(run) {
-  const so = run.signoff; const s = run.signed || {};
-  const out = run.brief.pr.direction === 'outgoing';
-  return `<h3>Firma</h3>
-    <div class="item"><span class="dot ${so.decision === 'aprobar' ? 'ok' : 'no'}"></span><div><div class="ttl">${so.decision === 'aprobar' ? 'Aceptado' : 'Devuelto al autor'} por ${h(so.signer)}</div><div class="d">${new Date(so.ts).toLocaleString()} · informe sha256:${h(so.briefHash.slice(0, 16))}…${so.auditRequired ? ' · pendiente de auditoría por una segunda persona' : ''}</div><div class="d">Riesgo aceptado: ${h(so.residualRisk)}</div></div></div>
-    ${so.decision === 'aprobar' && s.commands?.length ? copyBlock(out ? 'Para enviarlo (lo ejecutas tú)' : 'Para hacer el merge (lo ejecutas tú)', s.commands.join('\n'), 'cmds') : ''}
-    ${s.trailers ? copyBlock('Líneas de firma para el commit', s.trailers, 'trl') : ''}
-    ${s.markdown ? copyBlock(out ? 'Descripción del PR, con el informe' : 'Comentario para el PR', s.markdown, 'md') : ''}
-    <button class="act quiet" id="attach">Adjuntar el informe al commit (git notes)</button><div id="aerr" class="sub"></div>`;
+  const so = run.signoff, s = run.signed || {}, out = run.brief.pr.direction === 'outgoing';
+  return `<div class="sec"><h3>Sign-off</h3>
+    <div class="done"><b>${so.decision === 'aprobar' ? 'Accepted' : 'Sent back'} by ${esc(so.signer)}</b><p>${new Date(so.ts).toLocaleString('en-GB')} · report sha256:${esc(so.briefHash.slice(0, 12))}…${so.auditRequired ? ' · waiting for a second person to audit' : ''}</p><p>Accepted risk: ${esc(so.residualRisk)}</p></div>
+    ${so.decision === 'aprobar' && s.commands?.length ? copyBlock(out ? 'To send it (you run this)' : 'To merge (you run this)', s.commands.join('\n'), 'c1') : ''}
+    ${s.trailers ? copyBlock('Commit trailers', s.trailers, 'c2') : ''}
+    ${s.markdown ? copyBlock(out ? 'PR description, with the report' : 'PR comment', s.markdown, 'c3') : ''}
+    <p class="lead" style="margin-top:14px">Katse never merges. You do.</p>
+    <button class="link" id="attach" style="margin-top:10px">Attach the report to the commit (git notes)</button><div class="err" id="aerr" style="color:var(--fg2)"></div></div>`;
 }
 function bindSigned() {
-  $('panel').querySelectorAll('[data-copy]').forEach((b) => (b.onclick = async () => { await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = 'Copiado'; setTimeout(() => (b.textContent = 'Copiar'), 1200); }));
+  $('dbody').querySelectorAll('[data-copy]').forEach((b) => (b.onclick = async () => { await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1200); }));
   $('attach').onclick = async () => {
-    try { const r = await api(`/projects/${pid()}/runs/${S.run.id}/attach`, { body: {} }); $('aerr').innerHTML = `Adjuntado al commit ${h(r.commit.slice(0, 9))} en <code>${h(r.ref)}</code>. Para compartirlo: <code>${h(r.push)}</code>`; }
+    try { const r = await api(`/projects/${S.pid}/runs/${S.run.id}/attach`, { body: {} }); $('aerr').innerHTML = `Attached to ${esc(r.commit.slice(0, 9))} in <code>${esc(r.ref)}</code>. To share it: <code>${esc(r.push)}</code>`; }
     catch (e) { $('aerr').textContent = e.message; }
   };
 }
+$('dx').onclick = () => ($('drawer').hidden = true);
 
-/* ── Modals ───────────────────────────────────────────────────────────── */
-function modal(html) { $('modalBody').innerHTML = html; $('modal').hidden = false; }
+/* ── Modal ────────────────────────────────────────────────────────────── */
+function modal(html) { $('mbody').innerHTML = html; $('modal').hidden = false; }
 function closeModal() { $('modal').hidden = true; }
-function showText(title, text) { modal(`<h2>${h(title)}</h2><pre class="log">${h(text)}</pre>`); }
-
-function openAddProject(first) {
-  modal(`<h2>${first ? 'Elige tu proyecto' : 'Abrir otro proyecto'}</h2><p class="sub">Katse trabaja sobre un repositorio git de tu equipo. No instala nada dentro: usa copias temporales.</p>
-    <div class="field"><label for="ppath">Carpeta de un repositorio local</label><input type="text" id="ppath" placeholder="/ruta/a/tu/repo"></div><button class="act" id="padd">Abrir</button>
-    <div class="field" style="margin-top:20px"><label for="purl">O clonar desde una URL</label><input type="text" id="purl" placeholder="https://github.com/usuario/repo"></div><button class="act quiet" id="pclone">Clonar en ${h(S.workspace || 'workspace')}</button>
-    <div id="merr" class="err"></div>`);
-  const go = async (body) => {
-    $('merr').textContent = 'Abriendo…';
-    try { const p = await api('/projects', { body }); if (!S.projects.find((x) => x.id === p.id)) S.projects.push(p); renderProjects(); closeModal(); await loadProject(p.id); }
-    catch (e) { $('merr').textContent = e.message; }
-  };
-  $('padd').onclick = () => go({ path: $('ppath').value.trim() });
-  $('pclone').onclick = () => go({ url: $('purl').value.trim() });
-}
-function openSettings() {
-  const p = S.project; const s = S.status;
-  modal(`<h2>Ajustes de ${h(p.name)}</h2><p class="sub mono">${h(p.path)}</p>
-    <div class="field"><label for="sbase">Rama base (contra la que se comparan los PR)</label><input type="text" id="sbase" value="${h(p.base)}"></div>
-    <div class="field"><label for="sissue">Repositorio de las issues (usuario/repo). Vacío: se deduce del origen</label><input type="text" id="sissue" value="${h(p.issueRepo || '')}" placeholder="${h(p.origin || '')}"></div>
-    <div class="field"><label for="sbuild">Comando de compilación (opcional)</label><input type="text" id="sbuild" value="${h(p.commands?.build || '')}" placeholder="se detecta solo"></div>
-    <div class="field"><label for="stest">Comando de tests (opcional)</label><input type="text" id="stest" value="${h(p.commands?.test || '')}" placeholder="se detecta solo"></div>
-    <button class="act solid" id="ssave">Guardar</button>
-    <h3>Guardar el prompt de cada commit (Entire)</h3>
-    <p class="sub">${s.entire.enabled ? 'Entire está activo en este repositorio: cada commit hecho con un agente guarda su prompt y Katse lo usa para rehacer el cambio.' : s.entire.installed ? 'Entire está instalado pero no activo aquí. Ejecuta en el repositorio:' : 'Entire no está instalado. Sin él, Katse usa el texto del requisito y lo marca como menos confianza. Para activarlo:'}</p>
-    ${s.entire.enabled ? '' : `<pre class="log">${s.entire.installed ? '' : 'brew install --cask entireio/tap/entire\n'}cd ${h(p.path)}\nentire enable</pre>`}
-    <h3>Agentes para las réplicas</h3><p class="sub">${S.agents.length ? S.agents.map((a) => h(a.label)).join(' · ') : 'Ninguno disponible.'}${!S.clis.claude && S.clis.claudeInstalled ? ' · Claude: sesión caducada, ejecuta «claude auth login».' : ''}</p>
-    <div id="merr" class="err"></div>`);
-  $('ssave').onclick = async () => {
-    try {
-      const np = await api(`/projects/${p.id}`, { method: 'PATCH', body: { base: $('sbase').value, issueRepo: $('sissue').value, commands: { build: $('sbuild').value, test: $('stest').value } } });
-      S.projects = S.projects.map((x) => (x.id === np.id ? np : x)); closeModal(); await loadProject(np.id);
-    } catch (e) { $('merr').textContent = e.message; }
-  };
-}
-async function openLedger() {
-  const L = await api(`/projects/${pid()}/ledger`);
-  const m = L.metrics;
-  const ST = { prueba: ['no', 'En prueba'], ganada: ['ok', 'Ganada'], retirada: ['bad', 'Retirada'] };
-  const card = (l, n, x, star) => `<div class="card ${star ? 'star' : ''}"><div class="l">${l}</div><div class="n">${n}</div><div class="x">${x}</div></div>`;
-  const sd = m.seeded;
-  modal(`<h2>Libro de confianza · ${h(S.project.name)}</h2>
-    <p class="sub">La confianza se gana por área con lo que pasa después del merge y se retira tras un escape. El tiempo de revisión solo puede bajar mientras los escapes no suban.</p>
-    <h3>Medidas</h3><div class="cards">
-      ${card('Defectos sembrados', sd.total ? `${sd.byTests + sd.routed} de ${sd.total}` : '—', sd.total ? `${sd.byTests} los detectan los tests · ${sd.routed} llegan a la persona · ${sd.escaped} escaparían` : 'Verifica algún PR para medirlo', true)}
-      ${card('Líneas que lee una persona', m.readRatio.total ? `${m.readRatio.read} de ${m.readRatio.total}` : '—', m.readRatio.total ? `${m.readRatio.pct} % del código cambiado (sin contar lo devuelto)` : '')}
-      ${card('A lectura completa', `${m.fullRead.n} de ${m.fullRead.of}`, Object.entries(m.lanes).map(([k, v]) => `${v} ${k}`).join(' · ') || 'sin verificaciones')}
-      ${card('Hallazgos que cambiaron algo', m.findings.answered ? `${m.findings.acted} de ${m.findings.answered}` : '—', 'Preguntas en las que la persona no respondió «aceptar»')}
-      ${card('Estabilidad del revisor', m.stability.repeated ? `${m.stability.stable} de ${m.stability.repeated}` : '—', 'Mismo commit verificado dos veces, mismo carril')}
-      ${card('Minutos hasta la firma', m.minutesToSign ?? '—', `${m.signoffs} cambios firmados`)}
-      ${card('Coste', m.cost.usd ? `${m.cost.usd} $` : `${m.cost.minutes} min`, `${m.cost.minutes} min de cómputo en total`)}
-      ${card('Escapes', m.escapes, m.signoffs ? 'Reverts e incidentes atribuidos' : 'Aún no se ha firmado nada: no demuestra nada')}
-    </div>
-    <h3>Confianza por área</h3>
-    ${L.areas.length ? `<table><tr><th>Área</th><th>Estado</th><th>Firmados</th><th>Escapes</th><th>Qué implica</th></tr>${L.areas.map((a) => `<tr><td class="mono">${h(a.area)}</td><td><span class="pill ${ST[a.state][0]}">${ST[a.state][1]}</span></td><td>${a.signoffs}</td><td>${a.escapes}</td><td class="sub">${a.state === 'ganada' ? 'Firma ligera permitida; auditoría por muestreo' : a.state === 'retirada' ? `Lectura completa durante ${a.remaining} cambios más` : `Cada cambio lo audita una segunda persona; faltan ${a.remaining} para ganarla`}</td></tr>`).join('')}</table>` : '<p class="sub">Verifica algún PR para que aparezcan sus áreas.</p>'}
-    <h3>Registrar un escape</h3><p class="sub">Un revert o un incidente atribuido a un área. Le retira la confianza durante los siguientes ${L.k} cambios.</p>
-    <div class="row" style="margin-top:8px"><select id="earea">${L.areas.map((a) => `<option>${h(a.area)}</option>`).join('')}</select><input type="text" id="enote" placeholder="Qué ocurrió"></div>
-    <button class="act quiet" id="eadd" ${L.areas.length ? '' : 'disabled'}>Registrar escape</button><div id="merr" class="err"></div>
-    <h3>Historial</h3>${L.entries.length ? `<table><tr><th>Cuándo</th><th>Qué</th><th>Quién</th><th>Detalle</th></tr>${L.entries.map((e) => `<tr><td class="sub">${new Date(e.ts).toLocaleString()}</td><td>${e.type === 'signoff' ? 'Firma' : e.type === 'escape' ? '<span class="t-bad">Escape</span>' : 'Devuelto'}</td><td>${h(e.signer || e.by || '')}</td><td class="sub">${e.type === 'signoff' ? `${h(e.branch)} · ${h(e.lane)} · leyó ${e.read}/${e.total} · ${h(e.residualRisk)}` : e.type === 'escape' ? `${h(e.area)} · ${h(e.note)}` : h(e.pr || '')}</td></tr>`).join('')}</table>` : '<p class="sub">Todavía no hay firmas ni escapes.</p>'}`);
-  $('eadd').onclick = async () => {
-    try { await api(`/projects/${pid()}/escape`, { body: { area: $('earea').value, note: $('enote').value, by: localStorage.getItem('katse.signer') || '' } }); openLedger(); }
-    catch (e) { $('merr').textContent = e.message; }
-  };
-}
-
-/* ── Wiring ───────────────────────────────────────────────────────────── */
-$('tIn').onclick = () => { S.side = 'incoming'; renderList(); if (S.prs.incoming[0] && S.cur?.direction !== 'incoming') selectPR(S.prs.incoming[0]); };
-$('tOut').onclick = () => { S.side = 'outgoing'; renderList(); if (S.prs.outgoing[0] && S.cur?.direction !== 'outgoing') selectPR(S.prs.outgoing[0]); };
-$('project').onchange = (e) => loadProject(e.target.value);
-$('addProject').onclick = () => openAddProject(false);
-$('settings').onclick = () => S.project && openSettings();
-$('openLedger').onclick = () => S.project && openLedger();
-$('modalClose').onclick = closeModal;
+function showText(title, text) { modal(`<h2>${esc(title)}</h2><pre class="log">${esc(text)}</pre>`); }
+$('mx').onclick = closeModal;
 $('modal').onclick = (e) => { if (e.target === $('modal')) closeModal(); };
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
-$('f').onsubmit = (e) => { e.preventDefault(); const v = $('q').value.trim(); if (v) { ask(v); $('q').value = ''; } };
-init().catch((e) => { $('panel').innerHTML = `<p class="err">${h(e.message)}</p>`; });
+addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!$('modal').hidden) closeModal(); else if (!$('drawer').hidden) $('drawer').hidden = true; else closeGraph();
+});
+
+init().catch((e) => { $('sum').textContent = e.message; });
