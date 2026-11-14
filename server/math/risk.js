@@ -42,6 +42,7 @@ export const WEIGHTS = {
   untested: 0.8,     // no test reaches it in the dependency graph (after Chianti's affected tests, Ren et al. 2004)
   tested: -0.4,      // tests written with the change reach it: same author, so weak evidence, but better than none
   literals: -1.2,    // only string literals changed (messages, labels)
+  moved: -1.2,       // same tokens as a function removed elsewhere in this pull request: moved, not rewritten (a label, not a proof)
   warn: 0.8,         // each failed practice check of warning level
   info: 0.2,         // each informational finding
 };
@@ -76,6 +77,7 @@ export function signals(u, pr = {}) {
     else if (!(t.reachedBy > 0)) add('untested', 1, 'no test reaches it in the dependency graph');
   }
   if (u.change?.kind === 'literals' && u.change.onlyStrings) S.push({ id: 'literals', x: 1, w: WEIGHTS.literals, text: 'only string literals changed' });
+  if (u.change?.kind === 'moved') S.push({ id: 'moved', x: 1, w: WEIGHTS.moved, text: `same tokens as the function removed from ${u.change.from}: moved, not rewritten (what its names refer to in the new place was not checked)` });
   const warn = (u.findings || []).filter((f) => f.severity === 'warn').length, info = (u.findings || []).filter((f) => f.severity === 'info').length;
   if (warn) S.push({ id: 'warn', x: Math.min(warn, 3), w: WEIGHTS.warn, text: `${plural(warn, 'practice check')} failed` });
   if (info) S.push({ id: 'info', x: Math.min(info, 3), w: WEIGHTS.info, text: `${plural(info, 'note')}` });

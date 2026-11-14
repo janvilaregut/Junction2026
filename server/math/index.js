@@ -36,7 +36,7 @@ function historyOf(repo, base) {
 import { verdict, summarize, POLICY, WEIGHTS } from './risk.js';
 import { lexicon, decide, merge } from './sensitivity.js';
 
-export const VERSION = 11; // part of the cache key: raise it whenever a measurement or the model changes
+export const VERSION = 12; // part of the cache key: raise it whenever a measurement or the model changes
 const MAX_UNITS = 44, MAX_CONTEXT = 22;
 // A call that can fail a test: assert/expect/should/verify/ensure/check families, and the Roslyn verifier runs (VerifyCS.Test.RunDefaultAsync).
 // Things a function can do that no static graph can follow, per language. A changed function that does one of
@@ -50,8 +50,8 @@ const ASSERT = /^(assert|expect|should|verify|ensure|check|must|throws|rejects|i
 
 /** The methods behind the colours, for the interface's legend and the report. */
 export const METHODS = [
-  { id: 'identical', level: 'proof', name: 'Token equality', basis: 'Comments and layout are not part of the program: equal token streams compile to the same program.' },
-  { id: 'alpha', level: 'proof', name: 'Alpha-equivalence', basis: 'Renaming a bound variable consistently, without capture, preserves meaning (lambda calculus; Barendregt 1984).' },
+  { id: 'identical', level: 'proof', name: 'Token equality', basis: 'Comments and layout are not part of the program: equal token streams compile to the same program. Issued in JavaScript, TypeScript and C# only, and refused wherever the tokenizer may have misread the text (JSX, an ambiguous regular expression, a comment a build tool reads, an unusual line terminator).' },
+  { id: 'alpha', level: 'proof', name: 'Alpha-equivalence', basis: 'Renaming a bound variable consistently, without capture, preserves meaning (lambda calculus; Barendregt 1984). Issued in JavaScript and TypeScript only: in C# and Java a local name can reach run time.' },
   { id: 'checks', level: 'fact', name: 'Deterministic checks', basis: 'Imports resolve, call arities match, nothing removed is still called, no test was deleted or disabled.' },
   { id: 'graph', level: 'measure', name: 'Dependency graph', basis: 'Who uses whom, by name; rank by use relations (Inoue et al. 2003) and what can reach a function (after Chianti, Ren et al. 2004). Network measures on dependency graphs predict defect-prone code (Zimmermann & Nagappan 2008). An estimate: published call graphs miss 10 to 15% of targets (Feldthaus et al. 2013).' },
   { id: 'complexity', level: 'measure', name: 'Cyclomatic complexity', basis: 'Number of linearly independent paths through a function (McCabe 1976).' },
@@ -223,14 +223,17 @@ export async function analyze(project, pr, { force = false, decisions = true } =
       units.push({ id: `${f.path}::(declarations)`, name: 'declarations', qname: `${path.basename(f.path)} · declarations`, kind: 'type', file: f.path, lang, start: 1, end: 1, status: 'added', isTest: isTestFile, helper: isTestFile, exported: false, lines: loose, findings: [], declarations: true, change: { kind: 'logic' } });
     }
   }
-  // A function removed in one place and added, token for token, in another was moved, not changed.
+  // A function removed in one place and added, token for token, in another was moved, not rewritten. That is a
+  // fact about its text and a reason to read it less closely; it is not a proof. In its new place the names it
+  // does not declare (imports, constants, sibling functions, members of the class around it) may refer to
+  // something else, and nothing here checks that they do not.
   guard('proofs', () => {
     const gone = units.filter((u) => u.status === 'removed' && u._b), sig = (F, s) => F.tokens.slice(s.a, s.b).map((t) => t.v).join('\u0001');
     const bySig = new Map(gone.map((u) => [sig(u._B, u._b), u]));
     for (const u of units) if (u.status === 'added' && u._h && u._h.bodyB - u._h.bodyA > 6) {
       const from = bySig.get(sig(u._H, u._h)); if (!from || from.moved) continue;
       from.moved = true; u.status = 'modified'; u.lines.removed += from.lines.removed;
-      u.proof = { proved: true, level: 'identical', claim: `Same tokens as the function removed from ${path.basename(from.file)}: moved, not changed.` }; u.change = { kind: 'identical' };
+      u.proof = null; u.change = { kind: 'moved', from: path.basename(from.file) };
     }
   });
   // A proof that the text is the same program holds for one way of compiling it. If this pull request also

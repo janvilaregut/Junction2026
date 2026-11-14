@@ -14,8 +14,12 @@ test('identical: comments, indentation, blank lines and re-wrapping are the same
   proved('const x = a &&\n  b;', 'const x = a\n  && b;', 'js', 'identical');
   proved('if (a) {\n  b();\n}\nelse {\n  c();\n}', 'if (a) {\n  b();\n} else {\n  c();\n}', 'js', 'identical');
   proved('int F(int a)\n{\n    /* old */\n    return a   +   1;\n}', 'int F(int a) { return a + 1; } // new', 'cs', 'identical');
-  proved('def f(a):\n    # note\n    return a + 1\n', 'def f(a):\n    return a + 1  # moved note\n', 'py', 'identical');
-  proved('x = (1,\n     2)\n', 'x = (1, 2)\n', 'py', 'identical');
+  // Outside JavaScript, TypeScript and C# nothing is certified, not even a moved comment: the review showed the
+  // tokenizer misreads strings, layout or comments in each of the other languages.
+  refused('def f(a):\n    # note\n    return a + 1\n', 'def f(a):\n    return a + 1  # moved note\n', 'py', /JavaScript, TypeScript and C# only/);
+  refused('x = (1,\n     2)\n', 'x = (1, 2)\n', 'py', /only/);
+  refused('int f(int a) {\n  // one\n  return a + 1;\n}', 'int f(int a) { return a + 1; }', 'java', /only/);
+  refused('func f() int {\n  // one\n  return 1\n}', 'func f() int {\n  return 1\n}', 'go', /only/);
 });
 
 test('identical: a changed token is never the same program', () => {
@@ -49,8 +53,9 @@ test('alpha: a consistent renaming of locals is proved, and it really behaves th
   proved('function f(a, b) { return a + b; }', 'function f(x, y) { return x + y; }', 'js', 'alpha'); // JS parameters cannot be named by callers
   proved('const f = (xs) => xs.map((x) => x * 2);', 'const f = (xs) => xs.map((v) => v * 2);', 'js', 'alpha');
   proved('const f = (xs) => xs.map(x => { const d = x * 2; return d; });', 'const f = (xs) => xs.map(y => { const e = y * 2; return e; });', 'js', 'alpha');
-  proved('int F(List<int> xs) { var total = 0; foreach (var x in xs) { total += x; } return total; }', 'int F(List<int> xs) { var sum = 0; foreach (var item in xs) { sum += item; } return sum; }', 'cs', 'alpha');
-  proved('string F(int a) { var s = a.ToString(); return $"v={s}"; }', 'string F(int a) { var text = a.ToString(); return $"v={text}"; }', 'cs', 'alpha');
+  // Not in C#: a local's name reaches run time there with no reflection in sight (see the next tests).
+  refused('int F(List<int> xs) { var total = 0; foreach (var x in xs) { total += x; } return total; }', 'int F(List<int> xs) { var sum = 0; foreach (var item in xs) { sum += item; } return sum; }', 'cs');
+  refused('string F(int a) { var s = a.ToString(); return $"v={s}"; }', 'string F(int a) { var text = a.ToString(); return $"v={text}"; }', 'cs');
   proved('function f(a: number): number { const t: number = a * 2; return t; }', 'function f(a: number): number { const twice: number = a * 2; return twice; }', 'ts', 'alpha');
 });
 
@@ -85,22 +90,23 @@ test('alpha is refused whenever a name could be seen from outside or captured', 
   proved('function f(a) { const x = a; return `v=${x}`; }', 'function f(a) { const y = a; return `v=${y}`; }', 'js', 'alpha');
 });
 
-test('alpha in C#: parameters, named arguments, nameof and anonymous types are part of the contract', () => {
-  refused('int F(int count) { return count + 1; }', 'int F(int n) { return n + 1; }', 'cs', /parameter/);
+test('no renaming is certified in C#: names there are part of the contract and reach run time', () => {
+  refused('int F(int count) { return count + 1; }', 'int F(int n) { return n + 1; }', 'cs'); // callers can pass it by name
   refused('void F() { var total = 1; G(total: total); }', 'void F() { var sum = 1; G(sum: sum); }', 'cs');
-  refused('string F() { var total = 1; return nameof(total); }', 'string F() { var sum = 1; return nameof(sum); }', 'cs', /nameof/);
-  refused('object F() { var total = 1; return new { total }; }', 'object F() { var sum = 1; return new { sum }; }', 'cs', /shorthand/);
-  refused('int F() { var x = 1; return this.x + x; }', 'int F() { var y = 1; return this.y + y; }', 'cs', /member/);
-  refused('int F() { return count + 1; }', 'int F() { return total + 1; }', 'cs', /not declared inside/);
+  refused('string F() { var total = 1; return nameof(total); }', 'string F() { var sum = 1; return nameof(sum); }', 'cs');
+  refused('object F() { var total = 1; return new { total }; }', 'object F() { var sum = 1; return new { sum }; }', 'cs'); // the anonymous type's member is named after the variable
+  refused('void F(string value) { var input = value; ArgumentNullException.ThrowIfNull(input); }', 'void F(string value) { var text = value; ArgumentNullException.ThrowIfNull(text); }', 'cs'); // CallerArgumentExpression: the message names the variable
+  refused('int F() { var x = 1; return this.x + x; }', 'int F() { var y = 1; return this.y + y; }', 'cs');
+  refused('int F() { return count + 1; }', 'int F() { return total + 1; }', 'cs');
   refused('class C { constructor(private x: number) { this.y = x; } }', 'class C { constructor(private z: number) { this.y = z; } }', 'ts');
 });
 
 test('holes found while attacking the module stay closed', () => {
   // `return a > limit;` ends like a generic declaration `List<int> x;` but declares nothing: limit is a field
-  refused('bool F(int a) { return a > limit; }', 'bool F(int a) { return a > bound; }', 'cs', /not declared inside/);
+  refused('bool F(int a) { return a > limit; }', 'bool F(int a) { return a > bound; }', 'cs');
   refused('int F(bool c, int a) { return c ? a : fallback; }', 'int F(bool c, int a) { return c ? a : other; }', 'cs');
-  proved('int F() { List<int> xs = Make(); return xs.Count; }', 'int F() { List<int> items = Make(); return items.Count; }', 'cs', 'alpha');
-  proved('int F() { int? v = Get(); return v ?? 0; }', 'int F() { int? value = Get(); return value ?? 0; }', 'cs', 'alpha');
+  refused('int F() { List<int> xs = Make(); return xs.Count; }', 'int F() { List<int> items = Make(); return items.Count; }', 'cs');
+  refused('int F() { int? v = Get(); return v ?? 0; }', 'int F() { int? value = Get(); return value ?? 0; }', 'cs');
   // a call or a condition at the start of a snippet is not a parameter list
   refused('foo(a, b);', 'foo(c, b);', 'js', /not declared inside/);
   refused('if (ready) { go(ready); }', 'if (done) { go(done); }', 'js', /not declared inside/);
@@ -113,7 +119,7 @@ test('holes found while attacking the module stay closed', () => {
   // var is function-scoped: a use after its block is the same variable, but the block-scope model refuses (safe side)
   refused('function f() { { var x = 1; } return x; }', 'function f() { { var y = 1; } return y; }', 'js', /outside the scope/);
   // Java parameters cannot be named by callers; C# ones can
-  proved('int f(int count) { return count + 1; }', 'int f(int n) { return n + 1; }', 'java', 'alpha');
+  refused('int f(int count) { return count + 1; }', 'int f(int n) { return n + 1; }', 'java', /only/); // -parameters, records and anonymous classes expose names
 });
 
 test('renaming is not certified for languages whose scoping the engine does not model', () => {

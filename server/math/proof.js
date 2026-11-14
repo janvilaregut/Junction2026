@@ -3,63 +3,138 @@
 //
 //   identical   The two versions have the same significant token stream: only comments and layout changed, so
 //               the compiler is given the same program (ECMA-262 §12 and C# §6.3: comments and white space
-//               separate tokens and are otherwise discarded). In JavaScript, TypeScript and Go a line break can
-//               end a statement (automatic semicolon insertion), so line breaks are compared wherever one
-//               could: see `breaks` below. Python layout is already tokens. In Kotlin, Swift, Scala and Ruby
-//               line structure is compared exactly.
+//               separate tokens and are otherwise discarded). In JavaScript and TypeScript a line break can end
+//               a statement (automatic semicolon insertion), so line breaks are compared wherever one could:
+//               see `breaks` below.
 //   alpha       The versions differ only by a consistent, one-to-one renaming of variables that are bound
 //               inside the function, with no capture: alpha-conversion preserves meaning (Barendregt, The
-//               Lambda Calculus, 1984). Checked syntactically and conservatively, for the brace languages
-//               only (JavaScript, TypeScript, C#, Java); every condition is listed at `provesAlpha`.
+//               Lambda Calculus, 1984). Checked syntactically and conservatively, in JavaScript and TypeScript
+//               only; every condition is listed at `provesAlpha`.
+//
+// Where a proof is issued. Only in JavaScript, TypeScript and C#: the languages in which this module and the
+// tokenizer were attacked by a dedicated review, each claimed hole reproduced by running both versions. In the
+// other languages the lexer is good enough to measure, not to certify, and the review showed why: Java text
+// blocks and unicode escapes, nested string interpolation (Swift, Kotlin, Scala, Dart), Scala 3 indentation,
+// C macros and line splicing, PHP text outside its tags, Python raw strings and layout tokens. There every
+// proof is refused. Renaming is not certified in C# or Java: a name can reach run time there without any
+// reflection in sight (CallerArgumentExpression in everyday guard calls, anonymous-type members, record
+// components, parameter names read by frameworks).
+//
+// Even in those three languages a proof is refused whenever the tokenizer may have misread the text (`distrust`
+// below): JSX, where white space is content; a `/` that may open a regular expression; a string that does not
+// end where expected; a line terminator other than LF or CRLF; an HTML-like comment marker; or a changed
+// comment that a tool reads (`DIRECTIVE`).
 //
 // What a proof here does NOT cover, and the interface must not claim: bugs that were already in the base
 // version are preserved, not fixed; code that reads its own source text or line numbers (Function.prototype
-// .toString, stack traces, [CallerLineNumber], __LINE__) can observe a layout change; reflection on local
-// names cannot be seen; and a change to build configuration in the same pull request can change what a
-// preprocessor selects (the caller withdraws the proof in that case).
-import { tokenize, isJsLike } from './lex.js';
+// .toString, stack traces, [CallerLineNumber], __LINE__) can observe a layout change; a comment read by a tool
+// that is not in the DIRECTIVE list; and a change to build configuration in the same pull request can change
+// what a preprocessor selects (the caller withdraws the proof in that case). The proof is about this text in
+// this place: the caller must not extend it to a function moved to another file, where its free names may
+// mean something else.
+import { tokenize, isJsLike, matchBrackets } from './lex.js';
 
-const ASI = new Set(['js', 'ts', 'go']);            // a line break can end a statement
-const LINE_STRICT = new Set(['kt', 'swift', 'scala', 'rb']); // newline-terminated statements: compare line structure exactly
-const ALPHA = new Set(['js', 'ts', 'cs', 'java']);
-// After one of these a line break never ends anything: the statement cannot be complete yet.
-const NEVER_ENDS = new Set(['else', 'do', 'try', 'finally', 'typeof', 'new', 'void', 'delete', 'in', 'of', 'instanceof', 'case', 'extends', 'const', 'var', 'function', 'class', 'import', 'export', 'if', 'for', 'while', 'switch', 'catch', 'with', 'func', 'package', 'type', 'struct', 'interface', 'map', 'chan', 'select', 'range', 'go', 'defer']);
-// A token that can only continue the expression before it, never start a statement.
-const CONTINUES = new Set(['.', '?.', ',', ';', ')', ']', '}', '=', '==', '===', '!=', '!==', '<', '>', '<=', '>=', '&&', '||', '??', '?', ':', '*', '%', '|', '&', '^', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<=', '>>=', '>>>=', '**', '**=', '??=', '&&=', '||=', '<<', '>>', '>>>', '=>', ':=']);
-const CONTINUES_KW = new Set(['else', 'catch', 'finally', 'in', 'instanceof', 'of', 'as', 'extends', 'implements', 'from']);
+const PROVABLE = new Set(['js', 'ts', 'cs']);
+const ASI = new Set(['js', 'ts']); // a line break can end a statement
+const ALPHA = new Set(['js', 'ts']);
+// Reserved words after which a statement cannot be complete yet: a line break after one ends nothing.
+const NEVER_ENDS = new Set(['else', 'do', 'try', 'finally', 'typeof', 'new', 'void', 'delete', 'in', 'instanceof', 'case', 'extends', 'const', 'var', 'function', 'class', 'import', 'export', 'if', 'for', 'while', 'switch', 'catch', 'with']);
+// Words after which a line break is never dropped: the restricted productions of ECMA-262 §12.10 (a semicolon
+// is inserted after them whatever follows), class-member modifiers (alone on a line they are a field name) and
+// contextual words that are ordinary identifiers elsewhere (TypeScript stops an expression at a line break
+// before `as` and `satisfies`).
+const ALWAYS_ENDS = new Set(['return', 'throw', 'break', 'continue', 'yield', 'async', 'await', 'static', 'get', 'set', 'accessor', 'public', 'private', 'protected', 'readonly', 'abstract', 'declare', 'override', 'let', 'of', 'as', 'satisfies', 'from', 'type', 'interface', 'namespace', 'module', 'enum', 'is', 'keyof', 'infer', 'asserts', 'using']);
+// Operators that can be the last token of an expression (`!` and `>` in TypeScript: `x!`, `f<T>`).
+const END_OPS = new Set([')', ']', '}', '++', '--', '!', '>']);
+// A token that can only continue the expression before it, never start a statement. (`=>` is not here: a line
+// break before it is a syntax error, so it must stay visible.)
+const CONTINUES = new Set(['.', '?.', ',', ';', ')', ']', '}', '=', '==', '===', '!=', '!==', '<', '>', '<=', '>=', '&&', '||', '??', '?', ':', '*', '%', '|', '&', '^', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<=', '>>=', '>>>=', '**', '**=', '??=', '&&=', '||=', '<<', '>>', '>>>']);
+const CONTINUES_KW = new Set(['else', 'catch', 'finally', 'in', 'instanceof', 'extends', 'implements']);
 
 /** Tokens without line breaks, plus for each gap whether a significant line break sits in it. */
 function stream(text, lang) {
-  const raw = tokenize(text, lang, { nl: ASI.has(lang) || LINE_STRICT.has(lang) });
+  const raw = tokenize(text, lang, { nl: ASI.has(lang) });
   const T = [], gap = [];
   let nl = false;
   for (const t of raw) {
     if (t.k === 'nl') { nl = true; continue; }
-    if (T.length) gap.push(nl && breaks(T[T.length - 1], t, lang));
+    if (T.length) gap.push(nl && breaks(T[T.length - 1], t, T[T.length - 2]));
     T.push(t); nl = false;
   }
   return { T, gap };
 }
 /**
- * Can a line break between tokens p and n change how the code parses?
- * ECMA-262 §12.10: a semicolon is inserted at a line break when the next token cannot continue the statement,
- * and always after `return`, `throw`, `break`, `continue`, `yield`, before a postfix `++`/`--` and before `=>`.
- * The answer is "no" only when p cannot be the end of a statement, or n can do nothing but continue one. Every
- * other break is kept, so joining or splitting statements that rely on automatic semicolons is never certified.
- * Go inserts a semicolon after any line's final identifier, literal, `)`, `]`, `}`, `++`, `--` or `return`-like
- * keyword, whatever follows: there only p decides.
+ * Can a line break between tokens p and n change how JavaScript or TypeScript parses the code? (`pp` is the
+ * token before p.) ECMA-262 §12.10: a semicolon is inserted at a line break when the next token cannot continue
+ * the statement, and always after `return`, `throw`, `break`, `continue`, `yield`, before a postfix `++`/`--`
+ * and before `=>`. The answer is "no" in two cases only: p is a reserved word that cannot end a statement, or
+ * p is an operator that cannot end an expression; or n can do nothing but continue the expression and p is not
+ * one of the words in ALWAYS_ENDS. Every other break is kept, so joining or splitting statements that rely on
+ * automatic semicolons is never certified. Keeping a break can only refuse a proof, never grant one.
  */
-function breaks(p, n, lang) {
-  if (LINE_STRICT.has(lang)) return true;
-  const canEnd = p.k === 'id' || p.k === 'num' || p.k === 'str' || (p.k === 'kw' && !NEVER_ENDS.has(p.v)) || (p.k === 'op' && (p.v === ')' || p.v === ']' || p.v === '}' || p.v === '++' || p.v === '--'));
+function breaks(p, n, pp) {
+  const member = !!pp && pp.k === 'op' && (pp.v === '.' || pp.v === '?.'); // x.new, x.default: a property name, not the keyword
+  if ((p.k === 'id' || p.k === 'kw') && !member && ALWAYS_ENDS.has(p.v)) return true;
+  const canEnd = p.k === 'id' || p.k === 'num' || p.k === 'str' || (p.k === 'kw' && (member || !NEVER_ENDS.has(p.v))) || (p.k === 'op' && END_OPS.has(p.v));
   if (!canEnd) return false;
-  if (lang === 'go') return true;
-  if (n.k === 'op' && CONTINUES.has(n.v) && n.v !== '=>') return false; // `=>` after a break is a syntax error: keep it visible
+  if (n.k === 'op' && CONTINUES.has(n.v)) return false;
   if (n.k === 'kw' && CONTINUES_KW.has(n.v)) return false;
   return true;
 }
 const same = (a, b) => a.k === b.k && a.v === b.v;
 const where = (t) => `line ${t.l}`;
+
+// Comments that a tool reads: a bundler, a minifier, the JSX transform, the type checker, the test runner. The
+// compiler proper discards them, the build does not. Each match runs to the end of its line, so a changed
+// value is seen as well as a changed marker. The list is what is known, not a guarantee.
+const DIRECTIVE = /(?:[@#]__[A-Z_]+__|webpack[A-Z]\w*\s*:|@vite-ignore|@jsx\w*|@jest-environment|\/\/\/\s*<|@ts-(?:ignore|expect-error|nocheck|check)\b|@flow\b|@noflow\b|@preserve\b|@license\b|@cc_on\b|\/\*!|[#@]\s*source(?:Mapping)?URL)[^\n]*/g;
+const directives = (text) => (String(text).match(DIRECTIVE) || []).join('\n');
+const SAFE_BEFORE_SLASH = new Set(['this', 'super', 'true', 'false', 'null']); // words that are values: a `/` after them divides
+
+// Line terminators the tokenizer does not treat as line breaks: a lone CR, NEL (U+0085), LS (U+2028), PS (U+2029).
+const ODD_LINE_END = new RegExp('\\r(?!\\n)|[' + String.fromCharCode(0x85, 0x2028, 0x2029) + ']');
+
+/**
+ * distrust(text, S, lang) → why the tokenizer's reading of this text cannot carry a proof, or null.
+ * Each case is a place where a review got a behaviour-changing edit certified because the lexer read text as
+ * layout, or code as text. Refusing here costs a proof in code that is fine; it never grants one.
+ */
+function distrust(text, S, lang) {
+  if (ODD_LINE_END.test(text)) return 'it has a line terminator other than LF or CRLF (a lone CR, NEL, U+2028, U+2029), which the tokenizer does not treat as a line break';
+  if (/\\\r\n/.test(text)) return 'a backslash is followed by CRLF: a line continuation the tokenizer does not follow';
+  const T = S.T, js = isJsLike(lang);
+  if (js && (/<!--/.test(text) || /^[ \t]*-->/m.test(text))) return 'it contains an HTML-like comment marker (<!-- or -->), which scripts read as a comment';
+  const M = js ? matchBrackets(T) : null;
+  const op = (t, v) => !!t && t.k === 'op' && t.v === v;
+  for (let i = 0; i < T.length; i++) {
+    const t = T[i], p = T[i - 1], n = T[i + 1];
+    // A quoted string ends with the quote that opened it. One that does not is the tokenizer running to the end
+    // of a line inside something that was not a string (an apostrophe in JSX text, a regular expression).
+    // Chunks of a template or an interpolated string follow a `}` and are not judged.
+    if (t.k === 'str' && (t.v[0] === '"' || t.v[0] === "'") && !op(p, '}') && (t.v.length < 2 || t.v[t.v.length - 1] !== t.v[0])) return `the string that starts at ${where(t)} does not end where a string ends: the tokenizer may have lost track of what is text`;
+    // `1.e3` and `1 .e3`, `1.toString` and `1 .toString`: an integer followed by a dot reads both ways.
+    if (t.k === 'num' && /^[0-9][0-9_]*$/.test(t.v) && op(n, '.')) return `${where(t)}: an integer is followed by a dot, which reads as a decimal point or as a member access depending on the spacing`;
+    if (!js || t.k !== 'op') continue;
+    // JSX. Text between tags is content, so its white space, `//` and quotes are not what the tokenizer takes
+    // them for. `<` compares only after a value (a name, a literal, `)`, `]`, a postfix `++`/`--`); anywhere
+    // else it opens a JSX element or a TypeScript type assertion or generic arrow, and the first element of a
+    // function is always in such a place. The closing forms `</`, `/>` and `<>` are checked as well.
+    if (t.v === '<') {
+      const afterValue = !!p && (p.k === 'id' || p.k === 'num' || p.k === 'str' || (p.k === 'kw' && SAFE_BEFORE_SLASH.has(p.v)) || op(p, ')') || op(p, ']') || op(p, '++') || op(p, '--'));
+      if (!afterValue || (n && (op(n, '/') || op(n, '>') || (n.k === 'str' && n.v[0] === '/')))) return `${where(t)}: this looks like JSX (or a type assertion), where white space and text between tags are content`;
+    }
+    if (t.v === '/' && op(n, '>')) return `${where(t)}: this looks like JSX, where white space and text between tags are content`;
+    // A `/` after `)` or `}` or a keyword opens a regular expression in some places and divides in others; the
+    // tokenizer always takes it for a division, and a regular expression read as code hides whatever follows
+    // a `//` or a `/*` inside it. Decided here where it can be: after a call or a group it divides.
+    if ((t.v === '/' || t.v === '/=') && p) {
+      const header = op(p, ')') && M[i - 1] > 0 && T[M[i - 1] - 1].k === 'kw' && ['if', 'while', 'for', 'with'].includes(T[M[i - 1] - 1].v);
+      const word = p.k === 'kw' && !SAFE_BEFORE_SLASH.has(p.v) && !(op(T[i - 2], '.') || op(T[i - 2], '?.'));
+      if (op(p, '}') || header || word) return `${where(t)}: a \`/\` here may open a regular expression rather than divide, and the tokenizer cannot tell`;
+    }
+  }
+  return null;
+}
 
 function firstDifference(A, B) {
   const n = Math.min(A.T.length, B.T.length);
@@ -79,9 +154,13 @@ function firstDifference(A, B) {
 export function proveEquivalent(oldText, newText, lang, { alpha: allowAlpha = true } = {}) {
   const none = (why) => ({ proved: false, level: null, claim: null, renames: null, why });
   if (!lang) return none('not a language the engine reads');
+  if (!PROVABLE.has(lang)) return none('proofs are issued for JavaScript, TypeScript and C# only: elsewhere the tokenizer is good enough to measure, not to certify');
   let A, B;
   try { A = stream(oldText, lang); B = stream(newText, lang); } catch { return none('could not be tokenised'); }
   if (!A.T.length || !B.T.length) return none(A.T.length === B.T.length ? 'no code on either side' : 'one side has no code');
+  const doubt = distrust(String(oldText), A, lang) || distrust(String(newText), B, lang);
+  if (doubt) return none(`not certified: ${doubt}`);
+  if (directives(oldText) !== directives(newText)) return none('not certified: a comment that a build tool, the JSX transform or the type checker reads was added, removed or changed');
   const diff = firstDifference(A, B);
   if (!diff) return { proved: true, level: 'identical', claim: 'Same tokens as before: only comments and layout changed, so the compiler is given the same program.', renames: null, why: null };
   const alpha = allowAlpha ? provesAlpha(A, B, lang) : { proved: false, candidate: false };
@@ -118,7 +197,7 @@ const DYNAMIC = new Set(['eval', 'Function', 'arguments']);
  */
 export function provesAlpha(A, B, lang) {
   const no = (why, candidate = true) => ({ proved: false, why, candidate });
-  if (!ALPHA.has(lang)) return no('renaming is only certified for JavaScript, TypeScript, C# and Java', false);
+  if (!ALPHA.has(lang)) return no('renaming is only certified for JavaScript and TypeScript', false);
   const T = A.T, U = B.T, n = T.length;
   if (n !== U.length) return no('the token count changed', false);
   const map = new Map(), inv = new Map();
@@ -181,6 +260,12 @@ export function provesAlpha(A, B, lang) {
       const hole = is(i - 1, '{') && T[i - 2]?.k === 'str' && lang === 'cs'; // an interpolation hole, not a shorthand
       if ((is(i - 1, '{') || is(i - 1, ',')) && (is(i + 1, '}') || is(i + 1, ',') || is(i + 1, '=')) && !hole && blockOf[i] !== -1 && !(parenOf[i] > blockOf[i])) return no(`\`${name}\` appears as a shorthand property or in a destructuring pattern`);
       if (kw(i - 2, 'nameof') && is(i - 1, '(')) return no(`\`${name}\` is read by nameof`);
+      // An anonymous function or class assigned to a name takes that name as its own (`f.name`, the class's name
+      // in messages and in React): ECMA-262 NamedEvaluation. Renaming the variable renames the function.
+      if (js && is(i + 1, '=')) {
+        const v = i + 2, close = is(v, '(') ? parenEnd.get(v) ?? -1 : -1;
+        if (kw(v, 'function') || kw(v, 'class') || kw(v, 'async') || (close >= 0 && is(close + 1, '=>')) || (T[v]?.k === 'id' && is(v + 1, '=>'))) return no(`\`${name}\` names a function or a class: an anonymous one takes the variable's name as its own`);
+      }
       // 5./6. binders
       const inSig = sig >= 0 && inside(i, sig, sigEnd);
       if (inSig && parenOf[i] === sig && (is(i - 1, '(') || is(i - 1, ',') || T[i - 1].k === 'id' || T[i - 1].k === 'kw' || is(i - 1, '>') || is(i - 1, ']') || is(i - 1, '?') || is(i - 1, '...')) && (is(i + 1, ',') || is(i + 1, ')') || is(i + 1, '=') || is(i + 1, ':') || is(i + 1, '?'))) {
@@ -258,7 +343,9 @@ export function classifyChange(oldText, newText, lang) {
   const T = A.T, U = B.T, total = Math.max(T.length, U.length);
   const p = proveEquivalent(oldText, newText, lang);
   if (p.proved) return { kind: p.level, changed: p.level === 'identical' ? 0 : p.renames.length, total, onlyStrings: false, onlyNumbers: false };
-  if (T.length === U.length) {
+  // The label is given only where a proof could be: a text the tokenizer may have misread is 'logic'.
+  const trusted = PROVABLE.has(lang) && !distrust(String(oldText), A, lang) && !distrust(String(newText), B, lang) && directives(oldText) === directives(newText);
+  if (trusted && T.length === U.length) {
     let str = 0, num = 0, other = 0;
     for (let i = 0; i < T.length; i++) if (!same(T[i], U[i])) { if (T[i].k === 'str' && U[i].k === 'str') str++; else if (T[i].k === 'num' && U[i].k === 'num') num++; else other++; }
     if (!other && str + num > 0 && A.gap.every((g, i) => g === B.gap[i])) return { kind: 'literals', changed: 2 * (str + num), total, onlyStrings: num === 0, onlyNumbers: str === 0 };
