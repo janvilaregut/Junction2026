@@ -8,7 +8,8 @@ const loc = (i) => `${path.basename(i.file)}:${i.start}${i.end !== i.start ? `�
 export function markdown(brief, signoff) {
   const b = brief;
   const L = [];
-  L.push(`## Informe de verificación · ${b.lane.name}`);
+  L.push(`## Informe de verificación · ${b.recommendation?.name || b.lane.name}`);
+  if (b.recommendation) L.push('', `**Recomendación:** ${b.recommendation.name}. ${b.recommendation.why} · **Carril:** ${b.lane.name}`);
   L.push('');
   L.push(`**Requisito:** ${b.requirement?.title ? `${b.requirement.id} — ${b.requirement.title}` : 'sin requisito enlazado'}  `);
   L.push(`**Cambio:** \`${b.pr.branch}\` → \`${b.pr.base}\` · \`${b.pr.head.slice(0, 9)}\` · ${b.totals.files} ficheros · +${b.totals.added} −${b.totals.removed}  `);
@@ -79,6 +80,8 @@ export function answer(question, { brief, plan }) {
   }
   if (/no (se )?(ha )?compr|no compro|qué no|que no|sin compro|falta/.test(s)) return `No comprobado, y por qué:\n${ul(b.notChecked.map((n) => `${n.what} — ${n.why}`))}`;
   if (/decid|pregunt|negad|duda/.test(s)) return b.questions.length ? `Esto no lo decido yo:\n${ul(b.questions.map((q) => `${q.text}${q.why?.[0] ? `\n   Por qué: ${q.why[0]}` : ''}`))}` : 'No ha quedado ninguna decisión abierta para ti en este PR.';
+  if (/recomend|qu[eé] hago|qu[eé] har[ií]as/.test(s) && b.recommendation) return `Recomendación: ${b.recommendation.name}. ${b.recommendation.why}\nLa decisión es tuya.`;
+  if (/rebobin|quitar|quita/.test(s)) return b.rewind?.steps?.length ? `Quité cada cambio de código de uno en uno y pasé los tests:\n${ul(b.rewind.steps.map((x) => `${path.basename(x.file)}:${x.start} — ${x.status === 'necesario' ? `necesario: fallan ${x.testCount} test(s) sin él` : x.status === 'sin-test' ? 'ningún test lo nota' : x.status === 'no-compila-sin-el' ? 'sin él no compila' : x.status}`))}` : 'En esta verificación no se ha rebobinado.';
   if (/carril|por qu[eé]|regla|riesgo/.test(s)) return `Carril «${b.lane.name}». Reglas que se han disparado:\n${ul(b.rules.fired.map((r) => `${r.title}: ${r.detail}`))}\nNo hay puntuación: son reglas que puedes leer.`;
   if (/leer|residuo|l[ií]neas|d[oó]nde mir/.test(s)) return b.residue.items.length ? `Tienes que leer ${b.residue.lines} de ${b.totals.lines} líneas:\n${ul(b.residue.items.slice(0, 12).map((i) => `${loc(i)} — ${i.why[0]}`))}` : 'No ha quedado residuo: todo lo comprobable está comprobado.';
   if (/r[eé]plica|agente|rehac|coincid|consenso/.test(s)) {

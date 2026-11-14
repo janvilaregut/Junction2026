@@ -96,7 +96,7 @@ function renderList() {
   $('list').innerHTML = list.map((p, i) => {
     const l = p.last;
     const chip = p.running ? '<span class="pill warn">verificando…</span>'
-      : l ? `<span class="pill ${l.tone === 'ok' ? 'ok' : l.tone === 'warn' ? 'warn' : 'no'}">${h(l.laneName)}</span><span class="pill">${l.residue}/${l.total} líneas</span>${l.stale ? '<span class="pill bad">desactualizado</span>' : ''}`
+      : l ? `<span class="pill ${l.tone === 'ok' ? 'ok' : l.tone === 'warn' ? 'warn' : 'no'}">${h(l.laneName)}</span><span class="pill">${l.residue}/${l.total} líneas</span>${l.signedBy ? (l.stale ? '<span class="pill bad">firma caducada</span>' : `<span class="pill ok">${l.decision === 'devolver' ? 'devuelto' : 'firmado'}</span>`) : l.stale ? '<span class="pill bad">desactualizado</span>' : ''}`
         : '<span class="pill">sin verificar</span>';
     return `<button type="button" class="pr ${S.cur?.id === p.id ? 'on' : ''}" data-i="${i}"><div class="id">${p.requirement ? '#' + h(p.requirement) + ' · ' : ''}${h(p.branch)}</div><div class="t">${h(p.title)}</div><div class="meta">${chip}</div></button>`;
   }).join('');
@@ -233,7 +233,7 @@ function greetBrief() {
   say(`<b>${h(S.cur.branch)}</b> — ${h(S.cur.title)}\nVerificado ${new Date(b.createdAt).toLocaleString()}. Carril <b>${h(b.lane.name)}</b>: lees <b>${b.residue.lines} de ${b.totals.lines}</b> líneas${b.questions.length ? ` y respondes ${b.questions.length} ${b.questions.length === 1 ? 'pregunta' : 'preguntas'}` : ''}.${S.run.signoff ? `\nFirmado por ${h(S.run.signoff.signer)}.` : ''}`);
   briefChips();
 }
-const briefChips = () => chips(['¿Qué has comprobado?', '¿Qué no has comprobado?', '¿Qué tengo que decidir?', '¿Qué tengo que leer?', '¿Por qué este carril?']);
+const briefChips = () => chips(['¿Qué recomiendas?', '¿Qué has comprobado?', '¿Qué no has comprobado?', '¿Qué tengo que decidir?', '¿Qué tengo que leer?', '¿Qué pasa si quito cada cambio?']);
 const ev = (e) => e.artifact ? `<button type="button" class="linkbtn" data-art="${h(e.artifact)}">${h(e.label)}</button>` : e.url ? `<a href="${h(e.url)}" target="_blank" rel="noopener">${h(e.label)}</a>` : `<span class="mono" style="color:var(--dim)">${h(e.label)}</span>`;
 function codeHTML(item) {
   if (!item.code?.length) return '';
@@ -245,7 +245,8 @@ function renderBrief(keepScroll) {
   const stale = S.cur.sha && !b.pr.head.startsWith(S.cur.sha);
   const req = b.requirement;
   const P = [];
-  if (stale) P.push('<div class="banner">La rama ha cambiado desde esta verificación. El informe ya no corresponde al código actual: vuelve a verificar.</div>');
+  if (stale) P.push(so ? `<div class="banner">Firma caducada. ${h(so.signer)} firmó el commit <span class="mono">${h(so.head.slice(0, 9))}</span> y la rama ya está en <span class="mono">${h(S.cur.sha)}</span>. Lo que se comprobó valía para ese commit: vuelve a verificar y a firmar.</div>` : '<div class="banner">La rama ha cambiado desde esta verificación. El informe ya no corresponde al código actual: vuelve a verificar.</div>');
+  if (b.recommendation) { const rc = { cambios: 'bad', insuficiente: 'warn', lista: 'ok' }[b.recommendation.id]; P.push(`<div class="reco t-${rc}"><span class="sub">Recomendación</span><b>${h(b.recommendation.name)}</b><span class="sub">${h(b.recommendation.why)}</span></div>`); }
   P.push(`<span class="lane ${TONE[b.lane.tone]}">${h(b.lane.name)}</span>
     <div class="big">${b.residue.lines} <span style="color:var(--dim)">de ${b.totals.lines} líneas</span></div>
     <div class="sub">${h(b.lane.summary)}</div>
@@ -287,6 +288,11 @@ function renderBrief(keepScroll) {
     P.push(`<details><summary><span class="sub">Defectos sembrados, uno a uno (${b.mutation.mutants.length})</span></summary><table style="margin-top:6px"><tr><th>Dónde</th><th>Defecto</th><th>Resultado</th></tr>${b.mutation.mutants.map((m) => `<tr><td class="mono">${h(base(m.file))}:${m.line}</td><td>${h(m.op)}</td><td class="${m.status === 'sobrevive' ? 't-warn' : ''}">${m.status === 'detectado' ? `detectado por ${m.killerCount} test(s)` : m.status === 'sobrevive' ? `sobrevive${m.inResidue ? ' · está en lo que lees' : ''}` : h(m.status)}</td></tr>`).join('')}</table></details>`);
   }
 
+  if (b.rewind?.steps?.length) {
+    const R = { necesario: (x) => `necesario · fallan ${x.testCount} test(s) sin él`, 'sin-test': () => 'ningún test lo nota', 'no-compila-sin-el': () => 'sin él no compila', 'no-aplicado': () => 'no se pudo quitar' };
+    P.push(`<details><summary><span class="sub">Rebobinar: cada cambio quitado de uno en uno (${b.rewind.steps.length})</span></summary><table style="margin-top:6px"><tr><th>Cambio</th><th>Sin él…</th></tr>${b.rewind.steps.map((x) => `<tr><td><span class="mono">${h(base(x.file))}:${x.start}${x.end !== x.start ? '–' + x.end : ''}</span><div class="sub mono">${h(x.label)}</div></td><td class="${x.status === 'sin-test' ? 't-warn' : x.status === 'necesario' ? 't-ok' : ''}">${(R[x.status] || (() => h(x.status)))(x)}</td></tr>`).join('')}</table></details>`);
+  }
+
   if (b.l3) {
     const reps = b.l3.replicas.filter((r) => r.ok);
     P.push(`<h3>Réplicas · ${reps.length} de ${b.l3.replicas.length} válidas</h3>`);
@@ -305,7 +311,7 @@ function renderBrief(keepScroll) {
       const cell = (x) => !x ? '—' : x.status !== 'ok' ? 'no compila' : `${x.passed}/${x.ran} pasan`;
       P.push(`<details><summary><span class="sub">Tests cruzados</span></summary><table style="margin-top:6px"><tr><th>Réplica</th><th>Tests del PR sobre su código</th><th>Sus tests sobre el PR</th></tr>${b.l3.cross.map((c) => `<tr><td>${h(c.label)}</td><td class="${c.prTestsOnReplica?.failed ? 't-warn' : ''}">${cell(c.prTestsOnReplica)}${c.prTestsOnReplica?.failedNames?.length ? `<div class="sub mono">${c.prTestsOnReplica.failedNames.slice(0, 4).map((n) => h(n.split('.').pop())).join(', ')}</div>` : ''}</td><td class="${c.replicaTestsOnPr?.failed ? 't-warn' : ''}">${cell(c.replicaTestsOnPr)}</td></tr>`).join('')}</table></details>`);
     }
-    P.push(`<details><summary><span class="sub">Cada réplica: estado y lo que dice (sus afirmaciones no son evidencia)</span></summary>${b.l3.replicas.map((r) => `<div class="note"><b>${h(r.label)}</b> · <span class="${r.ok ? 't-ok' : 't-warn'}">${h(r.status)}</span>${r.lines ? ` · ${r.files} ficheros, ${r.lines} líneas, ${secs(r.ms)}` : ''}${r.patchFile ? ` · <button type="button" class="linkbtn" data-art="${h(r.patchFile)}">ver su parche</button>` : ''}${r.summary ? `\n${h(r.summary)}` : ''}${r.decisions && !/^none\.?$/i.test(r.decisions) ? `\n<b>Decisiones que dice haber tomado:</b> ${h(r.decisions)}` : ''}</div>`).join('')}</details>`);
+    P.push(`<details><summary><span class="sub">Cada réplica: estado y lo que dice (sus afirmaciones no son evidencia)</span></summary>${b.l3.replicas.map((r) => `<div class="note"><b>${h(r.label)}</b>${r.mission ? ` <span class="sub">(${h(r.mission)})</span>` : ''} · <span class="${r.ok ? 't-ok' : 't-warn'}">${h(r.status)}</span>${r.lines ? ` · ${r.files} ficheros, ${r.lines} líneas, ${secs(r.ms)}` : ''}${r.patchFile ? ` · <button type="button" class="linkbtn" data-art="${h(r.patchFile)}">ver su parche</button>` : ''}${r.summary ? `\n${h(r.summary)}` : ''}${r.decisions && !/^none\.?$/i.test(r.decisions) ? `\n<b>Decisiones que dice haber tomado:</b> ${h(r.decisions)}` : ''}</div>`).join('')}</details>`);
   }
 
   P.push('<h3>No comprobado</h3>');

@@ -224,6 +224,19 @@ export function route(ctx) {
   }
   for (const j of judged || []) questions.push(j);
 
+  const rewind = ctx.rewind;
+  if (rewind && !rewind.skipped) {
+    const loose = rewind.steps.filter((x) => x.status === 'sin-test');
+    if (rule(loose.length > 0, 'cambio-sin-test', 'Hay cambios que se pueden quitar sin que falle ningún test',
+      loose.slice(0, 3).map((x) => `${loc(x.file, x.start, x.end)}`).join(', '), 'decision', [{ label: 'Detalle de rebobinar', artifact: 'rewind.json' }])) {
+      for (const x of loose) addResidue(x.file, x.start, x.end, x.end - x.start + 1, 'al quitar este cambio no falla ningún test');
+      q('rebobinar', `Si se quita ${loose.length === 1 ? 'este cambio' : `cualquiera de estos ${loose.length} cambios`} (${loose.slice(0, 3).map((x) => loc(x.file, x.start, x.end)).join(', ')}), todos los tests siguen pasando. ¿Qué lo justifica y qué prueba debería cubrirlo?`,
+        ['Ninguna prueba ejecutable depende de ese código: si estuviera mal, nadie se enteraría.', 'Puede ser código defensivo legítimo, pero entonces falta un test que lo demuestre.'],
+        loose.slice(0, 4).map((x) => ({ label: `${loc(x.file, x.start, x.end)} · ${x.label}` })),
+        ['Está justificado sin test', 'Pedir un test que lo cubra', 'Pedir que se quite']);
+    }
+  }
+
   if (mutation && !mutation.skipped) {
     const surv = mutation.mutants.filter((m) => m.status === 'sobrevive');
     rule(surv.length > 0, 'mutantes-vivos', 'Hay líneas que ningún test protege',
@@ -285,7 +298,18 @@ export function route(ctx) {
   const laneId = ORDER.find((id) => fired.some((f) => f.lane === id)) || 'reproducido';
   if (laneId === 'reproducido') notFired.push({ id: 'residuo', title: 'Queda código sin reproducir' });
 
+  // The three outcomes the human reads first. It is a recommendation; the decision is the signer's.
+  const firedIds = new Set(fired.map((f) => f.id));
+  const reproducibleFailure = ['conflicto', 'no-compila', 'suite-rota', 'tests-propios-fallan'].some((id) => firedIds.has(id));
+  const insufficient = ['requisito-insuficiente', 'sin-evidencia-ejecutable', 'repo-modificado'].some((id) => firedIds.has(id));
+  const recommendation = reproducibleFailure
+    ? { id: 'cambios', name: 'Pedir cambios', why: 'Hay un fallo reproducible: el informe trae cómo repetirlo.' }
+    : insufficient
+      ? { id: 'insuficiente', name: 'Evidencia insuficiente', why: 'Falta algo para poder juzgar el cambio: el informe dice qué.' }
+      : { id: 'lista', name: 'Lista para aprobación humana', why: questions.length ? 'Lo comprobable está comprobado. Quedan decisiones que solo puede tomar una persona.' : 'Lo comprobable está comprobado. Firma con el alcance documentado.' };
+
   return {
+    recommendation,
     lane: LANES[laneId],
     rules: { fired, notFired },
     questions,

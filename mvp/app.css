@@ -151,3 +151,6 @@ td{padding:8px 10px 8px 0;border-bottom:1px solid var(--line);vertical-align:top
 
 @media (max-width:1100px){body{grid-template-columns:240px minmax(0,1fr) 380px}}
 @media (max-width:860px){body{display:block;height:auto;overflow:auto}.side,.right{border:0;border-bottom:1px solid var(--line)}.main{min-height:70vh}.list{max-height:260px}}
+.reco{display:flex;flex-direction:column;gap:2px;border:1px solid currentColor;border-radius:9px;padding:10px 12px;margin-bottom:14px}
+.reco b{font:650 18px/1.25 var(--sans);letter-spacing:-.02em}
+.reco .sub{color:var(--dim)}

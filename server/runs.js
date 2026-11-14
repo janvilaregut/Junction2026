@@ -102,4 +102,8 @@ export function artifact(projectId, runId, name) {
 
 export function saveSignoff(projectId, runId, signoff) {
   writeJSON(path.join(dirOf(projectId, runId), 'signoff.json'), signoff);
+  // A signature belongs to one commit. Remember which, so the list can show it expiring when the branch moves.
+  const idx = runIndex(projectId);
+  for (const r of idx) if (r.runId === runId) { r.signedBy = signoff.signer; r.signedHead = signoff.head; r.decision = signoff.decision; }
+  writeJSON(indexFile(projectId), idx);
 }

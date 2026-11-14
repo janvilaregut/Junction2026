@@ -12,10 +12,10 @@ Eliges un repositorio. Katse te enseña sus pull requests: los que **recibes** (
 | Nivel | Qué hace | Usa IA |
 |---|---|---|
 | 1 · Determinista | Clasifica cada fichero. En los derivados (snapshots, código generado) detecta el mismo cambio repetido y aísla el que cambia distinto | No |
-| 2 · Conductual | Mezcla sobre la base, compila, pasa la suite. Comprueba que los tests nuevos **fallan sin el cambio y pasan con él**. Siembra defectos en las líneas cambiadas y mira si algún test los detecta | No |
-| 3 · Generativa | Varios agentes rehacen el cambio **a ciegas** desde el requisito. Compara zona a zona y cruza los tests: los del PR contra cada réplica y los de cada réplica contra el PR | Sí |
+| 2 · Conductual | Mezcla sobre la base, compila, pasa la suite. Comprueba que los tests nuevos **fallan sin el cambio y pasan con él**. Siembra defectos en las líneas cambiadas y mira si algún test los detecta. **Rebobina**: quita cada cambio de uno en uno y mira si algún test lo nota | No |
+| 3 · Generativa | Varios agentes rehacen el cambio **a ciegas** desde el requisito. Cuántos: `mín(6, 1 + grupos de cambios + grupos de alto riesgo)`, cada uno con una misión distinta. Compara zona a zona y cruza los tests: los del PR contra cada réplica y los de cada réplica contra el PR | Sí |
 
-Con eso decide un **carril** mediante reglas que se pueden leer (no hay puntuación):
+Con eso da una **recomendación** (pedir cambios, evidencia insuficiente o lista para aprobación humana) y decide un **carril** mediante reglas que se pueden leer (no hay puntuación):
 
 `Reproducido` · `Solo residuo` · `Decides tú` · `Lectura completa` · `Devolver`
 

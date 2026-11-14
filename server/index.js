@@ -8,7 +8,7 @@ import { ask, clis } from './llm.js';
 import { git } from './git.js';
 import { listProjects, getProject, addProject, cloneProject, updateProject, removeProject, listPullRequests, findPullRequest, projectStatus } from './projects.js';
 import { startRun, getRun, subscribe, activeRun, artifact, latestByPr, latestBriefs, saveSignoff } from './runs.js';
-import { intake } from './pipeline/run.js';
+import { intake, replicaBudget } from './pipeline/run.js';
 import { addedTestNames } from './pipeline/classify.js';
 import { availableAgents } from './pipeline/replicas.js';
 import { areaStates, areasOf, metrics, record, entries, K_EARN } from './ledger.js';
@@ -37,13 +37,15 @@ async function planFor(project, pr, mode) {
   const derived = it.files.filter((f) => f.kind === 'derived').length;
   const src = it.files.filter((f) => f.kind === 'source').length;
   const full = mode === 'completo';
+  const budget = replicaBudget(it.files);
   const will = [
     `Mezclar ${pr.branch} sobre ${project.base} en una copia aislada (tu repo no se toca)`,
     it.toolchain.kind !== 'none' ? `Compilar y pasar los tests afectados (${it.toolchain.describe})` : null,
     tests.length ? `Comprobar que los ${tests.length} tests nuevos fallan sin el cambio y pasan con él` : null,
     derived ? `Analizar ${derived} ficheros derivados: cambio repetido y anomalías` : null,
     src && it.toolchain.kind !== 'none' ? 'Sembrar defectos en las líneas cambiadas y ver si algún test los detecta' : null,
-    full && agents.length ? `Rehacer el cambio a ciegas con ${Math.min(3, agents.length)} agentes (${agents.slice(0, 3).map((a) => a.label).join(', ')}) y comparar` : null,
+    src && it.toolchain.kind !== 'none' ? 'Rebobinar: quitar cada cambio de código de uno en uno y ver si algún test lo nota' : null,
+    full && agents.length ? `Rehacer el cambio a ciegas con ${budget.n} ${budget.n === 1 ? 'agente' : 'agentes'}, ${budget.formula}, cada uno con una misión distinta, y comparar` : null,
     full && agents.length && tests.length ? 'Cruzar tests: los del PR contra cada réplica y los de cada réplica contra el PR' : null,
   ].filter(Boolean);
   const text = `${it.requirement?.title || ''}\n${it.requirement?.body || ''}`;
@@ -63,7 +65,7 @@ async function planFor(project, pr, mode) {
     provenance: it.provenance.status,
     toolchain: it.toolchain.describe,
     areas: areaStates(project.id, areasOf(it.files)),
-    will, wont,
+    will, wont, budget,
   };
 }
 

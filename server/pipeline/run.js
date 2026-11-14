@@ -9,7 +9,7 @@ import { areasOf, areaStates } from '../ledger.js';
 import { mechanicalGroups, addedTestNames } from './classify.js';
 import { detectToolchain } from './toolchain.js';
 import { worktree, removeWorktree, mergedTree, overlay, resetTree } from './sandbox.js';
-import { runMutation } from './mutation.js';
+import { runMutation, runRewind, changeGroups } from './mutation.js';
 import { availableAgents, buildPrompt, runReplica, preflight } from './replicas.js';
 import { withKinds, compareRegions } from './compare.js';
 import { judge } from './judge.js';
@@ -33,11 +33,29 @@ export function normalizeOptions(o = {}, agentsAvailable = []) {
     mode, agents, agentsPicked,
     mutants: Number.isFinite(+o.mutants) ? Math.max(0, Math.min(12, +o.mutants)) : 4,
     crossTests: o.crossTests !== false,
+    rewind: o.rewind !== false,
     judge: o.judge !== false,
     agentTimeoutMin: Math.max(3, Math.min(45, +o.agentTimeoutMin || 20)),
     keepTrees: !!o.keepTrees,
   };
 }
+
+/**
+ * Replica budget: n = min(6, 1 + groups of changes + high-risk groups).
+ * A group is hand-written code that changes one behaviour (hunks close together in one file).
+ * A group is high risk when it touches public surface or silences existing behaviour.
+ */
+export function replicaBudget(files) {
+  const groups = changeGroups(files);
+  const risky = groups.filter((g) => g.hunks.some((h) => h.added.some((l) => HIGH_RISK.test(l)) || h.removed.some((l) => /\bthrow\b|Report(Diagnostic)?\(/.test(l))));
+  const n = Math.max(1, Math.min(6, 1 + groups.length + risky.length));
+  const where = (g) => `${path.basename(g.file)}:${g.start}`;
+  const missions = [{ why: 'base', text: 'Solve the requirement in the way you think is best.' }];
+  for (const g of groups) missions.push({ why: `grupo ${where(g)}`, text: `Pay special attention to the code around ${g.file} line ${g.start}; consider a different way to solve that part than the obvious one.` });
+  for (const g of risky) missions.push({ why: `riesgo ${where(g)}`, text: `Choose the most conservative strategy: change as little existing behaviour as possible around ${g.file} line ${g.start}, and add a test proving that existing behaviour (warnings, errors, results) is preserved.` });
+  return { n, groups: groups.length, risky: risky.length, formula: `mín(6, 1 + ${groups.length} grupos + ${risky.length} de alto riesgo)`, missions: missions.slice(0, n) };
+}
+const HIGH_RISK = /^\s*public\s+(?:(?:sealed|static|abstract|partial|readonly)\s+)*(class|interface|struct|record|enum)\b|\bcatch\b|#pragma warning disable|\b(drop|ignore|suppress|skip|silenc)\w*/i;
 
 /** Fast look at a PR without running anything: what it is, what would be checked and what would not. */
 export async function intake(project, pr) {
@@ -222,12 +240,29 @@ export async function verify({ project, pr, options, runDir, emit }) {
       return { ...m, detail: `${m.killed} de ${m.valid} defectos los detecta algún test${m.survived ? ` · ${m.survived} sobreviven` : ''}` };
     });
 
+    // 4b ── Rewind: take each change out ─────────────────────────────────
+    ctx.rewind = await stage('rebobinar', 'Rebobinar: quitar cada cambio y ver si algún test lo nota', async () => {
+      if (!options.rewind) return { skipped: true, reason: 'Desactivado en esta verificación.', detail: 'Desactivado', steps: [] };
+      if (!l2ok) return { skipped: true, reason: 'No se ejecuta si el PR no compila o rompe tests.', detail: 'No aplicable', steps: [] };
+      const r = await runRewind({ tree: merged, prFiles: files, toolchain, max: 6, emit: (text) => emit({ type: 'log', text }) });
+      await resetTree(merged);
+      save('rewind.json', r);
+      if (!r.steps.length) return { ...r, skipped: true, reason: 'No hay cambios de código a mano que quitar.', detail: 'Nada que rebobinar' };
+      return { ...r, detail: `${r.needed} de ${r.steps.length} cambios los nota algún test${r.untested ? ` · ${r.untested} no los nota ninguno` : ''}` };
+    });
+
     // 5 ── Level 3: replicas ───────────────────────────────────────────────
     if (options.agents.length && ctx.merge.ok) {
       const presets = await availableAgents();
-      const wanted = options.agents.map((id) => presets.find((a) => a.id === id)).filter(Boolean);
+      // How many replicas, and what each one explores: one base attempt, one per group of changes,
+      // and one more per high-risk group (capped). Unless the user picked the agents.
+      const budget = replicaBudget(files);
+      ctx.budget = budget;
+      let wanted = options.agents.map((id) => presets.find((a) => a.id === id)).filter(Boolean);
+      if (!options.agentsPicked) wanted = presets.slice(0, budget.n);
       const prompt = buildPrompt({ requirement, provenance: it.provenance, toolchain });
-      save('replica-prompt.txt', prompt);
+      save('replica-prompt.txt', prompt + `\n\n--- Misiones ---\n${budget.missions.map((m, i) => `${i + 1}. ${m.why}: ${m.text}`).join('\n')}`);
+      emit({ type: 'log', text: `Réplicas: ${budget.n} = ${budget.formula}` });
       const srcChanged = files.some((f) => f.kind === 'source');
       ctx.replicas = await stage('l3', `Nivel 3 · ${wanted.length} agentes rehacen el cambio a ciegas`, async () => {
         // Drop agents that cannot answer right now (no quota, no login) before spending minutes on them.
@@ -255,7 +290,9 @@ export async function verify({ project, pr, options, runDir, emit }) {
           const dir = path.join(runDir, `replica-${agent.id}`);
           trees.push(dir);
           try {
-            const r = await runReplica({ repo, baseSha, dir, agent, prompt, timeoutMs: options.agentTimeoutMin * 60_000, artifacts: art, forbidden });
+            const mission = budget.missions[agents.indexOf(agent) % budget.missions.length];
+            const r = await runReplica({ repo, baseSha, dir, agent, prompt: `${prompt}\n\nYOUR APPROACH: ${mission.text}`, timeoutMs: options.agentTimeoutMin * 60_000, artifacts: art, forbidden });
+            r.mission = mission.why;
             r.files = withKinds(r.files);
             emit({ type: 'log', text: `${agent.label}: ${r.finished ? `${r.files.length} ficheros, ${r.lines} líneas en ${sec(r.ms)}` : r.status}` });
             return r;
@@ -384,7 +421,7 @@ function claim(id, text, status, detail, evidence = []) { return { id, text, sta
 
 function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) {
   const { files, totals, requirement, toolchain } = it;
-  const { merge, build, l2, mutation, replicas, compare, cross, groups } = ctx;
+  const { merge, build, l2, mutation, replicas, compare, cross, groups, rewind } = ctx;
   const claims = [];
   const notRun = (why) => ['no-ejecutado', why];
 
@@ -429,6 +466,14 @@ function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) 
   else claims.push(claim('mutacion', 'Los tests detectarían un defecto en las líneas cambiadas', mutation.survived ? 'parcial' : 'reproducido',
     `${mutation.killed} de ${mutation.valid} defectos sembrados detectados`, [{ label: 'Detalle de mutantes', artifact: 'mutation.json' }]));
 
+  if (rewind && !rewind.skipped) {
+    claims.push(claim('rebobinar', 'Cada cambio de código es necesario para algún test', rewind.untested ? 'parcial' : 'reproducido',
+      `${rewind.needed} de ${rewind.steps.length} cambios: al quitarlos falla algún test${rewind.untested ? ` · ${rewind.untested} se pueden quitar sin que falle nada` : ''}`,
+      [{ label: 'Detalle de rebobinar', artifact: 'rewind.json' }]));
+  } else if (rewind?.skipped) {
+    claims.push(claim('rebobinar', 'Cada cambio de código es necesario para algún test', 'no-ejecutado', rewind.reason));
+  }
+
   if (compare && compare.n) {
     const code = compare.regions.filter((r) => r.kind === 'source' || r.kind === 'config');
     const agree = code.filter((r) => r.verdict === 'consensus' || r.verdict === 'trivial').length;
@@ -470,6 +515,7 @@ function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) 
     totals, kinds,
     files: files.slice(0, 500).map((f) => ({ path: f.path, kind: f.kind, add: f.add, del: f.del, status: f.status })),
     toolchain: { kind: toolchain.kind, describe: toolchain.describe, sdk: ctx.env.dotnet },
+    recommendation: routed.recommendation,
     lane: routed.lane,
     rules: routed.rules,
     claims,
@@ -481,9 +527,11 @@ function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) 
     l1: { groups: groups.map((g) => ({ ...g, anomalies: g.anomalies.slice(0, 10) })) },
     l2: l2 && !l2.skipped ? l2 : null,
     mutation: mutation.skipped ? { skipped: true, reason: mutation.reason, mutants: [] } : mutation,
+    rewind: ctx.rewind?.skipped ? { skipped: true, reason: ctx.rewind.reason, steps: [] } : ctx.rewind ? { steps: ctx.rewind.steps, total: ctx.rewind.total, needed: ctx.rewind.needed, untested: ctx.rewind.untested } : null,
+    budget: ctx.budget || null,
     l3: compare ? {
       n: compare.n, need: compare.need,
-      replicas: replicas.map((r) => ({ id: r.id, label: r.label, model: r.model, ok: r.ok, status: r.status, ms: r.ms, lines: r.lines, files: r.files.length, summary: r.summary, decisions: r.decisions, cost: r.cost, patchFile: r.patchFile, self: r.self, confined: r.confined })),
+      replicas: replicas.map((r) => ({ id: r.id, label: r.label, model: r.model, ok: r.ok, status: r.status, ms: r.ms, lines: r.lines, files: r.files.length, summary: r.summary, decisions: r.decisions, cost: r.cost, patchFile: r.patchFile, self: r.self, confined: r.confined, mission: r.mission })),
       regions: compare.regions.map((r) => ({ id: r.id, file: r.file, kind: r.kind, label: r.label, newStart: r.newStart, newEnd: r.newEnd, lines: r.lines, cells: r.cells, same: r.same, n: r.n, verdict: r.verdict })),
       omissions: compare.omissions,
       cross: cross ? [...cross] : null,
