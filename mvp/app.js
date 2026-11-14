@@ -100,10 +100,11 @@ async function loadProject(id) {
 }
 async function reloadPRs() {
   const pid = S.pid;
-  const prs = await api(`/projects/${pid}/prs`);
+  const [prs, hist] = await Promise.all([api(`/projects/${pid}/prs`), api(`/projects/${pid}/history`).catch(() => null)]);
   if (pid !== S.pid) return; // the project changed while this was loading
-  const same = S.prsKey === pid + JSON.stringify(prs); // a reload that changed nothing redraws nothing
-  S.prs = prs; S.base = prs.base; S.prsKey = pid + JSON.stringify(prs);
+  const key = pid + JSON.stringify(prs) + JSON.stringify(hist);
+  const same = S.prsKey === key; // a reload that changed nothing redraws nothing
+  S.prs = prs; S.base = prs.base; S.prsKey = key; S.history = hist;
   if (S.cur) S.cur = [...prs.incoming, ...prs.outgoing].find((p) => p.id === S.cur.id) || S.cur;
   if (!same || S.treeStale || !$('tree').firstChild) renderTree(); else applyHighlight();
 }
@@ -288,7 +289,20 @@ function renderTree() {
   mk('line', { x1: xNow, y1: 8, x2: xNow, y2: H - 8, stroke: 'rgba(255,255,255,.06)', 'stroke-dasharray': '2 6' }, svg);
   mk('line', { x1: 8, y1: mainY, x2: xNow, y2: mainY, stroke: '#f5f5f7', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-opacity': .8 }, svg);
   mk('line', { x1: xNow, y1: mainY, x2: W - 8, y2: mainY, stroke: 'rgba(255,255,255,.16)', 'stroke-width': 2, 'stroke-dasharray': '3 6', 'stroke-linecap': 'round' }, svg);
-  for (let x = xNow - 64; x > 40; x -= 64) mk('circle', { cx: x, cy: mainY, r: 3.6, fill: '#0c0c0e', stroke: '#f5f5f7', 'stroke-opacity': .55, 'stroke-width': 1.6 }, svg);
+  // History: the base's real latest commits, newest next to "you are here"; one made in an agent session wears its mark.
+  const hist = S.history?.commits;
+  for (let x = xNow - 64, k = 0; x > 40; x -= 64, k++) {
+    const c = hist?.[k];
+    if (hist && !c) break;
+    const hg = c ? mk('g', { class: 'hcmt', tabindex: 0, role: 'button', 'aria-label': `${c.subject} (${c.sha.slice(0, 7)})` }, svg) : svg;
+    mk('circle', { cx: x, cy: mainY, r: 3.6, fill: '#0c0c0e', stroke: '#f5f5f7', 'stroke-opacity': .55, 'stroke-width': 1.6 }, hg);
+    if (!c) continue;
+    mk('circle', { cx: x, cy: mainY, r: 13, fill: 'transparent' }, hg);
+    if (typeof aiBadge === 'function') aiBadge(hg, c, x, mainY, 0);
+    hg.onmouseenter = hg.onfocus = () => commitCard(c, x, mainY, -1, false);
+    hg.onmouseleave = hg.onblur = () => $('card').classList.remove('on');
+    if (c.ai) { hg.onclick = () => openAiSession(c); hg.onkeydown = (e) => { if (e.key === 'Enter') openAiSession(c); }; }
+  }
   mk('text', { x: 8, y: mainY - 14, class: 'mono' }, svg).textContent = base(S.base || 'main');
 
   const lanes = mk('g', {}, svg);
@@ -403,8 +417,9 @@ function drawRail(svg, f, mainY, W, H, anim) {
     const pop = mk('g', { class: 'pop' }, cg);
     if (head) { mk('circle', { cx: x, cy: yF, r: 13, fill: 'none', stroke: col, 'stroke-opacity': 0.3 }, pop); mk('circle', { cx: x, cy: yF, r: 7, fill: col }, pop); }
     else mk('circle', { cx: x, cy: yF, r: 4.6, fill: '#0c0c0e', stroke: col, 'stroke-width': 2 }, pop);
+    let up = dir < 0;
     if ((n - 1 - i) % step === 0) {
-      const up = alt ? li % 2 === 0 : dir < 0; li++;
+      up = alt ? li % 2 === 0 : dir < 0; li++;
       const t = mk('text', { x, y: up ? yF - 20 : yF + 28, 'text-anchor': n === 1 ? 'end' : 'middle', class: 'clab' }, cg);
       if (n === 1) t.setAttribute('x', x + 6);
       t.textContent = clip(c.subject);
@@ -412,10 +427,12 @@ function drawRail(svg, f, mainY, W, H, anim) {
       s.textContent = c.sha.slice(0, 7) + (c.author ? ' · ' + c.author.split(' ')[0] : '');
     }
     mk('circle', { cx: x, cy: yF, r: 15, fill: 'transparent' }, cg);
+    if (typeof aiBadge === 'function') aiBadge(cg, c, x, yF, up ? 1 : -1); // the agent session behind it (Entire)
     const show = () => commitCard(c, x, yF, dir, head);
     cg.onmouseenter = show; cg.onfocus = show;
     cg.onmouseleave = cg.onblur = () => $('card').classList.remove('on');
     if (head) { cg.onclick = () => openGraph(p); cg.onkeydown = (e) => { if (e.key === 'Enter') openGraph(p); }; }
+    else if (c.ai) { cg.onclick = () => openAiSession(c); cg.onkeydown = (e) => { if (e.key === 'Enter') openAiSession(c); }; }
   });
   if (F.total > n) mk('text', { x: a + 8, y: yF + (dir < 0 ? -20 : 28), class: 'csha' }, g).textContent = `+${F.total - n} earlier`;
   S.focusTip = [end, yF];
@@ -423,7 +440,7 @@ function drawRail(svg, f, mainY, W, H, anim) {
 function commitCard(c, x, y, dir, head) {
   const svg = $('tree'); const r = svg.getBoundingClientRect(); const vb = svg.viewBox.baseVal; const card = $('card');
   const when = c.date ? new Date(c.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-  card.innerHTML = `<div class="k">${esc(c.sha.slice(0, 9))}${c.author ? ' · ' + esc(c.author) : ''}</div><div class="t">${esc(c.subject)}</div><div class="r"><span>${esc(when)}</span><span>${head ? 'Newest · click to open' : ''}</span></div>`;
+  card.innerHTML = `<div class="k">${esc(c.sha.slice(0, 9))}${c.author ? ' · ' + esc(c.author) : ''}</div><div class="t">${esc(c.subject)}</div><div class="r"><span>${esc(when)}</span><span>${head ? 'Newest · click to open' : ''}</span></div>${typeof aiRow === 'function' ? aiRow(c) : ''}`;
   const px = r.left + (x * r.width) / vb.width, py = r.top + (y * r.height) / vb.height;
   card.style.left = Math.min(Math.max(px - 150, 12), innerWidth - 312) + 'px';
   card.style.top = (dir < 0 ? py - card.offsetHeight - 52 : py + 56) + 'px';
@@ -484,10 +501,12 @@ function drawZoom(svg, f, mainY, W, H) {
     mk('text', { x, y: up ? sy - 28 : sy + 36, 'text-anchor': 'middle', class: 'clab' }, cg).textContent = clip(c.subject);
     mk('text', { x, y: up ? sy - 45 : sy + 53, 'text-anchor': 'middle', class: 'csha' }, cg).textContent = c.sha.slice(0, 7) + (c.author ? ' · ' + c.author.split(' ')[0] : '');
     mk('circle', { cx: x, cy: sy, r: 20, fill: 'transparent' }, cg);
+    if (typeof aiBadge === 'function') aiBadge(cg, c, x, sy, up ? 1 : -1, 1.35);
     const show = () => commitCard(c, x + Z.pan, sy, dir, head);
     cg.onmouseenter = show; cg.onfocus = show;
     cg.onmouseleave = cg.onblur = () => $('card').classList.remove('on');
     if (head) { cg.onclick = () => openGraph(p); cg.onkeydown = (e) => { if (e.key === 'Enter') openGraph(p); }; }
+    else if (c.ai) { cg.onclick = () => openAiSession(c); cg.onkeydown = (e) => { if (e.key === 'Enter') openAiSession(c); }; }
   });
   if (Z.total > n) mk('text', { x: sx + 14, y: up ? sy + 30 : sy - 22, class: 'csha ztxt' }, pz).textContent = `+${Z.total - n} earlier`;
 
@@ -613,7 +632,7 @@ function showCard(p, st, x, y, dir) {
   const svg = $('tree'); const r = svg.getBoundingClientRect(); const vb = svg.viewBox.baseVal;
   const l = p.last; const card = $('card');
   card.innerHTML = `<div class="k">${esc(p.branch)}</div><div class="t">${esc(p.title)}</div>
-    <div class="r"><span class="chip ${st.tone}" style="background:${PAL[st.tone]}">${esc(st.label)}</span><span>${l ? `${l.residue} of ${l.total} lines for you` : 'Open it to verify'}</span></div>`;
+    <div class="r"><span class="chip ${st.tone}" style="background:${PAL[st.tone]}">${esc(st.label)}</span><span>${l ? `${l.residue} of ${l.total} lines for you` : 'Open it to verify'}</span></div>${typeof aiBranchRow === 'function' ? aiBranchRow(p) : ''}`;
   const px = r.left + (x * r.width) / vb.width, py = r.top + (y * r.height) / vb.height;
   card.style.left = Math.min(Math.max(px - 150, 12), innerWidth - 312) + 'px';
   card.style.top = (dir < 0 ? py - card.offsetHeight - 34 : py + 40) + 'px';

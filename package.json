@@ -15,7 +15,8 @@
     "doctor": "node scripts/doctor.js",
     "check:verda": "node scripts/check-verda.js",
     "check:privacy": "node scripts/check-privacy.js",
-    "check:decisions": "node scripts/check-decisions.js"
+    "check:decisions": "node scripts/check-decisions.js",
+    "entire": "node scripts/entire.js"
   },
   "engines": {
     "node": ">=22.15"
