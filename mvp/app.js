@@ -130,7 +130,7 @@ function renderTree() {
       const M = Math.min(44 + dy * 0.45, W - 16 - tipX);
       const mx = tipX + M;
       const faint = !recent.includes(p) && dir < 0;
-      const g = mk('g', { class: 'lane' + (st.tone === 'warn' || st.tone === 'bad' ? ' pulse' : '') }, lanes);
+      const g = mk('g', { class: 'lane' + (st.tone === 'warn' || st.tone === 'bad' ? ' pulse' : ''), 'data-pr': p.id }, lanes);
       const fork = `M${xf} ${mainY} C ${xf + R * .55} ${mainY}, ${xf + R * .45} ${y}, ${xf + R} ${y} L ${tipX} ${y}`;
       const merge = `M${tipX} ${y} C ${tipX + M * .55} ${y}, ${mx - M * .45} ${mainY}, ${mx} ${mainY}`;
       mk('path', { d: fork, fill: 'none', stroke: col, 'stroke-width': faint ? 1.4 : 2.2, 'stroke-linecap': 'round', 'stroke-opacity': faint ? .5 : .95 }, g);
@@ -172,6 +172,15 @@ function showCard(p, st, x, y, dir) {
   card.style.left = Math.min(Math.max(px - 150, 12), innerWidth - 312) + 'px';
   card.style.top = (dir < 0 ? py - card.offsetHeight - 34 : py + 40) + 'px';
   card.classList.add('on');
+}
+/* Light up some branches in the tree (by PR id) and dim the rest; no ids clears it.
+   Used by the voice mascot to point at PRs. Older branches are unfolded if needed. */
+function highlightLanes(ids) {
+  const want = new Set(ids || []);
+  if (want.size && !S.expanded && S.prs.incoming.some((p) => want.has(p.id) && !document.querySelector(`#tree .lane[data-pr="${CSS.escape(p.id)}"]`))) { S.expanded = true; renderTree(); }
+  const svg = $('tree');
+  svg.classList.toggle('hl', want.size > 0);
+  svg.querySelectorAll('.lane').forEach((g) => g.classList.toggle('on', want.has(g.dataset.pr)));
 }
 $('more').onclick = () => { S.expanded = !S.expanded; renderTree(); };
 addEventListener('resize', () => S.pid && renderTree());

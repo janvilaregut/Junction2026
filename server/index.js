@@ -14,6 +14,7 @@ import { availableAgents } from './pipeline/replicas.js';
 import { areaStates, areasOf, metrics, record, entries, K_EARN } from './ledger.js';
 import { markdown, trailers, answer } from './report.js';
 import { savePrompt } from './requirements.js';
+import { liveToken } from './live.js';
 
 const PORT = Number(process.env.PORT || 4173);
 const UI = path.join(ROOT, 'mvp');
@@ -96,6 +97,7 @@ async function api(req, res, url) {
   const seg = url.pathname.split('/').filter(Boolean).slice(1); // after "api"
   const method = req.method;
 
+  if (seg[0] === 'live' && seg[1] === 'token' && method === 'POST') return send(res, 200, await liveToken());
   if (seg[0] === 'state' && method === 'GET') {
     return send(res, 200, { projects: listProjects(), agents: await availableAgents(), clis: await clis(), workspace: path.join(ROOT, 'workspace') });
   }
