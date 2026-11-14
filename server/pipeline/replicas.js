@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { models } from '../agents.js';
+import { getSettings } from '../settings.js';
 import { run, tail } from '../util.js';
 import { clis, agentEnv } from '../llm.js';
 import { parseDiff } from '../git.js';
@@ -34,7 +35,7 @@ export async function availableAgents() {
   }
   const have = await clis();
   const agents = [];
-  if (have.opencode) for (const [role, model] of Object.entries(models())) if ((role === 'diverse' && process.env.VERDA_INFERENCE_KEY) || (role !== 'diverse' && process.env.GEMINI_API_KEY)) agents.push({ id: role, cli: 'opencode', model, label: model });
+  if (have.opencode) for (const [role, model] of Object.entries(models())) if ((role === 'diverse' && process.env.VERDA_INFERENCE_KEY && getSettings().models.nemotron) || (role !== 'diverse' && process.env.GEMINI_API_KEY)) agents.push({ id: role, cli: 'opencode', model, label: model });
   // The full pipeline uses these explicitly configured providers. Listing every
   // public OpenCode model delays page startup and does not establish credentials.
   if (agents.length) return agents;

@@ -15,6 +15,7 @@ import { areaStates, areasOf, metrics, record, entries, K_EARN } from './ledger.
 import { markdown, trailers, answer } from './report.js';
 import { savePrompt } from './requirements.js';
 import { liveToken } from './live.js';
+import { getSettings, updateSettings } from './settings.js';
 import { startConsensus, getConsensus, listConsensus, subscribeConsensus, isLive } from './consensus/run.js';
 import { verifyIntegrity } from './integrity.js';
 import { resolveProfile } from './profiles.js';
@@ -142,6 +143,11 @@ async function api(req, res, url) {
   const seg = url.pathname.split('/').filter(Boolean).slice(1); // after "api"
   const method = req.method;
 
+  if (seg[0] === 'settings') { // which models the review may call; keys are only reported as present or not
+    const keys = { gemini: !!process.env.GEMINI_API_KEY, verda: !!process.env.VERDA_INFERENCE_KEY };
+    if (method === 'GET') return send(res, 200, { ...getSettings(), keys });
+    if (method === 'PATCH' || method === 'POST') return send(res, 200, { ...updateSettings(await readBody(req)), keys });
+  }
   if (seg[0] === 'live' && seg[1] === 'token' && method === 'POST') return send(res, 200, await liveToken());
   // Consensus engine: Gemini variants solve blind, compare, debate in pairs.
   if (seg[0] === 'consenso') {

@@ -4,10 +4,15 @@ import path from 'node:path';
 import { ROOT, run, toolEnv, which, redact, sha256, writeJSON } from './util.js';
 import { Queue, remaining, execution, TokenBudgetError } from './execution.js';
 import { assertScratch } from './pipeline/sandbox.js';
+import { getSettings } from './settings.js';
 
 export const modelQueue = new Queue(2);
 export const usageTokens = t => Number.isFinite(t.total) ? t.total : (t.input || 0) + (t.output || 0) + (t.reasoning || 0) + (t.cache?.read || 0) + (t.cache?.write || 0);
-export const models = () => ({ fast: `google/${process.env.KATSE_GEMINI_FAST || 'gemini-4-hydrogen'}`, review: `google/${process.env.KATSE_GEMINI_REVIEW || 'gemini-4-carbon'}`, diverse: 'verda-nemotron/nemotron', ...execution.getStore()?.models });
+export const models = () => {
+  const fast = `google/${process.env.KATSE_GEMINI_FAST || 'gemini-4-hydrogen'}`, review = `google/${process.env.KATSE_GEMINI_REVIEW || 'gemini-4-carbon'}`;
+  const on = getSettings().models; // a Gemini model switched off in settings hands its roles to the other one
+  return { fast: on.hydrogen || !on.carbon ? fast : review, review: on.carbon || !on.hydrogen ? review : fast, diverse: 'verda-nemotron/nemotron', ...execution.getStore()?.models };
+};
 /** The pinned OpenCode (its postinstall writes bin/opencode.exe on every OS); a global one may be another version. */
 const opencodeBin = () => { const pinned = path.join(ROOT, 'node_modules/opencode-ai/bin/opencode.exe'); return fs.existsSync(pinned) ? pinned : 'opencode'; };
 export const entirePath = () => process.env.KATSE_ENTIRE_PATH || path.join(process.env.LOCALAPPDATA || os.homedir(), 'Katse/tools', process.platform === 'win32' ? 'entire.exe' : 'entire');
@@ -179,12 +184,12 @@ export async function attachSession(dir, sessionId) {
 let preflightCache = null;
 export function clearPreflightCache() { preflightCache = null; }
 
-export async function providerPreflight({ fetchImpl = fetch, execute = run, now = Date.now, cache = true, allowPartial = false } = {}) {
+export async function providerPreflight({ fetchImpl = fetch, execute = run, now = Date.now, cache = true, allowPartial = false, nemotron = true } = {}) {
   remaining();
   const selected = models(), verdaURL = process.env.KATSE_VERDA_URL || 'https://containers.datacrunch.io/nemotron-3-5-super-vl-b300/v1';
   const verdaModel = process.env.KATSE_VERDA_MODEL || 'nemotron-3.5-super-vl';
   // Only the digest stays in memory. Credentials never enter reports or cache artifacts.
-  const key = sha256(JSON.stringify([selected, verdaURL, verdaModel, entirePath(), configuration(), process.env.GEMINI_API_KEY, process.env.VERDA_INFERENCE_KEY]));
+  const key = sha256(JSON.stringify([selected, verdaURL, verdaModel, entirePath(), configuration(), process.env.GEMINI_API_KEY, process.env.VERDA_INFERENCE_KEY, nemotron]));
   if (cache && preflightCache?.key === key && now() < preflightCache.expires) return { ...structuredClone(preflightCache.value), preflight: { ...preflightCache.value.preflight, cached: true } };
   const attempts = {};
   const requestTimeoutMs = allowPartial ? 8000 : 15000;
@@ -211,7 +216,7 @@ export async function providerPreflight({ fetchImpl = fetch, execute = run, now 
   const names = ['Google', 'Verda/Nemotron', 'OpenCode', 'Entire'];
   const settled = await Promise.allSettled([
     process.env.GEMINI_API_KEY ? fetchModels('Google', 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', { 'x-goog-api-key': process.env.GEMINI_API_KEY }) : Promise.reject(new Error('Google: missing GEMINI_API_KEY')),
-    process.env.VERDA_INFERENCE_KEY ? fetchModels('Verda/Nemotron', `${verdaURL}/models`, { Authorization: `Bearer ${process.env.VERDA_INFERENCE_KEY}` }) : Promise.reject(new Error('Verda/Nemotron: missing VERDA_INFERENCE_KEY')),
+    !nemotron ? Promise.reject(new Error('Verda/Nemotron: switched off in settings')) : process.env.VERDA_INFERENCE_KEY ? fetchModels('Verda/Nemotron', `${verdaURL}/models`, { Authorization: `Bearer ${process.env.VERDA_INFERENCE_KEY}` }) : Promise.reject(new Error('Verda/Nemotron: missing VERDA_INFERENCE_KEY')),
     Promise.resolve().then(() => execute(opencodeBin(), ['--version'], { timeout: 10000 })),
     Promise.resolve().then(() => execute(entirePath(), ['version'], { timeout: 10000 })),
   ]);

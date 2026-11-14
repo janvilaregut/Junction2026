@@ -8,6 +8,7 @@ import { within, initialPopulation, priority, execution, TokenBudget } from '../
 import { resolveProfile } from '../profiles.js';
 import { loadContinuation } from './resume.js';
 import { applyProposal, deduplicateCandidates } from './proposals.js';
+import { getSettings } from '../settings.js';
 import { sourceBlocks } from './source-context.js';
 import { artifactManifest } from '../integrity.js';
 import { models, session, setupCapture, checkpoint, attachSession, providerPreflight, usageTokens } from '../agents.js';
@@ -141,7 +142,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
 
   try {
     await within(generationEnd, async () => {
-      state.providers = await providerPreflight({allowPartial:true}); emit({ type: 'log', text: state.providers.errors?.length ? `Disponibilidad parcial: ${state.providers.errors.join('; ')}. Se conserva el alcance ejecutable y se registra cualquier sustitución de modelo.` : 'Proveedores y herramientas accesibles' }); save();
+      state.providers = await providerPreflight({allowPartial:true, nemotron: getSettings().models.nemotron}); emit({ type: 'log', text: state.providers.errors?.length ? `Disponibilidad parcial: ${state.providers.errors.join('; ')}. Se conserva el alcance ejecutable y se registra cualquier sustitución de modelo.` : 'Proveedores y herramientas accesibles' }); save();
       it = await intake(project, pr); state.input = { proposed: it.headSha, proposedRef: pr.ref, target: it.baseSha, targetRef: project.base, historicalBase: it.mergeBase, requirement: it.requirement };
       if(options.resumeRunId) { resume = loadContinuation(project.id, options.resumeRunId, state.input, artifacts); state.continuation = {runId:resume.runId,reuse:resume.reuse}; state.attacks = resume.state.attacks.filter(a=>a.status==='admitted' && !resume.state.verdict?.semantic?.invalidAttacks?.some(x=>x.id===a.id)); state.debate = resume.state.debate || []; }
       // Pin input refs even if the user's branches move while agents are working.
