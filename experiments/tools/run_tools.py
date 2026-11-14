@@ -89,9 +89,11 @@ def tool_specs(t: Path, o: Path) -> dict[str, dict]:
             ["trivy", "fs", "--scanners", "vuln,secret,misconfig", "--format", "json", "--output", f"{O}/trivy.json",
              "--skip-db-update", "--skip-check-update", "--quiet", T],
             ["trivy", "convert", "--format", "sarif", "--output", f"{O}/trivy.sarif", f"{O}/trivy.json"]]},
+        # --no-ignore: like semgrep, osv-scanner honours the enclosing lab repo's .gitignore and otherwise
+        # reports "no package sources found" (exit 128) for our exported trees.
         "osv-scanner": {"family": "osv-scanner", "cmds": [
-            ["osv-scanner", "scan", "source", "-r", "--format", "json", "--output-file", f"{O}/osv-scanner.json", T],
-            ["osv-scanner", "scan", "source", "-r", "--format", "sarif", "--output-file", f"{O}/osv-scanner.sarif", T]],
+            ["osv-scanner", "scan", "source", "-r", "--no-ignore", "--format", "json", "--output-file", f"{O}/osv-scanner.json", T],
+            ["osv-scanner", "scan", "source", "-r", "--no-ignore", "--format", "sarif", "--output-file", f"{O}/osv-scanner.sarif", T]],
             "ok_codes": {0, 1, 128}},
         "syft": {"family": "syft", "cmds": [["syft", f"dir:{T}", "-q", "-o", f"cyclonedx-json={O}/syft.cdx.json"]]},
         "grype": {"family": "grype", "cmds": [["grype", f"sbom:{O}/syft.cdx.json", "-q", "-o", f"json={O}/grype.json",

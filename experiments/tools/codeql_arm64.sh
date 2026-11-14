@@ -46,7 +46,13 @@ analyze)
   SRC=$2; DB=$3; OUT=$4
   mkdir -p "$OUT"
   export PATH="$HOME/.dotnet:$PATH" DOTNET_ROOT="$HOME/.dotnet"
-  { /usr/bin/time -l codeql database create "$DB" --language=csharp --build-mode=none --source-root="$SRC" \
+  # build-mode=none runs `dotnet restore`, which writes obj/ into the source root. Extract from a throw-away
+  # copy so the trees scanned by the other tools stay byte-identical (SARIF paths are root-relative anyway).
+  SCRATCH="$WORK/codeql-src/$(basename "$DB")"
+  rm -rf "${SCRATCH:?}"
+  mkdir -p "$SCRATCH"
+  cp -R "$SRC/." "$SCRATCH/"
+  { /usr/bin/time -l codeql database create "$DB" --language=csharp --build-mode=none --source-root="$SCRATCH" \
       --search-path="$EXT" --common-caches="$WORK/codeql-cache" --overwrite --threads=0 ; } > "$OUT/codeql.create.log" 2>&1
   { /usr/bin/time -l codeql database analyze "$DB" codeql/csharp-queries:codeql-suites/csharp-security-and-quality.qls \
       --common-caches="$WORK/codeql-cache" --format=sarif-latest --output="$OUT/codeql.sarif" --threads=0 --ram=24000 ; } \

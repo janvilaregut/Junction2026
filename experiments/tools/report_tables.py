@@ -49,11 +49,13 @@ def e1():
 def e1_branches():
     rows = []
     for b, v in (S.get("e1_branch_deltas") or {}).items():
+        co = S["e1_baseline"].get(f"{b}/changed-only", {}).get("tools", {})
         for t, x in sorted(v["per_tool"].items()):
             if t not in v["tools_compared"]:
                 continue
             if x["new_vs_base"] or x["resolved_vs_base"] or x["in_changed_files"]:
-                rows.append([b, t, x["total"], x["new_vs_base"], x["resolved_vs_base"], x["in_changed_files"], x["changed_only_run"]])
+                rows.append([b, t, x["total"], x["new_vs_base"], x["resolved_vs_base"], x["in_changed_files"],
+                             x["changed_only_run"] if t in co else "–"])
     return table(["branch", "tool", "total", "new vs base", "gone vs base", "in changed files", "changed-only run"], rows)
 
 
@@ -76,15 +78,17 @@ def e2():
 
 def e2_subtypes():
     r = S["e2_seeded"]["recall"]["per_tool"]
-    rows = []
-    for t, cats in r.items():
-        for c, v in cats.items():
-            if "by_subtype" not in v:
-                continue
-            for st, x in v["by_subtype"].items():
-                rows.append([c, st, t, f"{x['detected']}/{x['seeded']}"])
-    rows.sort()
-    return table(["category", "subtype", "tool", "detected"], rows)
+    parts = []
+    for cat in ("secret", "dependency", "sast", "duplication"):
+        tools = [t for t, cats in r.items() if cat in cats and "by_subtype" in cats[cat]]
+        subs = sorted({st for t in tools for st in r[t][cat]["by_subtype"]})
+        rows = []
+        for st in subs:
+            row = [st, r[tools[0]][cat]["by_subtype"][st]["seeded"]]
+            row += [r[t][cat]["by_subtype"][st]["detected"] for t in tools]
+            rows.append(row)
+        parts.append(f"*{cat}* (cells = items detected):\n\n" + table(["subtype", "n"] + tools, rows))
+    return "\n\n".join(parts)
 
 
 def e3(which="base"):
@@ -92,19 +96,22 @@ def e3(which="base"):
     parts = []
     for cat, v in o.items():
         if not v["raw_total"]:
-            parts.append(f"**{cat}**: no findings from {', '.join(v['tools'])}.")
+            parts.append(f"*{cat}*: no findings from {', '.join(v['tools'])}.")
             continue
-        parts.append(f"**{cat}** — raw {v['raw_total']}, clusters after dedup {v['clusters_after_dedup']}, "
-                     f"duplicate ratio {pct(v['duplicate_ratio'])}; clusters per tool {v['clusters_per_tool']}; "
-                     f"clusters by #tools {v['clusters_by_n_tools']}")
-        jr = [[k.replace("|", " vs "), "n/a" if j is None else f"{j:.3f}"] for k, j in v["jaccard"].items() if j is not None]
-        if jr:
-            parts.append(table(["pair", "Jaccard"], jr))
-        cr = [[k.replace("|", " vs "), x["n1"], x["n2"], x["m"], x["lincoln_petersen"] if x["lincoln_petersen"] is not None else "∞ (m=0)",
-               x["chapman"], f"[{x['chapman_ci95'][0]}, {x['chapman_ci95'][1]}]", x["est_undetected_chapman"]]
-              for k, x in v["capture_recapture"].items()]
-        if cr:
-            parts.append(table(["pair", "n1", "n2", "m", "Lincoln–Petersen", "Chapman", "95% CI", "est. undetected"], cr))
+        byn = ", ".join(f"{k} tool{'s' if k != '1' else ''}: {n}" for k, n in sorted(v["clusters_by_n_tools"].items()))
+        per = ", ".join(f"{t} {n}" for t, n in v["clusters_per_tool"].items())
+        parts.append(f"*{cat}*: {v['raw_total']} raw findings → {v['clusters_after_dedup']} clusters (duplicate ratio "
+                     f"{pct(v['duplicate_ratio'])}). Clusters per tool: {per}. Clusters seen by {byn}.")
+        rows = []
+        for k, j in v["jaccard"].items():
+            x = v["capture_recapture"].get(k)
+            if not x:
+                continue
+            lp = x["lincoln_petersen"] if x["lincoln_petersen"] is not None else "∞ (m=0)"
+            rows.append([k.replace("|", " vs "), "n/a" if j is None else f"{j:.3f}", x["n1"], x["n2"], x["m"], lp,
+                         x["chapman"], f"[{x['chapman_ci95'][0]}, {x['chapman_ci95'][1]}]"])
+        if rows and len(v["tools"]) > 1:
+            parts.append(table(["pair", "Jaccard", "n1", "n2", "m", "Lincoln–Petersen", "Chapman N̂", "95% CI"], rows))
     return "\n\n".join(parts)
 
 

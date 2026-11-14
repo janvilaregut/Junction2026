@@ -1,0 +1,375 @@
+# 15 — Tool-catalog experiments: coverage, recall, overlap and cost of AI-free analysers on MessagePack-CSharp
+
+Date: 2026-11-14. Scope: empirical evidence for the AI-free code-quality certifier (Junction 2026, Tieto "Earned Trust in AI Code").
+Everything here is reproducible from `experiments/tools/` (commands in section 9). This file is rendered by
+`experiments/tools/render_report.py` from `experiments/tools/report_template.txt` and `out/tools/summary.json`
+(machine-readable results). Raw native reports: `out/tools/<ref>/` (SARIF 2.1.0 where the tool supports it).
+
+## 0. Bottom line
+
+* **Secrets are close to solved by the standard catalog, and one tool is nearly enough.** On 30 seeded fake secrets
+  (8 formats, in C# literals and 4 config formats) gitleaks found 30/30 (Wilson 95% CI 89–100%), trufflehog 28/30
+  (79–98%), betterleaks 26/30 (70–95%), detect-secrets 24/30 (63–90%), trivy 15/30 (33–67%), semgrep `p/secrets`
+  12/30 (25–58%). Noise floor on the real tree: 0 findings for every secret tool except detect-secrets (31
+  high-entropy strings).
+* **Dependency scanning on a modern .NET repo comes down to which manifest formats each tool reads.** No scanner reads
+  every format: trivy reads `Directory.Packages.props` and `packages.config` but not `.csproj` versions (6/9 seeded
+  vulnerable packages), osv-scanner reads `.csproj` versions and `packages.config` but extracts 0 packages from
+  `Directory.Packages.props` (6/9), syft/grype read none of them (0/9; they only see checked-in DLLs). Union 9/9. On
+  the real tree only trivy reports the one vulnerable direct pin (NuGet.Protocol 6.8.0, GHSA-g4vj-cjjj-v7hg).
+  Transitive dependencies are invisible to all of them without a lockfile or a restore.
+* **Pattern SAST for C# is weak.** 30 textbook insecure snippets (10 classes x 3): best single tool semgrep `p/csharp`
+  incl. tests 8/30 (27%, CI 14–44%); CodeQL `csharp-security-and-quality` 1/30 (3%, CI 1–17%; 7/30 if its
+  non-security quality alerts are counted); `p/security-audit` 0/30 (it has no C# rules). Union 9/30 (30%, CI 17–48%).
+  Seven of ten classes (MD5/SHA1, Process.Start, XML DTD, `new Random()` tokens, hard-coded password comparison,
+  disabled certificate validation, Path.Combine traversal) were never flagged by any security rule.
+* **Real vulnerabilities: 0 of 15.** No SAST/secret/pattern rule (semgrep p/csharp, p/default, p/security-audit,
+  p/secrets, CodeQL security, trivy, gitleaks, betterleaks, trufflehog, detect-secrets) produced a finding within ±5
+  lines of the code changed by the fixes of the 15 OSV advisories for MessagePack (recall 0/15, CI 0–20%). The CWE
+  classes involved (674 recursion, 407/328 hash collisions, 770/789/409 unbounded allocation, 125/20 LZ4 bounds,
+  502/470 typeless deserialization, 1188 insecure default, 1325, 190, 121) are not covered by any rule in the catalog.
+  Quality signals (lizard CCN>15, CPD, CodeQL quality) land near vulnerable lines at roughly the chance rate.
+* **Duplication:** exact (type-1) clones 7/7 for CPD, type-3 clones (1–2 inserted statements) 6/6 at 50 tokens,
+  **type-2 clones (renamed identifiers) 0/7 for every tool**; CPD's `--ignore-identifiers` is accepted but has no effect
+  for C#. Best: CPD-50 13/20 (65%, CI 43–82%).
+* **Overlap and capture–recapture:** secret scanners overlap heavily (Jaccard gitleaks–trufflehog 0.92 on the seeded
+  tree) and share blind spots, so pairwise Lincoln–Petersen/Chapman estimates come out too low. Checked against the
+  known 30 seeded secrets they return 22–31, several with 95% CIs that exclude the truth (e.g. betterleaks–detect-secrets
+  26 [26, 26]). For clones every pair estimates 10–13.3 against a true 20, because all tools miss type-2 clones. On
+  real code CR is mostly undefined (m = 0). Treat CR numbers as lower bounds, never as "what remains".
+* **Silent zero-coverage failures are the main operational risk** (section 2). In some layouts semgrep, osv-scanner and
+  jscpd each returned exit 0 or empty results without scanning anything. semgrep also skips `tests/` by default, and
+  CodeQL writes `obj/` into the source tree. A certifier must check coverage (files scanned) per tool, not just exit
+  codes.
+* **Cost is negligible except for CodeQL and CPD-50:** every catalog tool except CodeQL runs in under 15 s on the
+  73 KLOC C# tree. CPD at 50 tokens peaks at about 2.8 GB RSS. CodeQL (build-mode none) takes about 3 min and 12 GB
+  RSS. See E4.
+
+## 1. Setup
+
+* Machine: Apple M5 Max, 64 GB, macOS (arm64), no Docker, no sudo. The machine was shared with another lab agent
+  running dotnet builds (load average 8–29 during the runs), so wall-clock numbers are indicative; E4 uses medians of
+  3 repetitions.
+* Corpus: MessagePack-CSharp. Each ref was copied out read-only with `git archive <ref> | tar -x` into
+  `corpus/tools/refs/<ref>`, so every tool sees the same bytes and no `.git` directory. "Changed-only" trees contain
+  only the files the branch added or modified (`git diff --name-only --diff-filter=AM origin/HEAD...<branch>`).
+
+| ref | commit | files changed vs base |
+|---|---|---|
+| base (origin/HEAD) | 32258fdb | – |
+| ju26-issue-2129 | 083afd99 | 28 |
+| ju26-issue-2234 | 9007cee1 | 4 |
+| ju26-issue-2283 | 9df83c38 | 4 |
+| ju26-issue-2297 | a0aa5ab2 | 237 (mostly generated `.g.cs` snapshot resources) |
+
+Base size (scc): {{SIZE}}.
+
+### Tools
+
+| tool | version | install | categories | status |
+|---|---|---|---|---|
+| gitleaks | 8.30.1 | brew | secret | ran (`dir` mode, `--redact`) |
+| betterleaks | 1.10.1 | brew | secret | ran (`dir`, `--redact`, validation off) |
+| trufflehog | 3.99.9 | brew | secret | ran (`filesystem`, `--no-verification`) |
+| detect-secrets | 1.5.0 | pip in `corpus/tools/venv` | secret | ran (`scan --all-files`) |
+| trivy | 0.76.2 | brew | dependency, secret, misconfig | ran (`fs --scanners vuln,secret,misconfig`) |
+| osv-scanner | 2.7.1 | brew | dependency | ran (`scan source -r --no-ignore`) |
+| syft | 1.57.1 | brew | SBOM (CycloneDX JSON) | ran |
+| grype | 0.121.3 (DB schema v6.1.10, built 2026-11-14) | brew | dependency | ran on the syft SBOM and on `dir:` |
+| semgrep | 1.185.0 | brew; rules fetched once from `semgrep.dev/c/p/<pack>` | sast, secret | ran: `p/csharp` (27 rules), `p/security-audit` (225 rules, 0 C#), `p/secrets` (52), `p/default` (1073, 35 C#) |
+| PMD CPD | 7.29.0 | brew | duplication | ran (`--minimum-tokens 100` and `50`, xml+csv) |
+| jscpd | 4.3.0 | `npm install jscpd@4` (local) | duplication | ran (`--min-tokens 100` and `50`, json) |
+| scc | 4.1.0 | brew | size, per-file complexity | ran (json, by file) |
+| lizard | 1.26.0 | pre-installed `.venv` | per-function complexity | ran (csv + xml) |
+| OpenSSF Scorecard | 5.6.0 | brew | supply-chain hygiene | ran in `--local` mode only (11 of 18 checks) |
+| CodeQL | 2.27.4 + `codeql/csharp-queries` 1.11.0 | brew cask + pack download | sast, quality | ran (build-mode none, `csharp-security-and-quality`) through an arm64 shim (section 2) |
+| PMD rules for C# | – | – | – | **not applicable**: PMD 7 has no C# rule module |
+| SonarQube Community | – | – | – | **incomplete**: C# needs SonarScanner for .NET around an MSBuild build (out of scope here) |
+
+Semgrep rule-pack SHA-256 prefixes (for reproducibility): {{SEMGREP_SHA}}.
+
+## 2. Silent-failure pitfalls found during setup (relevant to any automated certifier)
+
+1. **semgrep scanned 0 files and exited 0** when the target directory sat inside a git-ignored folder of an enclosing
+   repository, because it uses `git ls-files`. Fix: `--no-git-ignore`. Second trap: semgrep then climbs to the
+   enclosing repo to look for `.semgrepignore`; a tree-local ignore file needs `--semgrepignore-v2 --project-root <tree>`.
+2. **semgrep's built-in default ignore list skips `tests/`**: `p/csharp` scanned 317 of 681 C# files (`src`,
+   `benchmark` and `sandbox` only), and `p/default` 566 of 948 files. The `*-all` variants in this report turn this off
+   with an empty `.semgrepignore` (681 and 948 files). 6 of the 30 seeded SAST snippets are in `tests/`.
+3. **jscpd silently ignores any path that contains a dot-directory** (our absolute path contains `/.claude/`): exit 0,
+   no report, 0.24 s. Fix: run it from inside the tree with `.` as the path.
+4. **osv-scanner honours the enclosing repo's `.gitignore`** and reported "no package sources found" (exit 128). With
+   `--no-ignore` it parses `Directory.Packages.props` but extracts 0 packages (it does not support central package
+   management) and skips 98 `PackageReference`s that have no version. On the real tree it finds only the Unity
+   `packages.config` (6 packages, no advisories), so its effective dependency coverage there is nil.
+5. **CodeQL's C# extractor ships for x86-64 only** ("Bad CPU type in executable"); Rosetta 2 is not installed and
+   installing it needs admin rights. We ran it by deleting the bundled x64 runtime, making the extractor
+   framework-dependent and running it on an arm64 .NET 10 runtime installed in the work area
+   (`experiments/tools/codeql_arm64.sh`). Extraction succeeded (73,152 LOC baseline; the extractor fetched the NuGet
+   dependencies itself).
+6. **CodeQL build-mode none writes `obj/` (project.assets.json) into the source root.** The first seeded run of the
+   other tools picked these files up, and detect-secrets jumped from 31 to 1,193 findings. The script now extracts from
+   a scratch copy. All affected runs were deleted and repeated on clean trees; the numbers in this report are the
+   clean ones.
+7. **CPD's `--ignore-identifiers` and `--ignore-literals` are accepted with `--language cs` but have no effect**: the
+   output is identical to plain CPD-100 on both base and seeded.
+8. **syft and grype read none of the NuGet manifest formats used here.** All 29 of grype's base findings come from
+   checked-in MessagePack 1.4.3 / 1.6.0.3 DLLs in `sandbox/PerfBenchmarkDotNet` and `benchmark/`, plus one GitHub
+   Action.
+9. trufflehog has no redact option, so its `Raw`/`RawV2` fields are replaced by hashes after each run. Seeded runs are
+   also scrubbed of every seeded value, because GitHub push protection would block correctly formatted fake tokens.
+
+## 3. E1 — baseline on base and the four AI branches
+
+Findings per tool and ref (all categories). scc and syft produce metrics and an SBOM, not findings. osv-scanner's 0 on
+the real refs means it parsed the manifests it supports and found no advisory:
+
+{{E1}}
+
+Branch deltas, for tools run on both refs. "New/gone" is the line-insensitive fingerprint multiset difference vs base;
+"changed-only run" is the same tool run on a tree that contains only the changed files ("–" = not run on that tree):
+
+{{E1B}}
+
+Observations:
+* None of the four AI branches introduces a secret, dependency or security finding (all secret scanners, trivy,
+  osv-scanner, semgrep and CodeQL security report 0 new).
+* ju26-issue-2129 adds two functions with CCN>15 (lizard: `GeneratedFormatterCollector.cs` lines 35 and 147, a new
+  file), one CodeQL quality alert (`cs/linq/missed-where`, `MessagePackGenerator.cs:70`) and a few small 50-token
+  clones. ju26-issue-2297 adds 18 CPD-100 and 341 CPD-50 duplicate occurrences, almost all in generated `*.g.cs`
+  snapshot test resources. That duplication is expected, which argues for excluding generated test fixtures.
+* For file-local tools (secret scanners, lizard), changed-only runs agree with the "findings in changed files" of the
+  full run. Clone detectors differ by design: a clone of unchanged code cannot be seen in a changed-only tree.
+* Real-tree findings worth noting:
+  * trivy flags NuGet.Protocol 6.8.0 (GHSA-g4vj-cjjj-v7hg, low) and 2 Dockerfile misconfigurations.
+  * scorecard (local mode) scores 6.2, with Pinned-Dependencies 0, Token-Permissions 0, SAST 0 and Fuzzing 0.
+  * CodeQL raises 813 quality alerts and 0 security alerts.
+  * semgrep `p/default`'s 32 findings are all GitHub Actions rules in `.github/` (17 `run-shell-injection`, 13 mutable
+    action tags, 1 `secrets-inherit`, 1 Dependabot cooldown). They overlap with scorecard's Pinned-Dependencies and
+    Token-Permissions warnings (Jaccard 0.375, section 5). `p/csharp` reports nothing on the real C# code.
+  * detect-secrets raises 31 high-entropy strings: Unity `.meta` GUIDs and hashes, all false positives judging by the
+    top files.
+
+## 4. E2 — seeded-defect ground truth (recall per tool)
+
+**Design.** `experiments/tools/seed_defects.py` (seed 20261114) wrote the ground truth to
+`out/tools/seeded/ground_truth.json`: 89 items, each in a different file, none inside a preprocessor `#if`.
+* 30 fake secrets:
+  * AWS key id + secret (4)
+  * GitHub classic PAT with a valid CRC32 checksum (4)
+  * Slack bot token (4)
+  * Stripe `sk_live_` (4; 24 or 99 chars)
+  * RSA private key PEM (3; freshly generated from the seed, 2048-bit PKCS#1)
+  * HS256 JWT (4)
+  * SQL connection string with a high-entropy password (4)
+  * Azure storage connection string (3)
+
+  20 are `private const string` fields in C# classes; 10 are in new config files (appsettings JSON, user-secrets JSON,
+  Web.config XML, Azure Pipelines YAML, `.env`). All values are random, and the ground truth stores only their SHA-256.
+* 9 known-vulnerable NuGet packages, each checked against `api.osv.dev/v1/query` at seeding time, in three manifest
+  formats:
+  * `Directory.Packages.props`: Newtonsoft.Json 12.0.1 (GHSA-5crp-9r3c-p9vr), System.Text.Encodings.Web 4.5.0
+    (GHSA-ghhp-997w-qr28), System.Net.Http 4.3.0 (GHSA-7jgj-8wvc-jh57).
+  * A non-CPM `.csproj` with explicit versions: Microsoft.Data.SqlClient 1.1.0, System.Text.RegularExpressions 4.3.0,
+    System.IdentityModel.Tokens.Jwt 5.6.0.
+  * `packages.config`: SharpZipLib 1.2.0, log4net 2.0.9, YamlDotNet 4.3.1.
+* 30 insecure snippets, inserted as new methods in existing classes together with the `using`s they need. Ten classes,
+  three textbook variants each, all taking their input from method parameters:
+  * BinaryFormatter deserialisation
+  * MD5/SHA1 for passwords or signatures
+  * DES/RC2
+  * SQL built by string concatenation
+  * Process.Start with concatenated input
+  * XML parsing with DTD processing or XmlUrlResolver
+  * `new Random()` for tokens or keys
+  * hard-coded password comparison
+  * a certificate validation callback that returns true
+  * Path.Combine with user input
+* 20 clones of existing 12–45-line methods (110–450 tokens), placed in other files: 7 exact copies, 7 with consistently
+  renamed identifiers (method, parameters, locals), 6 with 1–2 inserted statements.
+
+**Matching rule.** An item counts as detected if a finding of the same category lies in the same file and overlaps
+lines [start−2, end+2]. For dependencies, the finding must name the same package and version with any advisory, in any
+manifest. Two variants are also reported:
+* "strict" (clones only): the clone's partner occurrence must lie in the source method.
+* "any category": findings of other categories also count, e.g. a secret scanner flagging a hard-coded password.
+
+The noise floor is the number of findings of that category on the unmodified base.
+
+{{E2}}
+
+Per subtype:
+
+{{E2SUB}}
+
+Notes:
+* **Secrets.** Everyone finds the secrets in config files (10/10 for gitleaks, betterleaks, trufflehog, detect-secrets
+  and trivy). All the differences are in C# string literals (trivy 5/20, semgrep 4–6/20, detect-secrets 14/20).
+  Connection-string passwords depend most on the tool: gitleaks 4/4 and trufflehog 4/4, but betterleaks,
+  detect-secrets, trivy and semgrep 0/4.
+* **SAST.**
+  * semgrep `p/csharp` catches BinaryFormatter 3/3, SQL concatenation 3/3 (taint from `string` parameters) and DES/RC2
+    2/3. Its default ignore list costs it the 2 hits that are in `tests/`.
+  * CodeQL found only DES (`cs/weak-encryption`). Its default suites have no query for BinaryFormatter (the
+    `cs/unsafe-deserialization` query is low-precision and excluded), and its taint queries (SQL, command and path
+    injection) need remote-flow sources, which method parameters are not. The `csharp-security-extended` suite
+    returned the same 2 alerts.
+  * Outside the sast category, CodeQL's quality query `cs/path-combine` hit all 3 Path.Combine seeds, and
+    detect-secrets' keyword plugin hit 2/3 hard-coded passwords (both counted under "any category").
+* **Duplication.** All four detectors find exact copies. Inserted statements only break the 100-token windows, and
+  renamed identifiers defeat every detector (0/7). Each clone run also raises 8–42 extra unmatched occurrences, because
+  CPD reports the same seeded region against several similar originals.
+
+## 5. E3 — normalisation, deduplication, overlap, capture–recapture
+
+`experiments/tools/normalise.py` converts every native report to one schema:
+`{tool, rule_id, category, cwe, severity, file, start_line, end_line, message, fingerprint}`, plus package, version
+and advisories for dependency findings and the clone group for duplication findings.
+
+Category mapping:
+
+| source | category |
+|---|---|
+| secret scanners | secret |
+| trivy | by result class: vuln → dependency, secret → secret, misconfig → sast |
+| semgrep `p/secrets` and rules with `.secrets.` in the id | secret |
+| other semgrep rules | sast |
+| CodeQL alerts tagged `security` | sast |
+| other CodeQL alerts | style |
+| CPD, jscpd | duplication (one finding per occurrence) |
+| lizard functions with CCN>15 | complexity |
+| scorecard "Warn" details that name a file | sast (supply-chain) |
+
+Severity uses CVSS/security-severity bands where available, otherwise the SARIF level (error → high, warning → medium,
+note → low). Secrets are always high.
+
+Deduplication (`analyze.py`) runs union-find over findings of the same category in the same file whose line ranges
+overlap with ±2 lines of tolerance. Dependency findings cluster on (package, version, any shared advisory id or alias).
+One representative per tool family is used: semgrep `p/default` incl. tests for sast, and `p/secrets` incl. tests for
+secrets.
+
+Base tree:
+
+{{E3BASE}}
+
+Seeded tree (real + seeded findings):
+
+{{E3SEEDED}}
+
+**Checking capture–recapture against the seeded truth** (only clusters that match a seeded item, so the true N is
+known):
+
+{{E2CR}}
+
+How to read this:
+* Lincoln–Petersen and Chapman assume the two tools detect independently. When two tools share a blind spot, their
+  overlap m is larger than independence predicts and both estimators underestimate N, often with confidence intervals
+  that exclude the truth. Shared blind spots here: connection-string passwords for betterleaks, detect-secrets, trivy
+  and semgrep; type-2 clones for all clone detectors; most SAST classes for semgrep and CodeQL.
+* The estimator is only informative for pairs of tools that work differently. Even then it estimates what this family
+  of techniques can see, not what remains undetected.
+* On the real tree most pairs have m = 0, so the estimates are degenerate: Chapman reduces to (n1+1)(n2+1)−1.
+* The ±2-line clustering also merges adjacent secrets (the AWS id/secret pair, consecutive config keys), so cluster
+  counts are lower than item counts.
+
+**Complexity agreement.** {{COMPLEXITY}}
+
+## 6. E4 — cost
+
+{{E4TIMING}}. KLOC denominator: {{KLOC}}. CodeQL is a single run (database creation + analysis). scc counts are
+metrics, not findings, and syft produces an SBOM with no findings.
+
+{{E4}}
+
+## 7. E5 — real-vulnerability ground truth
+
+**Advisories.** `experiments/tools/e5_real_vulns.py` writes the ground truth to
+`out/tools/e5/vuln_ground_truth.json`. OSV lists 15 advisories for the MessagePack NuGet packages: 13 package names were
+queried, and MessagePack, MessagePack.ImmutableCollection, .ReactiveProperty, .UnityShims and .Unity have entries.
+
+**Fixing commits.**
+* GHSA-7q36 and GHSA-qhrr: taken from the OSV references.
+* The 13 advisories fixed in 3.1.7/2.5.301 have no commit references in OSV. They were attributed to the per-CWE
+  commits merged in PR #2274 (for example "Reject invalid DateTime ext lengths for CWE-789" and "Use iteration for
+  skipping msgpack structures for CWE-674"). Each advisory's attribution and the evidence for it are stored in the
+  ground truth.
+
+**Vulnerable snapshots.** All the 2026 per-CWE commits share the parent 06ea2495, which is therefore the last
+vulnerable v3 code. The other snapshots are 14aabf68 (before 3.1.9), 9be35840 (before 3.0.214-rc.1) and 7e5558fd
+(before 2.1.90). The four snapshots were exported with `git archive` into `corpus/tools/e5/`.
+
+**Vulnerable lines.** The lines each fix changed in product `.cs` files under `src/` (tests excluded), in the parent
+commit's coordinates. A pure insertion is anchored at its insertion point.
+
+**Scan and matching.** Each snapshot was scanned with gitleaks, betterleaks, trufflehog, detect-secrets, trivy, semgrep
+`p/csharp`, `p/default`, `p/security-audit` and `p/secrets` (all incl. tests), CodeQL security-and-quality, lizard,
+CPD-100 and jscpd-100. A hit is any finding in a vulnerable file within ±5 lines of a vulnerable line. "Expected by
+chance" is a Monte-Carlo estimate of the hits we would get if each advisory's line pattern were moved to a random
+offset in a random product C# file of the same snapshot. It calibrates the overlap rule for tools that report densely.
+
+{{E5}}
+
+* **Security rules: 0/15 (Wilson 95% CI 0–20%).** Every CWE in the advisories has 0 hits: 674 (×4), 407 (×3),
+  770 (×3), 1188 (×2), 409 (×2), 470 (×2), 502 (×2), 121, 125, 1325, 190, 20, 328 and 789. These are resource-exhaustion
+  and protocol-parsing defects (recursion depth, hash flooding, attacker-controlled lengths) for which the catalog has
+  no rules. The semgrep and CodeQL C# rules target injection, crypto API misuse and deserialisation gadgets in
+  application code.
+* Quality signals overlap vulnerable code at about the chance rate: lizard 5 hits vs 2.6 expected, CodeQL quality
+  4 vs 3.5, CPD-100 2 vs 2.9. There is no evidence that they localise these vulnerabilities beyond the fact that
+  complex code is everywhere.
+* **Dependency ground truth** (`out/tools/e5/e5_dependency_ground_truth.json`): {{DEPGT}}
+
+## 8. Caveats
+
+* Seeded recall depends on the seeding design: textbook snippets with parameter inputs, one item per file, random fake
+  secrets in common formats. Real defects are less canonical, and E5 shows how much less. Sample sizes are small
+  (3 per SAST class, 3–4 per secret format), hence the wide Wilson intervals.
+* Each language used a single carrier style for secrets: all config-file secrets were in new files, and all C#
+  secrets were `const` fields.
+* The "expected detectors" in the ground truth are expectations from rule documentation, written before the runs; they
+  are not used for scoring.
+* Matching by line overlap can credit an unrelated finding near a seed. Per-category matching, the strict variant for
+  clones and the reported noise floor reduce that risk. The ±5 window in E5 is deliberately generous and is calibrated
+  with the chance model.
+* We attributed the 3.1.7 advisories to commits ourselves, using the CWEs named in the commit subjects. GHSA-382j lists
+  9 CWEs but its text describes the DateTime stackalloc issue; it was mapped to that commit plus the CWE-190 commit.
+* Wall-clock numbers come from a shared, loaded machine (another agent was building .NET). Medians of 3 reduce that
+  noise but do not remove it. Peak RSS is the largest single process (`/usr/bin/time -l`), not the sum over a process
+  tree.
+* CodeQL ran through a non-standard arm64 shim and in build-mode none (no compilation), which lowers precision for
+  type-dependent queries. Scorecard ran without a token (local checks only). SonarQube was not run.
+* osv-scanner, trivy and grype results depend on their advisory databases as of 2026-11-14.
+
+## 9. Reproduce
+
+```bash
+# from the lab repo root
+brew install gitleaks betterleaks trufflehog osv-scanner trivy syft grype semgrep pmd scc scorecard
+brew install --cask codeql
+python3 -m venv corpus/tools/venv && corpus/tools/venv/bin/pip install detect-secrets
+(mkdir -p corpus/tools/npm && cd corpus/tools/npm && npm init -y && npm install jscpd@4)
+for p in csharp security-audit secrets default; do curl -sL -o corpus/tools/semgrep-rules/p-$p.yml https://semgrep.dev/c/p/$p; done
+TRIVY_CACHE_DIR=corpus/tools/cache/trivy trivy fs --download-db-only
+GRYPE_DB_CACHE_DIR=corpus/tools/cache/grype grype db update
+experiments/tools/codeql_arm64.sh setup
+# trees (repeat for each branch)
+git -C corpus/messagepack-csharp archive origin/HEAD | tar -x -C corpus/tools/refs/base
+.venv/bin/python experiments/tools/seed_defects.py --base corpus/tools/refs/base --out corpus/tools/seeded \
+    --truth out/tools/seeded/ground_truth.json --values corpus/tools/seeded-secret-values.json --verify-osv
+# E1/E2 runs (per ref)
+python3 experiments/tools/run_tools.py --target corpus/tools/refs/base --out out/tools/base
+python3 experiments/tools/run_tools.py --target corpus/tools/seeded --out out/tools/seeded \
+    --redact-values corpus/tools/seeded-secret-values.json --tools <default list>,cpd-100-ignore-ids
+experiments/tools/codeql_arm64.sh analyze corpus/tools/refs/base corpus/tools/codeql-db/base out/tools/base
+# E5
+python3 experiments/tools/e5_real_vulns.py prepare    # then run_tools.py + codeql_arm64.sh on corpus/tools/e5/<sha>
+# analysis
+experiments/tools/normalise_all.sh
+.venv/bin/python experiments/tools/analyze.py
+python3 experiments/tools/e5_real_vulns.py evaluate && python3 experiments/tools/e5_real_vulns.py deps
+python3 experiments/tools/bench.py --reps 3
+python3 experiments/tools/summarize.py && python3 experiments/tools/render_report.py
+```
+
+Do not commit `corpus/` (the seeded tree and the side file of fake secret values). The native reports under
+`out/tools/seeded/` have been scrubbed of every seeded value.

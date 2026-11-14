@@ -200,6 +200,7 @@ def recall_report(seeded: list[dict], base: list[dict], truth: dict, seeded_runs
                 continue
             tf = [f for f in seeded if f["tool"] == tool]
             det, det_any, det_strict, by_sub = [], [], [], defaultdict(lambda: [0, 0])
+            by_carrier = defaultdict(lambda: [0, 0])
             for it in cat_items:
                 hit = hit_any = hit_strict = False
                 for k, f in enumerate(tf):
@@ -227,6 +228,9 @@ def recall_report(seeded: list[dict], base: list[dict], truth: dict, seeded_runs
                 det_strict.append(hit_strict)
                 by_sub[it["subtype"]][0] += hit
                 by_sub[it["subtype"]][1] += 1
+                carrier = it.get("carrier") or ("tests" if it["file"].startswith("tests/") else "non-tests")
+                by_carrier[carrier][0] += hit
+                by_carrier[carrier][1] += 1
                 rep["items"].setdefault(it["id"], {"category": cat, "subtype": it["subtype"], "detected_by": []})
                 if hit:
                     rep["items"][it["id"]]["detected_by"].append(tool)
@@ -239,6 +243,7 @@ def recall_report(seeded: list[dict], base: list[dict], truth: dict, seeded_runs
                 "detected_strict": sum(det_strict), "recall_strict": round(sum(det_strict) / n, 4) if n else None,
                 "detected_any_category": sum(det_any),
                 "by_subtype": {s: {"detected": v[0], "seeded": v[1], "recall": round(v[0] / v[1], 3)} for s, v in sorted(by_sub.items())},
+                "by_carrier": {s: {"detected": v[0], "seeded": v[1]} for s, v in sorted(by_carrier.items())},
                 "noise_floor_base_findings": noise,
                 "unmatched_new_findings_on_seeded": sum(new_extra.values()),
             }
@@ -257,7 +262,7 @@ def seeded_capture_recapture(seeded: list[dict], truth: dict) -> dict:
     out = {}
     for cat in ("secret", "sast", "duplication"):
         items = [i for i in truth["items"] if i["category"] == cat]
-        tools = [t for t in OVERLAP_TOOLS[cat]]
+        tools = {"sast": ["semgrep-csharp-all", "semgrep-default-all", "codeql"]}.get(cat, OVERLAP_TOOLS[cat])
         caught = {t: set() for t in tools}
         for it in items:
             for f in seeded:

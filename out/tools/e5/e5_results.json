@@ -43,14 +43,14 @@
       "expected_hits_by_chance": 0.0
     },
     "codeql-all": {
-      "hit": 2,
+      "hit": 4,
       "n": 15,
-      "recall": 0.1333,
+      "recall": 0.2667,
       "wilson95": [
-        0.0374,
-        0.3788
+        0.109,
+        0.5195
       ],
-      "expected_hits_by_chance": 2.21
+      "expected_hits_by_chance": 3.42
     },
     "trivy-misconfig": {
       "hit": 0,
@@ -123,14 +123,14 @@
       "expected_hits_by_chance": 0.0
     },
     "lizard": {
-      "hit": 4,
+      "hit": 5,
       "n": 15,
-      "recall": 0.2667,
+      "recall": 0.3333,
       "wilson95": [
-        0.109,
-        0.5195
+        0.1518,
+        0.5829
       ],
-      "expected_hits_by_chance": 2.42
+      "expected_hits_by_chance": 2.6
     },
     "cpd-100": {
       "hit": 2,
@@ -140,7 +140,7 @@
         0.0374,
         0.3788
       ],
-      "expected_hits_by_chance": 2.8
+      "expected_hits_by_chance": 2.92
     },
     "jscpd-100": {
       "hit": 2,
@@ -150,27 +150,29 @@
         0.0374,
         0.3788
       ],
-      "expected_hits_by_chance": 2.37
+      "expected_hits_by_chance": 2.61
     },
     "codeql-style": {
-      "hit": 2,
+      "hit": 4,
       "n": 15,
-      "recall": 0.1333,
+      "recall": 0.2667,
       "wilson95": [
-        0.0374,
-        0.3788
+        0.109,
+        0.5195
       ],
-      "expected_hits_by_chance": 2.26
+      "expected_hits_by_chance": 3.5
     }
   },
   "union_security_tools_incl_codeql_quality": {
-    "hit": 2,
+    "hit": 4,
     "n": 15,
     "wilson95": [
-      0.0374,
-      0.3788
+      0.109,
+      0.5195
     ],
     "ids": [
+      "GHSA-4qm4-8hg2-g2xm",
+      "GHSA-7q36-4xx7-xcxf",
       "GHSA-cj9g-3mj2-g8vv",
       "GHSA-hv8m-jj95-wg3x"
     ]
@@ -185,13 +187,14 @@
     "ids": []
   },
   "union_quality_signals": {
-    "hit": 4,
+    "hit": 5,
     "n": 15,
     "wilson95": [
-      0.109,
-      0.5195
+      0.1518,
+      0.5829
     ],
     "ids": [
+      "GHSA-4qm4-8hg2-g2xm",
       "GHSA-7q36-4xx7-xcxf",
       "GHSA-cj9g-3mj2-g8vv",
       "GHSA-hv8m-jj95-wg3x",
@@ -313,7 +316,19 @@
         "src/MessagePack/MessagePackSecurity.cs"
       ],
       "n_vulnerable_lines": 135,
-      "hits": {}
+      "hits": {
+        "lizard": [
+          "CCN>15@src/MessagePack/MessagePackSecurity.cs:146"
+        ],
+        "codeql-all": [
+          "cs/equality-on-floats@src/MessagePack/MessagePackSecurity.cs:328",
+          "cs/equality-on-floats@src/MessagePack/MessagePackSecurity.cs:351"
+        ],
+        "codeql-style": [
+          "cs/equality-on-floats@src/MessagePack/MessagePackSecurity.cs:328",
+          "cs/equality-on-floats@src/MessagePack/MessagePackSecurity.cs:351"
+        ]
+      }
     },
     {
       "id": "GHSA-7q36-4xx7-xcxf",
@@ -453,6 +468,22 @@
           "CCN>15@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:181",
           "CCN>15@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:268",
           "CCN>15@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Resolvers/DynamicObjectResolver.cs:849"
+        ],
+        "codeql-all": [
+          "cs/complex-block@src/MessagePack.GeneratorCore/Generator/UnionTemplate.cs:45",
+          "cs/local-not-disposed@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:378",
+          "cs/local-not-disposed@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:389",
+          "cs/linq/missed-where@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Resolvers/DynamicObjectResolver.cs:1029",
+          "cs/useless-cast-to-self@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/CollectionFormatter.cs:162",
+          "cs/catch-of-all-exceptions@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:114"
+        ],
+        "codeql-style": [
+          "cs/complex-block@src/MessagePack.GeneratorCore/Generator/UnionTemplate.cs:45",
+          "cs/local-not-disposed@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:378",
+          "cs/local-not-disposed@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:389",
+          "cs/linq/missed-where@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Resolvers/DynamicObjectResolver.cs:1029",
+          "cs/useless-cast-to-self@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/CollectionFormatter.cs:162",
+          "cs/catch-of-all-exceptions@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:114"
         ]
       }
     },
@@ -625,7 +656,5 @@
       "hits": {}
     }
   ],
-  "snapshots_missing_findings": [
-    "9be35840"
-  ]
+  "snapshots_missing_findings": []
 }

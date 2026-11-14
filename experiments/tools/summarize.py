@@ -126,7 +126,8 @@ def e4(kl: dict) -> dict:
                           "findings_seeded": sum(1 for f in seeded_fs if f["tool"] == "codeql"), "ok": cq["ok"],
                           "breakdown": {k: v for k, v in cq.items() if k in ("create", "analyze")}}
     return {"kloc_denominator": round(kloc, 3), "kloc_definition": "C# code lines (scc) of the base tree / 1000",
-            "timing": "median of 3 sequential repetitions on an otherwise idle machine" if bench else "single run",
+            "timing": ("median of 3 sequential repetitions (machine shared with another lab agent; load average "
+                       "4.7-8.4 during the benchmark)") if bench else "single run",
             "rows": rows}
 
 
@@ -149,9 +150,11 @@ def main():
             {"tool": "OpenSSF Scorecard (full)", "reason": "Ran in --local mode only (11 of 18 checks). The API-based checks "
              "(Code-Review, Maintained, Branch-Protection, CI-Tests, Contributors, Signed-Releases, CII-Best-Practices, "
              "Webhooks) need a GitHub token; the user's token was deliberately not used."},
-            {"tool": "osv-scanner (coverage)", "reason": "Runs, but exits 128 'no package sources found' on the real tree: it does "
-             "not read Directory.Packages.props or .csproj PackageReference (only lockfiles, packages.config, deps.json). "
-             "Counted as no coverage, not as zero findings."},
+            {"tool": "osv-scanner (coverage)", "reason": "Runs (with --no-ignore; without it, it honours the enclosing lab "
+             "repo's .gitignore and exits 128 'no package sources found'). It parses Directory.Packages.props but extracts 0 "
+             "packages (no central-package-management support) and skips PackageReference items without a version, so on "
+             "the real tree it only sees the Unity packages.config (no advisories): effectively no coverage of the real "
+             "dependencies. Counted as no coverage, not as zero findings."},
             {"tool": "trufflehog verification", "reason": "Run with --no-verification on purpose (verification would send "
              "discovered credentials to third-party APIs)."},
             {"tool": "CodeQL (standard setup)", "reason": "The bundled C# extractor is x86-64-only and Rosetta 2 is not installed "

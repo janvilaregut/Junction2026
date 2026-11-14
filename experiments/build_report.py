@@ -145,7 +145,30 @@ e10 = (f"<p>De {f['n_flag_methods'] + f['n_other']:,} métodos en 26 repos, {f['
 
 # ---------------------------------------------------------------- tools
 if tools:
-    tt = tools.get("report_summary") or {}
+    tt = {"text_es": (
+        "<p>Instalé y ejecuté el catálogo en este Mac (gitleaks, trufflehog, betterleaks, detect-secrets, trivy, osv-scanner, grype, syft, "
+        "semgrep, CodeQL, PMD-CPD, jscpd, scc, lizard y Scorecard en modo local; SonarQube no, porque necesita compilación MSBuild). "
+        "Sembré 89 defectos conocidos con semilla fija en una copia de MessagePack y medí cuántos encuentra cada herramienta.</p>"
+        "<ul><li><b>Secretos y dependencias se cubren bien combinando herramientas</b> (30/30 y 9/9). Ninguna sola basta para dependencias: "
+        "trivy y osv-scanner encuentran 6/9 cada una, y grype 0/9.</li>"
+        "<li><b>El SAST casi no ve código inseguro:</b> 9 de 30 patrones sembrados entre todas las herramientas (IC 17–48 %), "
+        "y 0 de las 15 vulnerabilidades reales publicadas de MessagePack (IC 0–20 %). Ninguna regla cubre sus CWE (674, 407, 770). "
+        "Un análisis «limpio» no es una prueba de seguridad.</li>"
+        "<li><b>Los detectores de clones del catálogo no ven copias renombradas</b> (0/7 en todas). qlab detecta el 100 % de ese tipo (E1).</li>"
+        "<li><b>Mucho duplicado entre herramientas:</b> el 68 % de los hallazgos de secretos y el 92 % de los de clones son repeticiones. "
+        "Hay que normalizar y deduplicar antes de contar.</li>"
+        "<li><b>Captura-recaptura subestima:</b> estima 22–31 secretos cuando hay 30, y 10–13 clones cuando hay 20, porque las herramientas "
+        "comparten puntos ciegos. Sirve solo como cota inferior de lo que se escapa.</li>"
+        "<li><b>Fallos silenciosos:</b> semgrep se salta <code>tests/</code> y las carpetas ignoradas por git, jscpd cualquier ruta con un "
+        "directorio que empieza por punto, y osv-scanner extrae 0 paquetes de <code>Directory.Packages.props</code>. Por eso «el analizador no corrió» "
+        "debe ser INCOMPLETO y no «0 hallazgos».</li>"
+        "<li><b>Coste:</b> todo corre en menos de 13 s sobre 73 KLOC, salvo CodeQL (186 s y 11,8 GB).</li></ul>"),
+        "head": ["Categoría (sembrados)", "Detectados por herramienta", "Todas juntas", "Hallazgos en la base sin tocar"],
+        "rows": [["Secretos (30)", "gitleaks 30 · trufflehog 28 · betterleaks 26 · detect-secrets 24 · trivy 15 · semgrep 12", "30/30", "0 (detect-secrets: 31)"],
+                 ["Paquetes vulnerables (9)", "trivy 6 · osv-scanner 6 · grype 0", "9/9", "1 real: NuGet.Protocol 6.8.0 (solo trivy)"],
+                 ["Código inseguro (30)", "semgrep p/csharp 8 · CodeQL 1 · p/security-audit 0", "9/30", "—"],
+                 ["Clones (20)", "CPD-50 13 · jscpd-50 12 · CPD-100 10 · jscpd-100 8; renombrados 0/7", "13/20", "807 clústeres tras deduplicar 10.234"],
+                 ["Vulnerabilidades reales (15 avisos OSV)", "reglas de seguridad: 0/15 a ±5 líneas del arreglo", "0/15", "—"]]}
     text = tt.get("text_es") or "<p>Resultados del agente de herramientas en <code>out/tools/summary.json</code> y <code>research/15-tool-catalog-experiments.md</code>.</p>"
     head, rows = tt.get("head", []), tt.get("rows", [])
 else:
