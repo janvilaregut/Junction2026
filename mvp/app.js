@@ -661,7 +661,9 @@ function focusPoint() {
   const now = performance.now();
   if (G.fp && now - G.fpT < 250) return G.fp;
   const bar = $('fbar').getBoundingClientRect().top || innerHeight - 100;
-  G.fp = [innerWidth / 2, (90 + bar) / 2]; G.fpT = now;
+  // With the code view open (codeview.js) the free area is what the panel leaves on the left.
+  const cv = $('full').classList.contains('coding') && innerWidth >= 900 ? $('full').querySelector('.cview')?.offsetWidth || 0 : 0;
+  G.fp = [cv ? (innerWidth - cv - 24) / 2 : innerWidth / 2, (90 + bar) / 2]; G.fpT = now;
   return G.fp;
 }
 

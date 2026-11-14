@@ -23,6 +23,7 @@ import { session, models } from './agents.js';
 import { analyze as mathAnalyze } from './math/index.js';
 import { marksOf, setMark } from './math/marks.js';
 import { reviewNode, savedReview } from './math/nodereview.js';
+import { attention as attentionOf } from './math/attention.js';
 
 const PORT = Number(process.env.PORT || 4173);
 const UI = path.join(ROOT, 'mvp');
@@ -218,6 +219,10 @@ async function api(req, res, url) {
         const pr = await findPullRequest(project, body.pr);
         const m = await mathAnalyze(project, pr);
         return send(res, 200, { marks: setMark(project.id, m.head, String(body.node || ''), body.state, String(body.by || '').slice(0, 80)) });
+      }
+      if (seg[3] === 'attention') { // which chunks of a node (or of a file's changed functions) a person should read
+        const pr = await findPullRequest(project, url.searchParams.get('pr'));
+        return send(res, 200, await attentionOf(project, pr, String(url.searchParams.get('node') || ''), { force: url.searchParams.get('force') === '1' }));
       }
       if (seg[3] === 'review') { // one node, reviewed by agents: rebuilt blind from the requirement and compared
         const body = method === 'POST' ? await readBody(req) : { pr: url.searchParams.get('pr'), node: url.searchParams.get('node') };

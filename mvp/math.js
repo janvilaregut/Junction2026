@@ -2,7 +2,7 @@
    Every changed function is a node. Its SIZE is what depends on it; its COLOUR is what can be claimed about
    the change without running anything: proved (it cannot change behaviour), cleared (nothing flagged, not a
    proof), uncertain, risky. Grey nodes are unchanged neighbours: the code that uses, or is used by, the change.
-   A click opens the node's evidence; "Review this spot" sends just that function to the agents (review.js),
+   A click opens the node's code by attention (codeview.js); "Review with agents" sends just that function to the agents (review.js),
    and the node turns green when they reproduce it. Mathematics first, agents only where it cannot decide.
    Uses app.js globals: $, esc, api, base, short, S, G, PAL, focusOn, focusPoint, renderBar, renderGraph,
    openReview, zoomGraph, startLoop, alive. */
@@ -132,7 +132,7 @@ function showNodeCard(n, proof) {
     <div class="nt"><span>${esc(d.qname || d.name)}</span><em class="fchip" style="background:${ctx ? 'var(--card3)' : PAL[VTONE[v]]};${ctx ? 'color:var(--fg2)' : ''}">${VWORD[v]}</em></div>
     ${ncProof ? '' : `<p class="ncl">${mark && MARK_WORD[mark.state] ? `<b>${esc(MARK_WORD[mark.state])}.</b> ` : ''}${esc(mark?.note || d.claim)}</p>`}
     ${ncProof ? proofView(d, v) : rows || sens ? `<div class="nrows">${rows}${sens}</div>` : ''}
-    ${ctx ? '' : `<div class="nb">${prove}${code ? `<button class="cta${open ? '' : ' ghost'}" id="nReview">${byAgents ? 'See the agents\' review' : open ? 'Review this spot' : 'Review anyway'}</button>` : ''}${open ? '<button class="cta ghost" id="nRead">I read it</button>' : mark?.state === 'read' ? '<button class="cta ghost" id="nUnread">Undo</button>' : ''}</div>`}`;
+    ${ctx ? '' : `<div class="nb">${prove}${code ? `<button class="cta${open ? '' : ' ghost'}" id="nReview">${byAgents ? 'See the agents\' review' : 'Review with agents'}</button>` : ''}${open ? '<button class="cta ghost" id="nRead">I read it</button>' : mark?.state === 'read' ? '<button class="cta ghost" id="nUnread">Undo</button>' : ''}</div>`}`;
   if ($('nProve')) $('nProve').onclick = () => { ncProof = !ncProof; showNodeCard(n); };
   if ($('nReview')) $('nReview').onclick = () => openReview({ node: n });
   if ($('nRead')) $('nRead').onclick = () => markNode(d.id, 'read');
@@ -142,8 +142,10 @@ function showNodeCard(n, proof) {
 }
 addEventListener('resize', () => { if (ncId) placeNodeCard(); });
 
-/* A click on a node of the mathematical graph: fly to it and open its evidence. */
+/* A click on a node of the mathematical graph: fly to it and open its code, by attention (codeview.js);
+   the evidence card when there is no code to read (docs, config, removed, unchanged neighbours). */
 function mathTap(n) {
+  if (S.math && typeof showCode === 'function' && (n.m || n.kind === 'file') && showCode(n)) return true;
   if (!S.math || !n.m) return false;
   focusOn([n.id], { noTip: true });
   S.fixTarget = n.kind === 'sym' ? n : null;
@@ -183,7 +185,7 @@ function mathBar() {
   const full = so ? 'View sign-off' : b ? 'Review & sign' : 'Full review';
   const todo = reviewable(open);
   if (BUSY.size || BUSY.total) return `<span class="spin"></span><span class="txt live" style="color:var(--fg)">Agents rebuild ${BUSY.total - BUSY.done > 1 ? `${BUSY.total - BUSY.done} spots` : 'the last spot'} blind</span><span class="txt">${BUSY.done} / ${BUSY.total}</span><button class="cta" disabled>Reviewing…</button>`;
-  const cta = target ? `${['reproduced', 'differs', 'unclear'].includes(S.marks?.[target.id]?.state) ? 'See the review' : 'Review this spot'} <small class="spot">${esc(short(target.name, 18))}</small>` : todo.length ? `Review all <small class="spot">${todo.length} ${todo.length === 1 ? 'spot' : 'spots'}</small>` : open.length ? `Next <small class="spot">${open.length} left for you</small>` : full;
+  const cta = target ? `${['reproduced', 'differs', 'unclear'].includes(S.marks?.[target.id]?.state) ? 'See the review' : 'Review with agents'} <small class="spot">${esc(short(target.name, 18))}</small>` : todo.length ? `Review all <small class="spot">${todo.length} ${todo.length === 1 ? 'spot' : 'spots'}</small>` : open.length ? `Next <small class="spot">${open.length} left for you</small>` : full;
   return `<span class="num">${need}<small> / ${total}</small></span><span class="txt">${need === 1 ? 'line needs' : 'lines need'} a look</span><span class="chip ${lv[0]}" style="background:${PAL[lv[0]]}">${lv[1]}</span>`
     + (target || open.length ? `<button class="cta ghost" id="bFull">${full}</button>` : '') + `<button class="cta" id="bReview">${cta}</button>`;
 }

@@ -454,3 +454,46 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 @keyframes busy{50%{opacity:.35}}
 @media (prefers-reduced-motion:reduce){.nd.busy>g{animation:none;opacity:.6}}
 .fvcap{font:400 11px/1.3 var(--body);color:var(--fg3);margin-right:auto}
+
+/* ── Code view (codeview.js): the code of a node, by attention. Heat is warm, distinct from the verdict colours ── */
+:root{--heat:#ffb37a}
+.cview{position:absolute;right:24px;top:84px;bottom:112px;z-index:4;width:min(640px,calc(52vw));display:flex;flex-direction:column;border-radius:22px;background:var(--card);border:1px solid var(--line2);box-shadow:0 24px 70px rgba(0,0,0,.55);opacity:0;transform:translateX(16px);pointer-events:none;transition:opacity .25s ease,transform .25s ease}
+.cview.on{opacity:1;transform:none;pointer-events:auto}
+#full.infix .cview,#full.indebate .cview{opacity:0;pointer-events:none}
+.cview .chd{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.cview .nk{font:500 11px var(--mono);color:var(--fg3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cview .nt{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:6px}
+.cview .nt span{font:600 16px/1.25 var(--head);overflow-wrap:anywhere}
+.cview .nt em{font-style:normal;flex:0 0 auto}
+.cview .ncl{margin-top:8px;font-size:12.5px;line-height:1.45;color:var(--fg2)}.cview .ncl b{color:var(--fg);font-weight:500}
+.cview .cbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+.cview .cnum{font-size:12px;color:var(--fg2);display:flex;align-items:center;gap:6px;flex-wrap:wrap}.cview .cnum b{color:var(--fg);font-weight:600}
+.hk{display:inline-block;width:8px;height:8px;border-radius:2px;margin-left:6px;background:var(--heat)}.hk.h2{opacity:.4}
+.cview .cbody{flex:1;overflow:auto;overscroll-behavior:contain;padding:10px 12px 14px}
+.cview .cs+.cs{margin-top:14px}
+.cview .csec{display:flex;align-items:center;gap:6px;margin:4px 4px 6px}
+.cview .csec button{font:600 13px var(--head);color:var(--fg)}.cview .csec button:hover{text-decoration:underline}
+.cview .csec small{font:400 11px var(--mono);color:var(--fg3)}.cview .csec i{width:7px;height:7px;border-radius:50%;margin-left:auto}
+.cv-chunk{position:relative;margin:4px 0;padding:6px 0 6px;border-radius:10px;border-left:3px solid transparent;font:400 11.5px/1.55 var(--mono)}
+.cv-chunk.h3{border-left-color:var(--heat);background:linear-gradient(90deg,rgba(255,179,122,.09),transparent 70%)}
+.cv-chunk.h2{border-left-color:rgba(255,179,122,.4);background:rgba(255,255,255,.015)}
+.cv-chunk.h1{opacity:.55}
+.cv-head{display:flex;gap:8px;align-items:baseline;padding:0 10px 3px 12px;font:500 10.5px var(--body);color:var(--fg3)}
+.cv-chunk.h3 .cv-head span{color:var(--heat)}.cv-chunk.h2 .cv-head span{color:var(--fg2)}
+.cv-head em{font-style:normal;color:var(--fg3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cv-line{display:grid;grid-template-columns:38px 12px 1fr;align-items:baseline;padding-right:10px}
+.cv-line i{font-style:normal;text-align:right;color:var(--fg3);padding-right:8px;user-select:none}
+.cv-line b{color:var(--ok);font-weight:500;user-select:none}
+.cv-line code{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--fg2);font:inherit}
+.cv-chunk.h3 .cv-line code{color:var(--fg)}
+.cv-line.add{background:rgba(191,227,208,.05)}
+.cv-fold{display:flex;align-items:center;gap:8px;width:100%;margin:4px 0;padding:6px 12px;border-radius:10px;border:1px dashed var(--line2);font:500 11.5px var(--mono);color:var(--fg3);text-align:left}
+.cv-fold:hover{color:var(--fg2);border-color:var(--fg3)}.cv-fold small{margin-left:auto;font-size:10.5px}
+.cview .cft{padding:12px 16px 14px;border-top:1px solid var(--line)}
+.cview .csrc{display:block;font:400 10.5px var(--mono);color:var(--fg3);margin-bottom:10px;cursor:help}.cview .csrc.off{color:var(--warn)}
+.cview .nb{display:flex;gap:8px;flex-wrap:wrap}.cview .nb .cta{flex:1;padding:11px 14px;font-size:13px}
+.cview .cempty{padding:18px 8px;font-size:13px;color:var(--fg2)}
+.cload{display:flex;align-items:center;gap:6px;padding:18px 8px;font-size:12.5px;color:var(--fg2)}
+.cload i{width:7px;height:7px;border-radius:50%;background:var(--heat);animation:pulse 1.2s ease-in-out infinite}.cload i:nth-child(2){animation-delay:.2s}.cload i:nth-child(3){animation-delay:.4s}.cload span{margin-left:6px}
+@media (max-width:900px){.cview{left:16px;right:16px;width:auto;top:auto;height:56vh;bottom:108px}}
+@media (prefers-reduced-motion:reduce){.cview{transition:none}.cload i{animation:none}}
