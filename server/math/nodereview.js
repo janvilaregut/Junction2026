@@ -21,6 +21,7 @@ const { similarity } = await import('./clones.js').catch(() => ({ similarity: ()
 const { proveEquivalent } = await import('./proof.js').catch(() => ({ proveEquivalent: () => null }));
 import { nodeSource, analyze } from './index.js';
 import { setMark } from './marks.js';
+import { PrivacyGateway } from '../privacy.js';
 
 const STRATEGIES = [
   { id: 'A1', name: 'To the letter', temperature: 0.2, brief: 'Implement exactly what the requirement states for this function, sentence by sentence. Nothing it does not ask for.' },
@@ -106,6 +107,29 @@ async function secondOpinion(ctx, built, fetcher = fetch) {
   return rec;
 }
 
+/**
+ * Local Gemma, right before the agents (MVP, conceptual): it scans the text the agents will see, swaps what looks
+ * sensitive for KATSE_PRIVATE_n aliases, and the agents' answers are mapped back. Short budget; if Gemma is slow
+ * or down the review goes on with the regex rules alone and says so in `privacy.status`.
+ */
+async function gemmaPass(ctx, generate) {
+  if (generate.rebuild !== rebuild || process.env.KATSE_NODE_GEMMA === 'off') return { status: 'off' }; // tests inject fakes
+  const gw = new PrivacyGateway({ mode: 'strict', maxMs: Number(process.env.KATSE_NODE_GEMMA_MS) || 15000, terms: (process.env.KATSE_PRIVATE_TERMS || '').split(',').map((s) => s.trim()).filter(Boolean) });
+  const parts = [ctx.requirement.text, ctx.blind.slice(0, 14000), (ctx.base || '').slice(0, 6000), ctx.head.slice(0, 7000)];
+  let status = 'scanned';
+  try { await gw.prepare(parts.join('\n\n')); } catch { status = 'rules-only'; }
+  const swap = (s) => (typeof s === 'string' ? gw.replace(s) : s);
+  ctx.requirement = { ...ctx.requirement, text: swap(ctx.requirement.text) };
+  for (const k of ['blind', 'base', 'head', 'signature']) ctx[k] = swap(ctx[k]);
+  const { rebuild: r0, judge: j0, secondOpinion: s0 } = generate, alias = (built) => built.map((b) => ({ ...b, code: swap(b.code) }));
+  generate.rebuild = async (...a) => gw.restore(await r0(...a));
+  generate.judge = async (c, built, model) => gw.restore(await j0(c, alias(built), model));
+  generate.secondOpinion = (c, built) => s0(c, alias(built));
+  const snap = gw.snapshot();
+  console.log(`[gemma] node ${ctx.name}: ${status}, ${snap.scannedChunks} chunks, ${snap.replacements} replaced, ${snap.ms} ms`);
+  return { status, model: snap.model, chunks: snap.scannedChunks, replaced: snap.replacements, ms: snap.ms, loadMs: snap.loadMs, blockedBy: snap.blockedBy || null };
+}
+
 const storeFile = (projectId, head, id) => path.join(DATA, 'math', projectId, `review-${head.slice(0, 12)}-${sha256(id).slice(0, 12)}.json`);
 export const savedReview = (projectId, head, id) => readJSON(storeFile(projectId, head, id), null);
 
@@ -128,6 +152,7 @@ export async function reviewNode(project, pr, id, { force = false, generate = { 
   const signature = stripComments(src.fileHead.split('\n').slice(src.node.start - 1, sigEnd).join('\n'), src.lang).replace(/\{\s*$/, '').trim() || src.node.name;
   const ctx = { name: src.node.qname, file: src.node.file, lang: src.lang, requirement, signature, base: src.base, head: src.head, neighbours: src.neighbours, blind: stripComments(blind(src.fileHead, src.node.file, changed, key), src.lang).replace(/\n{3,}/g, '\n\n') };
   const fast = modelId(models().fast), review = modelId(process.env.KATSE_NODE_JUDGE || models().fast);
+  const privacy = await gemmaPass(ctx, generate);
 
   const agents = await Promise.all(STRATEGIES.map(async (s) => {
     const a = { id: s.id, strategy: s.name, model: fast, ok: false };
@@ -182,6 +207,7 @@ export async function reviewNode(project, pr, id, { force = false, generate = { 
       result.fix = { from: from.id, code: from.code, diff: lineDiff(src.head, from.code).slice(0, 24) };
     }
   }
+  result.privacy = privacy;
   result.ms = Date.now() - t0;
   result.head = m.head;
   try { writeJSON(storeFile(project.id, m.head, id), result); } catch { /* a convenience */ }
