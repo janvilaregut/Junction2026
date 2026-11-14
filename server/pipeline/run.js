@@ -13,6 +13,7 @@ import { runMutation, runRewind, changeGroups } from './mutation.js';
 import { availableAgents, buildPrompt, runReplica, preflight } from './replicas.js';
 import { withKinds, compareRegions } from './compare.js';
 import { judge } from './judge.js';
+import { resolveProfile } from '../profiles.js';
 import { route } from './lanes.js';
 
 const sec = (ms) => `${Math.round(ms / 1000)} s`;
@@ -31,7 +32,8 @@ export function normalizeOptions(o = {}, agentsAvailable = []) {
   agents = agents.filter((id) => agentsAvailable.some((a) => a.id === id)).slice(0, 5);
   return {
     mode, agents, agentsPicked,
-    budgetMs: Math.max(1000, Math.min(900000, Number(o.budgetMs) || 900000)),
+    ...resolveProfile(o), profile: resolveProfile(o).id,
+    resumeRunId: typeof o.resumeRunId === 'string' && /^[\w.-]+$/.test(o.resumeRunId) ? o.resumeRunId : null,
     controls: !!o.controls,
     providers: o.providers || {}, concurrency: { models: 2, runners: 1 },
     mutants: Number.isFinite(+o.mutants) ? Math.max(0, Math.min(12, +o.mutants)) : 4,

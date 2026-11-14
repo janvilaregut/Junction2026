@@ -15,6 +15,7 @@ import { areaStates, areasOf, metrics, record, entries, K_EARN } from './ledger.
 import { markdown, trailers, answer } from './report.js';
 import { savePrompt } from './requirements.js';
 import { verifyIntegrity } from './integrity.js';
+import { resolveProfile } from './profiles.js';
 import { session, models } from './agents.js';
 
 const PORT = Number(process.env.PORT || 4173);
@@ -32,23 +33,24 @@ const readBody = (req) => new Promise((resolve, reject) => {
 });
 
 /** What a verification will and will not do for this PR, computed without running anything. */
-async function planFor(project, pr, mode) {
+async function planFor(project, pr, mode, profileId = 'standard') {
   const it = await intake(project, pr);
   const agents = await availableAgents();
   const tests = addedTestNames(it.files.filter((f) => f.kind === 'test'));
   const derived = it.files.filter((f) => f.kind === 'derived').length;
   const src = it.files.filter((f) => f.kind === 'source').length;
   const full = mode === 'completo';
+  const profile = resolveProfile({ profile: profileId });
   const budget = replicaBudget(it.files);
   const will = [
     `Mezclar ${pr.branch} sobre ${project.base} en una copia aislada (tu repo no se toca)`,
     it.toolchain.kind !== 'none' ? `Compilar y pasar los tests afectados (${it.toolchain.describe})` : null,
     tests.length ? `Comprobar que los ${tests.length} tests nuevos fallan sin el cambio y pasan con él` : null,
     derived ? `Analizar ${derived} ficheros derivados: cambio repetido y anomalías` : null,
-    src && it.toolchain.kind !== 'none' ? 'Sembrar defectos en las líneas cambiadas y ver si algún test los detecta' : null,
-    src && it.toolchain.kind !== 'none' ? 'Rebobinar: quitar cada cambio de código de uno en uno y ver si algún test lo nota' : null,
-    full ? 'Reconstruir el contrato con Hydrogen y Carbon; explorar de dos a cuatro alternativas con Gemini y Nemotron desde la base' : null,
-    full ? 'Atacar, defender y ejecutar tests compartidos; tres misiones finales, checkpoints de Entire y veredicto en un máximo de 15 minutos' : null,
+    src && it.toolchain.kind !== 'none' && (!full || profile.id === 'deep') ? 'Sembrar defectos en las líneas cambiadas y ver si algún test los detecta' : null,
+    src && it.toolchain.kind !== 'none' && (!full || profile.id === 'deep') ? 'Rebobinar: quitar cada cambio de código de uno en uno y ver si algún test lo nota' : null,
+    full ? `Contrato con fuentes; hasta ${profile.initialCandidates} alternativas independientes desde la base` : null,
+    full ? `Mesa de pruebas, checkpoints de Entire y juicio con evidencia. Límite: ${profile.budgetMs/1000}s y ${profile.tokenBudget.toLocaleString()} tokens presupuestados; resultados pendientes si no alcanza` : null,
   ].filter(Boolean);
   const text = `${it.requirement?.title || ''}\n${it.requirement?.body || ''}`;
   const wont = [];
@@ -141,7 +143,7 @@ async function api(req, res, url) {
     }
     if (sub === 'plan') {
       const pr = await findPullRequest(project, url.searchParams.get('pr'));
-      return send(res, 200, await planFor(project, pr, url.searchParams.get('mode') || 'rapido'));
+      return send(res, 200, await planFor(project, pr, url.searchParams.get('mode') || 'rapido', url.searchParams.get('profile') || 'standard'));
     }
     if (sub === 'verify' && method === 'POST') {
       const body = await readBody(req);
@@ -182,6 +184,16 @@ async function api(req, res, url) {
       if (!action) {
         const r = await checkedRun(project, runId);
         return send(res, 200, { ...r, signed: r.signoff && r.brief && r.signatureValid !== false ? signedView(r.brief, r.signoff) : null });
+      }
+      if (action === 'continue' && method === 'POST') {
+        const previous = await checkedRun(project, runId);
+        if (previous.status !== 'done' || !previous.brief?.contract || !verifyIntegrity(previous.brief, path.join(previous.dir,'artifacts')).ok) throw new Error('La revisión anterior no tiene evidencia íntegra para continuar');
+        const body = await readBody(req);
+        const input = previous.brief.input;
+        const pr = previous.prId.startsWith('ref:') ? { id:previous.prId,ref:input.proposedRef,branch:input.proposedRef,title:previous.branch,direction:'incoming' } : await findPullRequest(project, previous.prId);
+        if(input.requirement?.id==='user-input') pr.requirementText=input.requirement.body;
+        const next = await startRun({ ...project, base:input.targetRef }, pr, { mode:'completo', profile:body.profile || 'deep', resumeRunId:runId });
+        return send(res,200,{runId:next.id,options:next.options});
       }
       if (action === 'events') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });

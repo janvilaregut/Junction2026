@@ -146,6 +146,12 @@ test('scenario adapter quotes inputs and rejects unsupported harness modes', () 
   assert.throws(() => materializeScenario({ test: { kind: 'shell', source: 'anything' } }, 'x'), /schema/);
 });
 
+test('model scenario cannot overwrite orchestrator identity or risk provenance', () => {
+  const a = materializeScenario({ id: 'forged', attacker: 'someone-else', riskKey: 'new-risk', originCandidate: 'C99', test: { kind: 'analyzer', source: 'class A {}' } }, 'A-2');
+  for (const key of ['id', 'attacker', 'riskKey', 'originCandidate']) assert.equal(a[key], undefined);
+  assert.deepEqual(a.names, ['KatseA2']);
+});
+
 test('one invalid harness preserves other completed attacks without turning invalid input into a bug', () => {
   const r = { status: 'harness-incompatible', executionComplete: true, tests: [
     { name: 'KatseDiagnostic', outcome: 'Passed' },

@@ -4,7 +4,7 @@ import { run, ROOT, sha256, writeJSON } from '../util.js';
 import { out } from '../git.js';
 import { models, session } from '../agents.js';
 
-export const contractHash = c => sha256(JSON.stringify({ version: c.version, expectations: c.expectations, sources: c.sources }));
+export const contractHash = c => sha256(JSON.stringify({ version: c.version, expectations: c.expectations, sources: c.sources, ...(c.version >= 2 ? { ambiguities: c.ambiguities } : {}) }));
 
 export function validateContract(value, sources) {
   if (!Array.isArray(value.expectations) || !value.expectations.length) throw new Error('Contract requires expectations');
@@ -12,9 +12,10 @@ export function validateContract(value, sources) {
     const refs = (e.sources || []).filter(r => sources.some(s => s.id === r.id && typeof r.quote === 'string' && r.quote.length >= 8 && s.text.includes(r.quote)));
     return { id: `E${i + 1}`, behavior: String(e.behavior || ''), critical: e.critical !== false,
       status: refs.length && e.status === 'documented' ? 'documented' : refs.length && e.status === 'inferred' ? 'inferred' : 'pending', sources: refs,
+      existingTests: Array.isArray(e.existingTests) ? e.existingTests.filter(n=>typeof n==='string') : [],
       testIdeas: Array.isArray(e.testIdeas) ? e.testIdeas : [], symbols: Array.isArray(e.symbols) ? e.symbols : [] };
   });
-  const c = { version: 1, expectations, sources, ambiguities: value.ambiguities || [] };
+  const c = { version: 2, expectations, sources, ambiguities: value.ambiguities || [] };
   c.hash = contractHash(c); return c;
 }
 
@@ -42,12 +43,12 @@ export async function reconstructContract(it, dir, artifacts, emit) {
     } catch {}
   }
   for (const c of it.provenance.checkpoints || []) for (const p of c.prompts || []) sources.push({ id: `prompt-${sources.length}`, kind: 'user-prompt', uri: `entire:${c.checkpoint}:${p.line}`, text: p.text });
-  const prompt = `Reconstruct a testable contract using ONLY the supplied sources BEFORE the proposed patch. NO tools; all context is supplied below. Never infer that the author's implementation is correct. Max 5 expectations. Each expectation must cite an exact source substring with id and quote (at least 8 characters). Distinguish documented behavior, inferred preservation behavior and pending ambiguities. Preserve diagnostics unrelated to the requested fix. Return JSON {"expectations":[{"behavior":"...","critical":true,"status":"documented|inferred|pending","sources":[{"id":"...","quote":"exact excerpt"}],"testIdeas":["..."],"symbols":["..."]}],"ambiguities":[]}. Do not edit files. Sources:\n${JSON.stringify(sources).slice(0, 65000)}`;
-  const analyst = await session({ dir, artifacts, role: 'contract', model: models().fast, prompt, validate: x => Array.isArray(x.expectations) });
+  const prompt = `Reconstruct a testable contract using ONLY the supplied sources BEFORE the proposed patch. NO tools; all context is supplied below. Never infer that the author's implementation is correct. Max 4 expectations. Critical means necessary for this specific requested fix; mark speculative surrounding behavior noncritical. Keep preservation as ONE expectation backed by prior tests. Include existingTests:[exact method names] only where a test source quote contains the method name. Each behavior max180 characters and exact quote max180 characters. Each expectation must cite an exact source substring with id and quote (at least 8 characters). Distinguish documented behavior, inferred preservation behavior and pending ambiguities. ambiguities contains ONLY unresolved expected behavior that would change approval; uncertainty about the root-cause line or choice of implementation is NOT a requirement ambiguity. Preserve diagnostics unrelated to the requested fix. Return JSON {"expectations":[{"behavior":"...","critical":true,"status":"documented|inferred|pending","sources":[{"id":"...","quote":"exact excerpt"}],"existingTests":[],"testIdeas":["..."],"symbols":["..."]}],"ambiguities":[]}. Do not edit files. Sources:\n${JSON.stringify(sources).slice(0, 65000)}`;
+  const analyst = await session({ dir, artifacts, role: 'contract', model: models().fast, prompt, noTools:true, maxOutputTokens:2500, timeout:45000, validate: x => Array.isArray(x.expectations) });
   let contract = validateContract(analyst.result, sources);
-  const review = await session({ dir, artifacts, role: 'contract-review', model: models().review, prompt: `Review the contract against the cited sources below, NO tools. Correct overclaims or mark ambiguity pending. Same JSON schema. Max5 expectations. Do not edit files.\n${JSON.stringify(contract).slice(0, 65000)}`, validate: x => Array.isArray(x.expectations) });
-  contract = validateContract(review.result, sources); contract.sessions = [analyst.id, review.id];
-  contract.sessionRecords = [analyst, review].map(({ result, ...r }) => r);
+  contract.sessions = [analyst.id];
+  contract.sessionRecords = [analyst].map(({result,...r})=>r);
+  contract.semanticReview = 'Sources checked literally; Carbon reviews contract and evidence at final judgment';
   writeJSON(path.join(artifacts, 'contract.json'), contract); emit({ type: 'contract', hash: contract.hash, expectations: contract.expectations }); return contract;
 }
 
