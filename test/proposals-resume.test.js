@@ -155,3 +155,17 @@ test('candidate deduplication is stable for reversed completion order and leaves
     assert.equal(list.find(c=>c.id==='C1').status,'pending');assert.equal(list.find(c=>c.id==='C11').status,'built');
   }
 });
+
+test('a proposal may create a file the change needs, but never overwrite or escape the allowed paths', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'katse-test-new'));
+  fs.mkdirSync(path.join(dir, 'src/A'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'src/A/Old.cs'), 'class Old { }\n');
+  const allowed = ['src/A/Old.cs', 'src/A/New.cs', 'src/B/Deep.cs'];
+  assert.deepEqual(applyProposal(dir, [{ path: 'src/B/Deep.cs', old: '', new: 'class Deep { }\n' }], allowed), ['src/B/Deep.cs']);
+  assert.equal(fs.readFileSync(path.join(dir, 'src/B/Deep.cs'), 'utf8'), 'class Deep { }\n');
+  assert.throws(() => applyProposal(dir, [{ path: 'src/A/Old.cs', old: '', new: 'class Gone { }' }], allowed), /proposal-content/);
+  assert.throws(() => applyProposal(dir, [{ path: 'src/A/New.cs', old: 'x', new: 'class New { }' }], allowed), /proposal-new-file/);
+  assert.throws(() => applyProposal(dir, [{ path: 'src/C/Other.cs', old: '', new: 'class Other { }' }], allowed), /proposal-path/);
+  assert.equal(fs.readFileSync(path.join(dir, 'src/A/Old.cs'), 'utf8'), 'class Old { }\n');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

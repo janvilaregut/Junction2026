@@ -123,6 +123,32 @@ function projectsModal(first) {
 }
 $('proj').onclick = () => projectsModal(false);
 
+/* ── Settings: which models the review may call (saved on the server) ── */
+const MODELS = [
+  ['hydrogen', 'Gemini Hydrogen', 'Fast model: reads the ticket, rebuilds the change, writes the attacks.'],
+  ['carbon', 'Gemini Carbon', 'The judge: audits the contract and the evidence.'],
+  ['nemotron', 'Nemotron · NVIDIA', 'A second model family for diversity, served by Verda. Off: Hydrogen takes its place and the report says so.'],
+];
+async function settingsModal() {
+  modal('<h2>Settings</h2><p class="lead">Loading…</p>');
+  let st;
+  try { st = await api('/settings'); } catch (e) { $('mbody').innerHTML = `<h2>Settings</h2><div class="err">${esc(e.message)}</div>`; return; }
+  const paint = () => {
+    $('mbody').innerHTML = `<h2>Settings</h2><p class="lead">Models the review may call. Changes apply to the next verification.</p>
+      <div class="sets">${MODELS.map(([id, n, d]) => {
+        const lastGemini = id !== 'nemotron' && st.models[id] && !st.models[id === 'hydrogen' ? 'carbon' : 'hydrogen'];
+        const nokey = id === 'nemotron' ? !st.keys.verda : !st.keys.gemini;
+        return `<label class="set${lastGemini ? ' locked' : ''}"><span><b>${esc(n)}</b><small>${esc(d)}${nokey ? ' · <em>no API key set</em>' : ''}${lastGemini ? ' · <em>the last Gemini model stays on</em>' : ''}</small></span><input type="checkbox" class="sw" data-m="${id}" ${st.models[id] ? 'checked' : ''} ${lastGemini ? 'disabled' : ''}></label>`;
+      }).join('')}</div><div class="err" id="serr2"></div>`;
+    $('mbody').querySelectorAll('[data-m]').forEach((x) => (x.onchange = async () => {
+      try { st = await api('/settings', { method: 'PATCH', body: { models: { [x.dataset.m]: x.checked } } }); paint(); }
+      catch (e) { x.checked = !x.checked; $('serr2').textContent = e.message; }
+    }));
+  };
+  paint();
+}
+$('gear').onclick = settingsModal;
+
 /* ── Home: left = history, centre = you, right = merges still to come ── */
 function renderTree() {
   const svg = $('tree'); svg.innerHTML = '';

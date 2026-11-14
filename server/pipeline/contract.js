@@ -22,7 +22,7 @@ export function validateContract(value, sources) {
 export async function analyzeSymbols(it, dir, artifacts) {
   const files = (await out(it.repo, ['ls-tree', '-r', '--name-only', it.mergeBase])).split('\n')
     .filter(p => p.endsWith('.cs') && /^(src|tests)\//.test(p) && !/generated|\.g\.cs|TestData|Resources/i.test(p)).slice(0, 1500);
-  const changes = it.files.filter(f => f.kind === 'source' && f.path.endsWith('.cs')).map(f => ({ file: f.path, lines: f.hunks.flatMap(h => Array.from({ length: Math.max(h.oldLines, 1) }, (_, i) => h.oldStart + i)) }));
+  const changes = it.files.filter(f => f.kind === 'source' && f.path.endsWith('.cs') && f.status !== 'added').map(f => ({ file: f.path, lines: f.hunks.flatMap(h => Array.from({ length: Math.max(h.oldLines, 1) }, (_, i) => h.oldStart + i)) }));
   const manifest = path.join(artifacts, 'roslyn-input.json'); writeJSON(manifest, { root: dir, files, changes });
   const dll = path.join(ROOT, 'tools/Katse.Analyze/bin/Release/net8.0/Katse.Analyze.dll');
   const build = await run('dotnet', ['build', path.join(ROOT, 'tools/Katse.Analyze/Katse.Analyze.csproj'), '-c', 'Release', '-v', 'q'], { timeout: 60_000 });

@@ -8,6 +8,7 @@ import { within, initialPopulation, priority, execution, TokenBudget } from '../
 import { resolveProfile } from '../profiles.js';
 import { loadContinuation } from './resume.js';
 import { applyProposal, deduplicateCandidates } from './proposals.js';
+import { getSettings } from '../settings.js';
 import { sourceBlocks } from './source-context.js';
 import { intentInput, semanticPrompt, normalizeIntent, intentPending } from './intent.js';
 import { artifactManifest } from '../integrity.js';
@@ -67,13 +68,13 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       const context = JSON.stringify(blocks);
       const feedback = parent ? state.evidence.filter(e => e.version === parent.id).map(e => ({ status: e.status, failures: e.tests?.filter(t => t.outcome === 'Failed'), log: e.log && fs.readFileSync(path.join(artifacts, e.log), 'utf8').slice(-7000) })) : [];
       let result = await session({ dir, artifacts, role: `build-${id}`, model, timeout: 75000, noTools: true, maxOutputTokens: 4096, maxInputTokens: 14000,
-        prompt: `Independently solve this contract from PRE-CHANGE source. The proposed patch is hidden. NO tools, commands or full file rewrites. Return at most 4 block replacements as JSON {"summary":"brief","decisions":["brief"],"unresolved":[],"edits":[{"block":"B1","new":"COMPLETE replacement for that block, including its unchanged context lines"}]}. Select only supplied block IDs. Copy unchanged lines within each edited block exactly. Do NOT include block labels in new. Do not invent or edit methods outside these blocks. Return the complete replacement block. Preserve indentation. Strategy: ${c.strategy}. For descendants edit the current parent source. Original requirement (independent of the proposed patch): ${state.requirementContext}\nContract: ${JSON.stringify(state.contract.expectations.map(({testIdeas,symbols,...e})=>e))}\nSource excerpts: ${context}\nParent feedback: ${JSON.stringify(feedback)}`, validate: x => typeof x.summary === 'string' && Array.isArray(x.edits) });
+        prompt: `Independently solve this contract from PRE-CHANGE source. The proposed patch is hidden. NO tools, commands or full file rewrites. Return at most 4 block replacements as JSON {"summary":"brief","decisions":["brief"],"unresolved":[],"edits":[{"block":"B1","new":"COMPLETE replacement for that block, including its unchanged context lines"}]}. Select only supplied block IDs. Copy unchanged lines within each edited block exactly. Do NOT include block labels in new. Do not invent or edit methods outside these blocks. Return the complete replacement block. Preserve indentation. Strategy: ${c.strategy}. For descendants edit the current parent source. Original requirement (independent of the proposed patch): ${state.requirementContext}\nContract: ${JSON.stringify(state.contract.expectations.map(({testIdeas,symbols,...e})=>e))}\nSource excerpts: ${context}\nParent feedback: ${JSON.stringify(feedback)}${state.newSourcePaths?.length ? `\nFiles that do not exist yet and the change may need to create: ${JSON.stringify(state.newSourcePaths)}. To create one, add an edit {"path":"<that path>","old":"","new":"complete file content"}.` : ''}`, validate: x => typeof x.summary === 'string' && Array.isArray(x.edits) });
       try { applyProposal(dir, result.result.edits, state.sourcePaths, blocks); }
       catch (error) {
         recordSession(result);
-        const diagnostics = result.result.edits.map(e=>({path:e.path,old:e.old,count:state.sourcePaths.includes(e.path) && typeof e.old==='string' ? fs.readFileSync(path.join(dir,e.path),'utf8').replaceAll('\r\n','\n').split(e.old.replaceAll('\r\n','\n')).length-1 : null}));
+        const diagnostics = result.result.edits.map(e=>({path:e.path,old:e.old,count:state.sourcePaths.includes(e.path) && typeof e.old==='string' && fs.existsSync(path.join(dir,e.path)) ? fs.readFileSync(path.join(dir,e.path),'utf8').replaceAll('\r\n','\n').split(e.old.replaceAll('\r\n','\n')).length-1 : null}));
         result = await session({dir,artifacts,role:`build-${id}-repair`,model,timeout:35000,noTools:true,maxOutputTokens:4096,maxInputTokens:18000,
-          prompt:`Your proposal was NOT applied: ${error.message}. One correction allowed. Return JSON {"summary":"...","decisions":[],"unresolved":[],"edits":[{"path":"src/...cs","old":"EXACT unique multiline substring","new":"replacement"}]}. No tools. Preserve whitespace. DO NOT join separate EXCERPTS. Include more unchanged context if count>1. Replace invented old substrings with actual source. Diagnostics:${JSON.stringify(diagnostics)}\nPrevious proposal:${JSON.stringify(result.result)}\nOriginal requirement:${state.requirementContext}\nActual source excerpts:${context}`,validate:x=>typeof x.summary==='string'&&Array.isArray(x.edits)});
+          prompt:`Your proposal was NOT applied: ${error.message}. One correction allowed. Return JSON {"summary":"...","decisions":[],"unresolved":[],"edits":[{"path":"src/...cs","old":"EXACT unique multiline substring","new":"replacement"}]}. No tools. Preserve whitespace. DO NOT join separate EXCERPTS. Include more unchanged context if count>1. Replace invented old substrings with actual source. ${state.newSourcePaths?.length ? `To create a file that does not exist yet (${JSON.stringify(state.newSourcePaths)}), use "old":"" and the complete content as "new". ` : ''}Diagnostics:${JSON.stringify(diagnostics)}\nPrevious proposal:${JSON.stringify(result.result)}\nOriginal requirement:${state.requirementContext}\nActual source excerpts:${context}`,validate:x=>typeof x.summary==='string'&&Array.isArray(x.edits)});
         applyProposal(dir,result.result.edits,state.sourcePaths,blocks);
       }
       c.application = 'Model proposed literal edits; local orchestrator applied and verified unique matches';
@@ -145,7 +146,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
 
   try {
     await within(generationEnd, async () => {
-      state.providers = await providerPreflight({allowPartial:true}); emit({ type: 'log', text: state.providers.errors?.length ? `Disponibilidad parcial: ${state.providers.errors.join('; ')}. Se conserva el alcance ejecutable y se registra cualquier sustitución de modelo.` : 'Proveedores y herramientas accesibles' }); save();
+      state.providers = await providerPreflight({allowPartial:true, nemotron: getSettings().models.nemotron}); emit({ type: 'log', text: state.providers.errors?.length ? `Disponibilidad parcial: ${state.providers.errors.join('; ')}. Se conserva el alcance ejecutable y se registra cualquier sustitución de modelo.` : 'Proveedores y herramientas accesibles' }); save();
       it = await intake(project, pr); state.input = { proposed: it.headSha, proposedRef: pr.ref, target: it.baseSha, targetRef: project.base, historicalBase: it.mergeBase, requirement: it.requirement };
       if(options.resumeRunId) { resume = loadContinuation(project.id, options.resumeRunId, state.input, artifacts); state.continuation = {runId:resume.runId,reuse:resume.reuse}; state.attacks = resume.state.attacks.filter(a=>a.status==='admitted' && !resume.state.verdict?.semantic?.invalidAttacks?.some(x=>x.id===a.id)); state.debate = resume.state.debate || []; }
       // Pin input refs even if the user's branches move while agents are working.
@@ -162,7 +163,10 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       state.reviewContext = ''; state.baseContext = ''; state.baseBlocks = []; state.testInventory = [];
       state.requirementContext = state.contract.sources.filter(s=>s.kind==='requirement').map(s=>s.text).join('\n').slice(0,12000);
       state.sourceChanges = it.files.filter(f=>f.kind==='source' && f.path.endsWith('.cs')).map(f=>({path:f.path,hunks:f.hunks}));
-      const sourceFiles = await Promise.all(state.sourceChanges.map(async f=>({...f,text:await out(it.repo,['show',`${it.mergeBase}:${f.path}`])})));
+      // A file the PR creates does not exist at the base: its base text is empty, and agents may create it.
+      const baseText = (p) => out(it.repo, ['show', `${it.mergeBase}:${p}`]).catch(() => null);
+      const sourceFiles = (await Promise.all(state.sourceChanges.map(async f => ({ ...f, text: await baseText(f.path) })))).map(f => ({ ...f, isNew: f.text === null, text: f.text ?? '' }));
+      state.newSourcePaths = sourceFiles.filter(f => f.isNew).map(f => f.path);
       state.baseBlocks = sourceBlocks(sourceFiles,state.requirementContext);
       state.baseContext = JSON.stringify(state.baseBlocks);
       state.harness = String(pr.branch).includes('2283') && it.toolchain.testProjects.some(p => p.endsWith('MessagePack.SourceGenerator.Tests.csproj')) ? [{ path: harnessPath, content: harnessContent }] : [];
@@ -171,8 +175,8 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       fs.writeFileSync(path.join(artifacts, 'original-change.patch'), state.proposedPatch);
       state.intentContext = intentInput(state.contract, state.proposedPatch, state.input);
       state.suiteOverlay = [];
-      for (const f of it.files.filter(f => f.kind === 'test' || f.kind === 'source')) {
-        const text = await out(it.repo, ['show', `${it.headSha}:${f.path}`]);
+      for (const f of it.files.filter(f => (f.kind === 'test' || f.kind === 'source') && f.status !== 'deleted')) {
+        const text = await out(it.repo, ['show', `${it.headSha}:${f.path}`]).catch(() => '');
         if (f.kind === 'test') { state.suiteOverlay.push({ path: f.path, content: text }); state.testInventory.push(...[...text.matchAll(/public\s+(?:async\s+)?(?:Task|void)\s+(\w+)\s*\(/g)].map(m=>m[1])); }
         const lines = text.split('\n');
         if (!(state.harness.length && f.kind === 'test')) state.reviewContext += `\nFILE ${f.path}\n` + (f.kind === 'test' ? text.slice(-28000) : f.hunks.map(h => lines.slice(Math.max(0, h.newStart - 8), h.newStart + h.newLines + 8).join('\n')).join('\n')).slice(0, state.harness.length ? 9000 : 32000);
