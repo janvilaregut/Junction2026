@@ -6,12 +6,14 @@ import os from 'node:os';
 const environmentKey=()=>sha256(JSON.stringify([process.platform,process.arch,process.version,process.env.DOTNET_ROOT || '',(fs.existsSync(path.join(os.homedir(),'.dotnet','sdk'))?fs.readdirSync(path.join(os.homedir(),'.dotnet','sdk')).sort():[]),...['graph-review.js','pipeline/evidence.js','pipeline/node-probes.js','pipeline/toolchain.js','pipeline/messagepack-harness.js'].map(f=>sha256(fs.readFileSync(path.join(ROOT,'server',f))))]));
 import { attackOutcome } from './pipeline/evidence.js';
 export const eligible = n => n.status !== 'context' && n.verdict !== 'context' && n.status !== 'removed' && !['doc','config','generated','type','test'].includes(n.kind) && n.file?.endsWith('.cs');
+// A node's `name` is the label the graph draws, cut at 28 characters: the scope carries the full name (`qname`),
+// or a long function could never be matched to its behaviour group.
 export function graphScope(math, requested, requirement) {
   const pool = math.nodes.filter(eligible);
   const relevant = pool.filter(n => n.verdict !== 'proved');
   const ids = requested === 'all' ? relevant.map(n=>n.id) : requested === 'relevant' ? relevant.filter(n => ['risky','uncertain'].includes(n.verdict) || n.impact >= .6).map(n=>n.id) : requested;
   if (!Array.isArray(ids) || !ids.length || ids.length > 44 || ids.some(id=>!pool.some(n=>n.id===id))) throw new Error('Select an existing changed C# function to execute');
-  const nodes = pool.filter(n=>ids.includes(n.id)).map(n=>({id:n.id,file:n.file,symbol:n.name,status:n.status,start:n.start,end:n.end,impact:n.impact,priority:n.priority}));
+  const nodes = pool.filter(n=>ids.includes(n.id)).map(n=>({id:n.id,file:n.file,symbol:n.qname || n.name,status:n.status,start:n.start,end:n.end,impact:n.impact,priority:n.priority}));
   return {version:2,key:sha256(JSON.stringify([2, math.key, requirement, environmentKey()])),head:math.head,base:math.base,nodes,partial:math.partial,denominator:relevant.map(n=>({id:n.id,weight:1+4*Math.max(0,Math.min(1,n.impact || 0))})),meaning:'Share of changed executable scope supported by scoped checks, weighted by impact; not a bug-free probability'};
 }
 export function focusGroups(groups, scope) {

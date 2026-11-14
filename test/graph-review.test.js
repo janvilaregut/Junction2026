@@ -29,3 +29,9 @@ import {probeOutcome} from '../server/pipeline/node-probes.js';
 import {repairAccepted} from '../server/pipeline/repair.js';
 test('probe requires the same passing test to fail with its unique marker',()=>{const a={names:['Test']};const good=result('original');const bad=result('probe','Failed');bad.tests[0].error='KATSE_PROBE_abc';assert.equal(probeOutcome('KATSE_PROBE_abc',a,good,bad),true);assert.equal(probeOutcome('different',a,good,bad),false);assert.equal(probeOutcome('KATSE_PROBE_abc',a,bad,bad),false);});
 test('repair requires completed nonempty passing regression execution',()=>{assert.equal(repairAccepted({...result('repair'),failed:0}),true);assert.equal(repairAccepted({...result('repair'),failed:0,ran:0}),false);assert.equal(repairAccepted({...result('repair'),failed:1}),false);assert.equal(repairAccepted({...result('repair'),failed:0,executionComplete:false}),false);});
+test('a long function name, cut short on the graph, still maps to its behaviour group',()=>{
+  const long={...n,id:'t.cs::TransformUtilities.EmitNestingTypesAndNamespaces/2',file:'t.cs',name:'EmitNestingTypesAndNamespac…',qname:'TransformUtilities.EmitNestingTypesAndNamespaces'};
+  const s=graphScope({...math,nodes:[long]},[long.id],'requirement');
+  const groups=[{id:'G1',file:'t.cs',symbol:'TransformUtilities.EmitNestingTypesAndNamespaces(IndentedTextWriter, string)',risk:2,riskReason:'changed',start:1,end:5}];
+  assert.deepEqual(focusGroups(groups,s)[0].nodeIds,[long.id]);
+});
