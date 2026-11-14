@@ -43,6 +43,35 @@ node server/cli.js workspace/messagepack-csharp ju26-issue-2283 --completo
 
 `--completo` lanza las réplicas. Otras opciones: `--mutantes N`, `--agentes glm-5.3-flash,claude-sonnet`, `--base rama`.
 
+## Consenso multi-agente (Gemini)
+
+Una segunda forma de verificar, más rápida de montar: **varios agentes resuelven el mismo prompt a ciegas y debaten hasta ponerse de acuerdo**.
+
+1. **Resolver.** 5 variaciones de `gemini-4-carbon` (distinta temperatura, topP, topK y nivel de razonamiento) reciben el requisito: el prompt que escribas o, si no, los mensajes de commit. Cada una trabaja en su propia copia del repo con un pequeño arnés de herramientas (leer, buscar, editar, pasar tests). Un sexto agente defiende el PR real.
+2. **Comparar.** Mapa de calor zona a zona: en cada trozo del código, quién escribió lo mismo, quién algo distinto y quién lo dejó igual.
+3. **Debatir.** Por parejas, del grupo más grande al más pequeño y empezando por las parejas más distintas. Cada uno defiende su solución y señala fallos concretos de la otra. Quien convence al otro absorbe su grupo y pasa a la siguiente ronda. Si son equivalentes, se fusionan.
+4. **Veredicto.** `coincide` si el PR acaba en el grupo mayoritario, `difiere` si no (con los problemas concretos y la solución del consenso) y `dudoso` si hay empate o no hay mayoría.
+
+La clave va en `.env` (no se versiona):
+
+```bash
+echo 'GEMINI_API_KEY=tu-clave' > .env
+```
+
+Interfaz en vivo con burbujas: http://localhost:4173/consenso.html. Desde la terminal:
+
+```bash
+npm run consenso -- workspace/demo-consenso pr-con-fallo --base main
+```
+
+Antes de hacer push de tu rama (sale con código 1 si el consenso no la respalda):
+
+```bash
+node server/consensus/cli.js . "$(git branch --show-current)"
+```
+
+API: `POST /api/consenso {repo, branch, base?, prompt?, agents?}` → `{id}`; `GET /api/consenso/:id/events` (SSE). El código está en `server/consensus/`.
+
 ## Agentes para las réplicas
 
 Katse usa los CLIs de agentes que encuentre instalados y con sesión iniciada:

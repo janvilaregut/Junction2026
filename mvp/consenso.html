@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Katse · Consensus</title>
+<link rel="icon" type="image/svg+xml" href="brand/katse-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="consenso.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="./"><img src="brand/katse-logo.svg" alt="Katse"></a>
+  <span class="ctx">Consensus</span>
+  <span id="meta" class="meta mono"></span>
+</header>
+
+<main class="wrap">
+  <form id="form" class="ask" autocomplete="off">
+    <textarea id="prompt" rows="2" placeholder="Leave empty to use the commit messages" aria-label="Task the PR should solve"></textarea>
+    <div class="fields">
+      <label class="f-repo"><span>Repo</span><input id="repo" type="text" value="workspace/demo-consenso"></label>
+      <label><span>Branch</span><input id="branch" type="text" value="pr-con-fallo"></label>
+      <label><span>Base</span><input id="base" type="text" value="main"></label>
+      <label class="f-n"><span>Agents</span><input id="agents" type="number" min="2" max="9" value="5"></label>
+      <button id="go" class="primary" type="submit">Verify</button>
+    </div>
+  </form>
+
+  <nav id="runs" class="runs" hidden aria-label="Previous verifications"></nav>
+
+  <section class="stage" aria-label="Agent arena">
+    <ol id="steps" class="steps">
+      <li data-p="resolver">Solve</li>
+      <li data-p="comparar">Compare</li>
+      <li data-p="debatir">Debate</li>
+      <li data-p="veredicto">Verdict</li>
+    </ol>
+    <p id="phaseText" class="phase-text" aria-live="polite">Ready to verify.</p>
+    <div id="arena" class="arena">
+      <div id="link" class="link"></div>
+      <div id="hint" class="hint">
+        <img src="brand/katse-favicon.svg" alt="">
+        <p>Several agents solve the same task independently, without seeing the PR. Then they compare their solutions and debate until they agree. Finally, I compare that consensus with the PR.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="verdict" class="card verdict" hidden></section>
+  <section id="heat" class="card" hidden></section>
+
+  <details id="log" class="card log" hidden>
+    <summary>Debate <span id="logN" class="dim"></span></summary>
+    <ol id="logList" class="rounds"></ol>
+  </details>
+</main>
+
+<aside id="drawer" class="drawer" hidden aria-label="Agent solution">
+  <button id="drawerClose" class="close" aria-label="Close">×</button>
+  <div id="drawerBody"></div>
+</aside>
+
+<script src="consenso.js"></script>
+</body>
+</html>

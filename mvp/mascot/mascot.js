@@ -9,7 +9,6 @@ const app = () => (typeof S !== 'undefined' ? S : null); // S is a top-level con
 const call = (name, ...a) => (typeof window[name] === 'function' ? window[name](...a) : undefined);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const LANG = (navigator.language || 'en').toLowerCase().startsWith('es') ? 'es' : 'en';
 let sess = null; // the live Gemini session, if any
 
 /* ── DOM ─────────────────────────────────────────────────────────────── */
@@ -294,7 +293,7 @@ const TOOL_FN = {
     const s = app(); const p = s?.cur && view() !== 'home' ? s.cur : null;
     if (!p) return { error: 'Open a pull request first.' };
     const project = s.projects.find((x) => x.id === s.pid);
-    const r = await fetch('/api/consenso', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: project.path, branch: p.branch, base: s.base, lang: LANG }) });
+    const r = await fetch('/api/consenso', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: project.path, branch: p.branch, base: s.base, lang: 'en' }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return { error: j.error || `Server answered ${r.status}` };
     act('Consensus started'); showConsensus(j.id);

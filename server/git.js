@@ -71,7 +71,8 @@ export function parseDiff(text) {
     if (line.startsWith('deleted file mode')) { f.status = 'deleted'; continue; }
     if (line.startsWith('rename to ')) { f.status = 'renamed'; continue; }
     if (line.startsWith('Binary files')) { f.binary = true; continue; }
-    if (line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('index ')) continue;
+    // File headers only come before the first hunk; inside a hunk `--- x` is the removed line `-- x` (SQL/Lua comments).
+    if (!h && (line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('index '))) continue;
     const hm = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
     if (hm) {
       h = {

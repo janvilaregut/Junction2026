@@ -6,7 +6,8 @@
   "description": "Review by reproduction: verifies agent-written pull requests with executable evidence and routes what is left to a named human.",
   "scripts": {
     "start": "node server/index.js",
-    "review": "node server/cli.js"
+    "review": "node server/cli.js",
+    "consenso": "node server/consensus/cli.js"
   },
   "engines": { "node": ">=20" }
 }

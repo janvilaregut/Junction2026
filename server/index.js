@@ -15,6 +15,7 @@ import { areaStates, areasOf, metrics, record, entries, K_EARN } from './ledger.
 import { markdown, trailers, answer } from './report.js';
 import { savePrompt } from './requirements.js';
 import { liveToken } from './live.js';
+import { startConsensus, getConsensus, listConsensus, subscribeConsensus, isLive } from './consensus/run.js';
 
 const PORT = Number(process.env.PORT || 4173);
 const UI = path.join(ROOT, 'mvp');
@@ -98,6 +99,31 @@ async function api(req, res, url) {
   const method = req.method;
 
   if (seg[0] === 'live' && seg[1] === 'token' && method === 'POST') return send(res, 200, await liveToken());
+  // Consensus engine: Gemini variants solve blind, compare, debate in pairs.
+  if (seg[0] === 'consenso') {
+    if (!seg[1] && method === 'GET') return send(res, 200, listConsensus());
+    if (!seg[1] && method === 'POST') return send(res, 200, await startConsensus(await readBody(req)));
+    const c = getConsensus(seg[1]);
+    if (!c) return send(res, 404, { error: 'No such consensus run' });
+    if (!seg[2]) return send(res, 200, { ...c, events: undefined });
+    if (seg[2] === 'events') {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
+      const write = (e) => res.write(`data: ${JSON.stringify(e)}\n\n`);
+      for (const e of c.events || []) write(e);
+      if (!isLive(seg[1])) {
+        // Not running here. If it never reached done/error and no live process owns it (status 'interrupted'),
+        // end with a terminal event so the client closes instead of reconnecting and replaying forever.
+        // (A run still owned by another live process, e.g. the CLI, reports 'running': no terminal event.)
+        const ended = (c.events || []).some((e) => e.type === 'done' || e.type === 'error');
+        if (!ended && c.status !== 'running') write({ type: 'error', message: 'interrupted' });
+        return res.end();
+      }
+      const off = subscribeConsensus(seg[1], (e) => { write(e); if (e.type === 'done' || e.type === 'error') res.end(); });
+      const ping = setInterval(() => res.write(': ping\n\n'), 15000);
+      req.on('close', () => { off(); clearInterval(ping); });
+      return undefined;
+    }
+  }
   if (seg[0] === 'state' && method === 'GET') {
     return send(res, 200, { projects: listProjects(), agents: await availableAgents(), clis: await clis(), workspace: path.join(ROOT, 'workspace') });
   }
