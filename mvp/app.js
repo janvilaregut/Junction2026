@@ -334,8 +334,9 @@ function drawZoom(svg, f, mainY, W, H) {
   const T = (x, yy) => `${(x * ZK + tx).toFixed(1)} ${(yy * ZK + ty).toFixed(1)}`;
   const yBase = mainY * ZK + ty;
 
-  const list = Z.commits, n = list.length, lead = 92;
-  const sp = n > 1 ? Math.max(170, Math.min(250, (W - sx - lead - 140) / (n - 1))) : 0;
+  const list = Z.commits, n = list.length, avail = W - sx - 200; // a short branch still gets a long line
+  const lead = n > 1 ? 92 : Math.max(92, Math.round(avail * 0.55));
+  const sp = n > 1 ? Math.max(170, Math.min(330, (avail - lead) / (n - 1))) : 0;
   const X = (i) => sx + lead + sp * i;
   const headX = X(n - 1), M = 150, endX = headX + (cut ? 30 : M + 30);
   Z.maxPan = Math.max(0, Math.round(endX + 40 - W));

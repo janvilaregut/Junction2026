@@ -164,7 +164,8 @@ const TOOLS = [
   { name: 'start_consensus', description: 'Start a multi-agent consensus check on the current pull request (takes ~15 minutes). Ask the user to confirm first.', parameters: T() },
   { name: 'open_consensus', description: 'Open the raw technical consensus report page (heatmap, full arguments) for the current pull request. For the visual story of the agents use show_agent_debate instead.', parameters: T() },
   { name: 'show_commits', description: 'Unfold one branch in the tree so all its commits show on a long rail (the other branches fold away). Use when the user asks for the commits / history of a branch. query: id, branch, number, a word from its title, or empty for the one open or in focus.', parameters: T({ query: { type: 'STRING' } }) },
-  { name: 'show_all_branches', description: 'Fold the commits back and show every branch in the tree again.', parameters: T() },
+  { name: 'show_all_branches', description: 'Fold the commits back (or zoom back out) and show every branch in the tree again.', parameters: T() },
+  { name: 'zoom_branch', description: 'Zoom the home tree\'s camera into one branch: a close-up of where it starts and its first commits, big, on one glowing line (the user can then slide along it). Use when the user asks to zoom in on, enlarge or magnify a branch ("amplíame la rama", "acércate a esa rama"). query: id, branch, number, a word from its title, or empty for the one in focus.', parameters: T({ query: { type: 'STRING' } }) },
   { name: 'focus_graph', description: 'Inside the open pull request graph: fly the camera to a node or group and light it up while you talk about it. query: a file name, "Tests", "Builds", "Mutation", a line like "Foo.cs:120", an agent, or a group: "what I must read" (red), "decisions" (yellow), "reproduced" (green), "checks", "files", "agents", "whole" (the core). Call it EVERY time you start explaining a specific part of the graph.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
   { name: 'zoom_graph', description: 'Move the graph camera: "in" (closer), "out" (further), "overview" (back to the whole graph, clears the highlight).', parameters: T({ action: { type: 'STRING', enum: ['in', 'out', 'overview'] } }, ['action']) },
   { name: 'show_agent_debate', description: 'Dive into the animated story of the AI agents for the open pull request: bubbles that solve it blind, compare, argue round by round (they meet, merge when they agree, the convinced one takes the winner\'s colour) and reach a consensus. Use when the user asks how the agents are doing, how they debated, who convinced whom, or to see the agents. It plays by itself; returns the story so you can narrate it. Uses the REAL review run of the PR when it has one (alternatives from the base, their debate, the attacks on the PR and the judge); otherwise a sample (say so).', parameters: T() },
@@ -199,6 +200,7 @@ function view() {
   if (full && !full.hidden && call('debateOpen')) return 'debate';
   if (full && !full.hidden) return 'graph';
   if (app()?.focus) return 'commits';
+  if (app()?.zoom) return 'zoom';
   return 'home';
 }
 const inGraph = () => ['graph', 'review', 'debate', 'agent'].includes(view());
@@ -272,7 +274,7 @@ const TOOL_FN = {
   async get_screen() {
     const s = app(); const v = view(); const p = s?.cur && v !== 'home' ? s.cur : null;
     const project = s?.projects?.find((x) => x.id === s.pid);
-    const f = v === 'commits' ? s.focus : null;
+    const f = v === 'commits' ? s.focus : v === 'zoom' ? s.zoom : null;
     return {
       view: v, project: project?.name, base: s?.base, pullRequest: p ? prBrief(p, allPRs().findIndex((x) => x.id === p.id)) : null, verification: p ? briefOf(s.run?.brief, 'summary') : null, verifyingNow: !!s?.es,
       graphNodes: v === 'graph' ? graphSummary() : undefined,
@@ -300,7 +302,8 @@ const TOOL_FN = {
     if (inGraph() && s?.cur?.id === p.id) { call('closeDebate'); return { alreadyOpen: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)) }; }
     if (inGraph()) { call('closeGraph'); await sleep(780); }
     if (s?.focus && s.focus.id !== p.id) { call('hideCommits'); await sleep(900); }
-    if (!s?.focus) { call('highlightLanes', [p.id]); await sleep(420); call('highlightLanes', []); }
+    if (s?.zoom && s.zoom.id !== p.id) { call('hideCommits'); await sleep(1100); }
+    if (!s?.focus && !s?.zoom) { call('highlightLanes', [p.id]); await sleep(420); call('highlightLanes', []); }
     call('openGraph', p); // grows out of the branch's own dot in the tree
     act(`Opened ${p.branch}`);
     await waitFor(() => app()?.run?.brief || app()?.plan, 8000);
@@ -315,6 +318,15 @@ const TOOL_FN = {
     if (!r) return { error: 'Could not show the commits.' };
     act(`${r.total} commit${r.total === 1 ? '' : 's'} · ${p.branch}`);
     return { branch: p.branch, total: r.total, shown: r.commits.length, commits: r.commits.map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date })), tip: 'The newest commit is at the right end; open_pull_request opens the branch from there.' };
+  },
+  async zoom_branch({ query = '' } = {}) {
+    const s = app();
+    const p = query ? findPR(query) : allPRs().find((x) => x.id === (s?.zoom?.id || s?.focus?.id || s?.cur?.id));
+    if (!p) return { error: query ? `No pull request matches "${query}".` : 'Which branch? Give a name.', available: allPRs().map((x) => x.branch).slice(0, 20) };
+    const r = await call('zoomBranch', p.id);
+    if (!r) return { error: 'Could not zoom into that branch.' };
+    act(`Zoomed into ${p.branch}`);
+    return { branch: p.branch, total: r.total, shown: r.commits.length, firstCommits: r.commits.slice(0, 6).map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date })), tip: 'Oldest commit on the left, where the branch leaves the base; the newest (filled dot) opens the branch. The user can slide along with the wheel or by dragging. show_all_branches zooms back out.' };
   },
   async show_all_branches() { if (inGraph()) { call('closeGraph'); await sleep(780); } call('hideCommits'); act('All branches'); return { ok: true }; },
   async focus_graph({ query }) {
@@ -451,7 +463,7 @@ const TOOL_FN = {
 const SYSTEM = `You are the Katse goat: the voice assistant living in the corner of Katse, an app that verifies pull requests by REPRODUCING them instead of reading them (it merges, builds, runs tests red-before/green-after, seeds defects, rewinds each change, and has independent AI agents redo the change blind and debate), then leaves a named human only what could not be checked.
 How you talk: warm, quick, professional, a little playful. Spoken answers of 1-3 short sentences; no markdown, no lists, no reading ids or hashes aloud (say branch names naturally). Reply in the language the user speaks (Spanish if they speak Spanish).
 The idea you explain and show: Katse gives the same ticket to AI agents who rebuild the change from the base WITHOUT seeing the PR. Where their versions converge with the PR, that code is reproduced and can be trusted; where only the PR wrote code, that is what the human reads (red nodes in the graph). An attacker runs a test against every version and a judge scores the PR. So instead of reading line by line, you guide the user spot by spot.
-How to guide: a pull request always opens on its graph. To EXPLAIN or help understand code, stay in the graph: focus_graph and zoom_graph move the camera, where_to_look lights the spots to read, show_code gives a region's code. When the user asks to review, check or fix something, or whether something works, call open_review (with the spot if they named one): the agents' tree grows, they argue at each junction and it ends in the verdict card where the user signs; narrate it as it plays. If there is no review yet it starts a real one: ask for a yes first. For "what did C2 say", call ask_agent. For "look harder", confirm and call look_deeper. "Show me the commits of this branch" means show_commits. Never invent regions or results: they come from the tools.
+How to guide: a pull request always opens on its graph. To EXPLAIN or help understand code, stay in the graph: focus_graph and zoom_graph move the camera, where_to_look lights the spots to read, show_code gives a region's code. When the user asks to review, check or fix something, or whether something works, call open_review (with the spot if they named one): the agents' tree grows, they argue at each junction and it ends in the verdict card where the user signs; narrate it as it plays. If there is no review yet it starts a real one: ask for a yes first. For "what did C2 say", call ask_agent. For "look harder", confirm and call look_deeper. "Show me the commits of this branch" means show_commits; "zoom into / enlarge this branch" ("amplíame la rama") means zoom_branch. Never invent regions or results: they come from the tools.
 How you act: you can see and drive the screen ONLY through tools. Never invent pull requests, numbers or results: call a tool. If the user says "this", "here", "that one", call get_screen. When asked to show, list, open or go somewhere, do it with the tool right away, then say in a few words what you did. For "why is it good/bad", "what was tested and what wasn't", "how did the agents work", use get_verification_details and get_consensus and explain in plain words with concrete files, tests and arguments; be honest about what was NOT verified. Before anything slow (start_verification, start_consensus) ask for a yes. Use express now and then to react (happy for good news, surprised at a bug).`;
 
 async function start(textOnly = false) {
