@@ -1,4 +1,7 @@
 workspace/
 data/
 node_modules/
+.env.local
+tools/**/bin/
+tools/**/obj/
 .DS_Store

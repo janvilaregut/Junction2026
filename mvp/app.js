@@ -13,7 +13,7 @@ async function api(path, opts) {
   return data;
 }
 
-const S = { projects: [], agents: [], clis: {}, project: null, status: null, prs: { incoming: [], outgoing: [] }, side: 'incoming', cur: null, plan: null, run: null, mode: 'rapido', agents_sel: null, mutants: 4, es: null, stageEls: {} };
+const S = { projects: [], agents: [], clis: {}, project: null, status: null, prs: { incoming: [], outgoing: [] }, side: 'incoming', cur: null, plan: null, run: null, mode: localStorage.getItem('katse.mode') === 'completo' ? 'completo' : 'rapido', agents_sel: null, mutants: 4, es: null, stageEls: {} };
 const pid = () => S.project.id;
 const TONE = { ok: 't-ok', warn: 't-warn', no: 't-no', bad: 't-bad' };
 const CLAIM = { reproducido: ['ok', 'Reproducido'], parcial: ['warn', 'Parcial'], fallo: ['bad', 'Falla'], 'no-ejecutado': ['no', 'No ejecutado'] };
@@ -74,7 +74,8 @@ async function loadProject(id, keep) {
   const all = [...prs.incoming, ...prs.outgoing];
   const again = keep && S.cur && all.find((p) => p.id === S.cur.id);
   if (again) { S.cur = again; renderList(); return; }
-  const first = S.prs[S.side][0];
+  const remembered = localStorage.getItem('katse.pr.' + id);
+  const first = S.prs[S.side].find(p => p.id === remembered) || S.prs[S.side][0];
   if (first) selectPR(first); else { S.cur = null; $('panel').innerHTML = `<h3>Sin cambios pendientes</h3><p class="sub">No hay ramas por delante de <code>${h(prs.base)}</code>. Crea una rama o cambia la rama base en los ajustes.</p>`; $('chat').innerHTML = ''; chips([]); }
 }
 function renderEnv() {
@@ -104,6 +105,7 @@ function renderList() {
 }
 
 async function selectPR(pr) {
+  localStorage.setItem('katse.pr.' + pid(), pr.id);
   if (S.es) { S.es.close(); S.es = null; }
   Object.assign(S, { cur: pr, run: null, plan: null, signed: null });
   renderList();
@@ -130,13 +132,11 @@ async function loadPlan() {
 }
 function optionsHTML() {
   const full = S.mode === 'completo';
-  const sel = S.agents_sel || S.agents.slice(0, 3).map((a) => a.id);
-  return `<div class="seg"><button type="button" data-mode="rapido" class="${full ? '' : 'on'}">Rápida · sin agentes</button><button type="button" data-mode="completo" class="${full ? 'on' : ''}">Completa · con réplicas</button></div>
-  ${full ? (S.agents.length ? `<div class="agents">${S.agents.map((a) => `<label><input type="checkbox" value="${h(a.id)}" ${sel.includes(a.id) ? 'checked' : ''}>${h(a.label)}</label>`).join('')}</div><p class="sub" style="margin:6px 0 0">Cada agente rehace el cambio sin ver el PR. Varios modelos distintos evitan que compartan los mismos puntos ciegos. Tarda varios minutos.</p>` : '<p class="err">No hay ningún agente disponible. Instala opencode o inicia sesión con «claude auth login».</p>') : ''}
-  ${!S.clis.claude && S.clis.claudeInstalled && full ? '<p class="sub" style="margin:6px 0 0">Claude no aparece porque su sesión ha caducado: ejecuta <code>claude auth login</code>.</p>' : ''}`;
+  return `<div class="seg"><button type="button" data-mode="rapido" class="${full ? '' : 'on'}">Rápida · sin agentes</button><button type="button" data-mode="completo" class="${full ? 'on' : ''}">Completa · reconstrucción</button></div>
+  ${full ? '<p class="sub" style="margin:6px 0 0">Hydrogen reconstruye, Carbon revisa y Nemotron aporta alternativas y ataques. Máximo 15 minutos; el informe conserva lo ejecutado y lo pendiente.</p>' : ''}`;
 }
 function bindOptions(rerender) {
-  $('panel').querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; rerender(); }));
+  $('panel').querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; localStorage.setItem('katse.mode', S.mode); rerender(); }));
   $('panel').querySelectorAll('.agents input').forEach((c) => (c.onchange = () => { S.agents_sel = [...$('panel').querySelectorAll('.agents input:checked')].map((x) => x.value); }));
 }
 function renderPlan() {
@@ -195,6 +195,11 @@ function attach(runId) {
   es.onmessage = async (m) => {
     const e = JSON.parse(m.data);
     if (e.type === 'stage') stageLine(e);
+    else if (e.type === 'contract') stageLine({ id: 'contract', name: 'Contrato revisado', status: 'done', detail: `${e.expectations.length} expectativas · ${e.hash.slice(0, 10)}` });
+    else if (e.type === 'candidate') stageLine({ id: `candidate-${e.id}`, name: `Alternativa ${e.id}`, status: e.status === 'pending' ? 'start' : e.status === 'built' ? 'done' : 'skip', detail: e.status });
+    else if (e.type === 'attack') stageLine({ id: e.id, name: `Ataque ${e.id}`, status: e.status === 'admitted' ? 'done' : 'skip', detail: `${e.status} · ${e.mission}` });
+    else if (e.type === 'result') line(e.status === 'passed' ? 'done' : 'skip', '·', `${h(e.version)}: ${h(e.status)} · ${e.ran || 0} tests ejecutados`);
+    else if (e.type === 'judgment') stageLine({ id: 'judgment', name: 'Juicio final', status: 'done', detail: e.verdict.label });
     else if (e.type === 'log') line('start', '·', h(e.text));
     else if (e.type === 'error') line('fail', '✗', h(e.text));
     else if (e.type === 'end') {
@@ -239,14 +244,22 @@ function codeHTML(item) {
   if (!item.code?.length) return '';
   return `<pre class="code">${item.code.map((c) => `<span class="h">@@ línea ${c.at}</span>\n${c.removed.map((l) => `<span class="r">- ${h(l)}</span>`).join('\n')}${c.removed.length && c.added.length ? '\n' : ''}${c.added.map((l) => `<span class="a">+ ${h(l)}</span>`).join('\n')}`).join('\n')}</pre>`;
 }
+function courtroomHTML(b) {
+  return `<h3>Reconstrucción y juicio</h3><p class="sub">${secs(b.budget.elapsedMs)} de ${secs(b.budget.limitMs)} · contrato ${h(b.contract?.hash?.slice(0, 12) || 'pendiente')}</p>
+  <details open><summary>Contrato comprobable</summary>${(b.contract?.expectations || []).map(e => `<div class="note"><b>${h(e.id)} · ${h(e.status)}</b> ${h(e.behavior)}<div class="sub">${(e.sources || []).map(s => h(s.id + ': ' + s.quote)).join(' · ')}</div></div>`).join('')}</details>
+  <details open><summary>Alternativas · ${b.candidates.length}</summary><table><tr><th>Candidato</th><th>Estado</th><th>Procedencia</th></tr>${b.candidates.map(c => `<tr><td>${h(c.id)}${c.final ? ' · final' : ''}<div class="sub">${h(c.model)} · padres: ${h(c.parents.join(', ') || 'base')}</div></td><td>${h(c.status)}${c.patch ? `<br><button class="linkbtn" data-art="${h(c.patch)}">Parche</button>` : ''}</td><td>${c.checkpoint?.metadata ? `<button class="linkbtn" data-art="${h(c.checkpoint.metadata)}">Checkpoint</button> <button class="linkbtn" data-art="${h(c.checkpoint.transcript)}">Transcripción</button>` : 'Sin checkpoint'}${c.error ? `<div class="sub">${h(c.error)}</div>` : ''}</td></tr>`).join('')}</table></details>
+  <details open><summary>Pruebas compartidas · ${b.attacks.length} propuestas</summary>${b.attacks.map(a => `<div class="note"><b>${h(a.id)} · ${h(b.verdict.semantic?.invalidAttacks?.some(x => x.id === a.id) ? "excluido por el juez" : a.status)}</b><div>${h(a.hypothesis || a.mission)}</div><button class="linkbtn" data-art="${h(a.id)}.json">Escenario y defensa</button></div>`).join('')}<table><tr><th>Versión</th><th>Resultado</th><th>Tests</th></tr>${b.evidence.map(e => `<tr><td>${h(e.version)}<div class="sub">${h(e.scope)}</div></td><td>${h(e.status)} <button class="linkbtn" data-art="${h(e.artifact)}">Evidencia</button>${e.log ? ` <button class="linkbtn" data-art="${h(e.log)}">Log</button>` : ''}</td><td>${e.ran || 0}</td></tr>`).join('')}</table></details>
+  <details><summary>Explicación del juez</summary><p>${h(b.verdict.semantic?.explanation || 'Revisión semántica pendiente')}</p>${b.verdict.pending.map(p => `<p class="sub">· ${h(p)}</p>`).join('')}<button class="linkbtn" data-art="pipeline.json">Expediente completo</button></details>`;
+}
+
 function renderBrief(keepScroll) {
-  const run = S.run; const b = run.brief; const so = run.signoff;
+  const run = S.run; const b = run.brief; const so = run.signatureValid === false ? null : run.signoff;
   const scrollWas = $('panel').scrollTop;
   const stale = S.cur.sha && !b.pr.head.startsWith(S.cur.sha);
   const req = b.requirement;
   const P = [];
   if (stale) P.push(so ? `<div class="banner">Firma caducada. ${h(so.signer)} firmó el commit <span class="mono">${h(so.head.slice(0, 9))}</span> y la rama ya está en <span class="mono">${h(S.cur.sha)}</span>. Lo que se comprobó valía para ese commit: vuelve a verificar y a firmar.</div>` : '<div class="banner">La rama ha cambiado desde esta verificación. El informe ya no corresponde al código actual: vuelve a verificar.</div>');
-  if (b.recommendation) { const rc = { cambios: 'bad', insuficiente: 'warn', lista: 'ok' }[b.recommendation.id]; P.push(`<div class="reco t-${rc}"><span class="sub">Recomendación</span><b>${h(b.recommendation.name)}</b><span class="sub">${h(b.recommendation.why)}</span></div>`); }
+  if (b.recommendation) { const rc = { cambios: 'bad', insuficiente: 'warn', lista: 'ok' }[b.recommendation.id] || (b.verdict?.status === 'request-changes' ? 'bad' : b.verdict?.status === 'ready-for-human' ? 'ok' : 'warn'); P.push(`<div class="reco t-${rc}"><span class="sub">Recomendación</span><b>${h(b.recommendation.name)}</b><span class="sub">${h(b.recommendation.why)}</span></div>`); }
   P.push(`<span class="lane ${TONE[b.lane.tone]}">${h(b.lane.name)}</span>
     <div class="big">${b.residue.lines} <span style="color:var(--dim)">de ${b.totals.lines} líneas</span></div>
     <div class="sub">${h(b.lane.summary)}</div>
@@ -256,9 +269,10 @@ function renderBrief(keepScroll) {
       <dt>Procedencia</dt><dd>${b.provenance.status === 'none' ? '<span class="t-warn">sin prompt guardado</span>; intención reconstruida desde el requisito' : `<span class="t-ok">prompt original guardado con el commit</span> (${b.provenance.status === 'nota' ? 'git notes' : 'Entire'})`}</dd>
     </dl>`);
 
+  if (b.version >= 2) P.push(courtroomHTML(b));
   P.push('<h3>Por qué este carril</h3>');
   P.push(b.rules.fired.length ? b.rules.fired.map((r) => `<div class="item"><span class="dot ${r.lane === 'devolver' ? 'bad' : r.lane === 'residuo' ? 'ok' : 'warn'}"></span><div><div class="ttl">${h(r.title)}</div><div class="d">${h(r.detail)}</div>${r.evidence?.length ? `<div class="links">${r.evidence.map(ev).join('')}</div>` : ''}</div></div>`).join('') : '<p class="sub">No se ha disparado ninguna regla de riesgo.</p>');
-  P.push(`<details><summary><span class="sub">Reglas que no se han disparado (${b.rules.notFired.length})</span></summary><div class="sub" style="padding:6px 0 0 18px">${b.rules.notFired.map((r) => h(r.title)).join(' · ')}</div></details>`);
+  P.push(`<details><summary><span class="sub">Reglas que no se han disparado (${(b.rules.notFired || []).length})</span></summary><div class="sub" style="padding:6px 0 0 18px">${(b.rules.notFired || []).map((r) => h(r.title)).join(' · ')}</div></details>`);
 
   if (b.questions.length) {
     P.push(`<h3>Decides tú · ${b.questions.length}</h3>`);
@@ -335,14 +349,14 @@ function renderBrief(keepScroll) {
 
 /* ── Sign-off ─────────────────────────────────────────────────────────── */
 function signFormHTML(b) {
-  const hard = b.rules.fired.some((r) => ['conflicto', 'no-compila', 'suite-rota', 'tests-propios-fallan'].includes(r.id));
+  const hard = (b.version >= 2 && b.verdict.status !== 'ready-for-human') || b.rules.fired.some((r) => ['conflicto', 'no-compila', 'suite-rota', 'tests-propios-fallan'].includes(r.id));
   return `<h3>Firma</h3>
     <p class="sub">La revisión automática es un consejo. Tu firma es la aprobación.${b.audit ? ' Esta área está en prueba: una segunda persona auditará el cambio.' : ''}</p>
     <div class="field"><label for="signer">Tu nombre</label><input type="text" id="signer" value="${h(localStorage.getItem('katse.signer') || '')}" placeholder="Nombre y apellidos"></div>
     ${b.residue.items.length ? `<label class="ck"><input type="checkbox" id="ckResidue"><span>He leído el residuo: ${b.residue.lines} líneas en ${b.residue.items.length} ${b.residue.items.length === 1 ? 'zona' : 'zonas'}</span></label>` : ''}
     <label class="ck"><input type="checkbox" id="ckNot"><span>He revisado las ${b.notChecked.length} cosas que no se han comprobado</span></label>
     <div class="field"><label for="risk">Riesgo residual que acepto</label><textarea id="risk" rows="3" placeholder="Con tus palabras: qué podría fallar todavía y por qué lo aceptas."></textarea></div>
-    <button class="act solid" id="sign" ${hard ? 'disabled title="No se puede aceptar un cambio que no compila o rompe tests"' : ''}>Firmar y aceptar</button>
+    <button class="act solid" id="sign" ${hard ? 'disabled title="Faltan comprobaciones o hay incumplimientos: revisa el informe"' : ''}>Firmar y aceptar</button>
     <button class="act quiet" id="sendBack">Devolver al autor</button>
     <div id="serr" class="err"></div>`;
 }
@@ -368,7 +382,7 @@ function copyBlock(title, text, id) {
   return `<div class="field copy"><label>${h(title)}</label><button type="button" data-copy="${id}">Copiar</button><pre id="${id}">${h(text)}</pre></div>`;
 }
 function signedHTML(run) {
-  const so = run.signoff; const s = run.signed || {};
+  const so = run.signatureValid === false ? null : run.signoff; const s = run.signed || {};
   const out = run.brief.pr.direction === 'outgoing';
   return `<h3>Firma</h3>
     <div class="item"><span class="dot ${so.decision === 'aprobar' ? 'ok' : 'no'}"></span><div><div class="ttl">${so.decision === 'aprobar' ? 'Aceptado' : 'Devuelto al autor'} por ${h(so.signer)}</div><div class="d">${new Date(so.ts).toLocaleString()} · informe sha256:${h(so.briefHash.slice(0, 16))}…${so.auditRequired ? ' · pendiente de auditoría por una segunda persona' : ''}</div><div class="d">Riesgo aceptado: ${h(so.residualRisk)}</div></div></div>

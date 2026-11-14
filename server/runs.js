@@ -5,6 +5,7 @@ import { DATA, readJSON, writeJSON, slug, sha256 } from './util.js';
 import { verify, normalizeOptions } from './pipeline/run.js';
 import { availableAgents } from './pipeline/replicas.js';
 import { record } from './ledger.js';
+import { verifyIntegrity } from './integrity.js';
 
 const live = new Map(); // runId → run
 const busy = new Map(); // projectId → runId (one verification per repository at a time)
@@ -78,7 +79,9 @@ export function getRun(projectId, runId) {
   if (!saved) throw new Error('No encuentro esa verificación');
   const brief = readJSON(path.join(dir, 'artifacts', 'brief.json'), null);
   const signoff = readJSON(path.join(dir, 'signoff.json'), null);
-  return { ...saved, dir, brief, signoff, briefHash: brief ? sha256(JSON.stringify(brief)) : null };
+  const briefHash = brief ? sha256(JSON.stringify(brief)) : null;
+  const signatureValid = signoff && brief ? signoff.briefHash === briefHash && verifyIntegrity(brief, path.join(dir, 'artifacts')).ok : null;
+  return { ...saved, dir, brief, signoff, signatureValid, briefHash };
 }
 
 export function subscribe(runId, listener) {

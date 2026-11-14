@@ -17,6 +17,17 @@ export function markdown(brief, signoff) {
   L.push(`**Procedencia:** ${b.provenance.status === 'none' ? 'sin prompt guardado; intención reconstruida desde el requisito' : b.provenance.status === 'nota' ? 'prompt original guardado con el commit (git notes)' : 'prompt original guardado con el commit (Entire)'}`);
   L.push('');
   L.push('> La revisión automática es un consejo con evidencia. La aprobación es la firma de una persona.');
+  if (b.version >= 2) {
+    L.push('', '### Contrato, candidatos y juicio', `**Decisión:** ${b.verdict.label}`, `**Contrato:** ${b.contract?.hash || 'pendiente'}`, `**Presupuesto:** ${Math.round(b.budget.elapsedMs / 1000)} / ${Math.round(b.budget.limitMs / 1000)} segundos`);
+    for (const e of b.contract?.expectations || []) L.push(`- ${e.id} [${e.status}]: ${e.behavior}`);
+    L.push('', '| Candidato | Estado | Padres | Modelo | Checkpoint |', '|---|---|---|---|---|');
+    for (const c of b.candidates || []) L.push(`| ${c.id} | ${c.status} | ${c.parents.join(', ') || 'base'} | ${c.model} | ${c.checkpoint?.id || 'pendiente'} |`);
+    L.push('', '| Versión | Alcance | Resultado | Tests | Evidencia |', '|---|---|---|---|---|');
+    for (const e of b.evidence || []) L.push(`| ${e.version} | ${e.scope} | ${e.status} | ${e.ran || 0} | ${e.artifact} |`);
+    if (b.verdict.semantic?.explanation) L.push('', b.verdict.semantic.explanation);
+    for (const f of b.verdict.confirmed) L.push(`- Incumplimiento reproducido: ${f.attack} (${f.expectations.join(', ')})`);
+    for (const risk of b.verdict.residualRisks) L.push(`- Límite: ${risk}`);
+  }
   L.push('');
   L.push('### Por qué este carril');
   for (const r of b.rules.fired) L.push(`- **${r.title}.** ${r.detail}`);
@@ -75,6 +86,11 @@ export function answer(question, { brief, plan }) {
     return `Todavía no he verificado este PR. Son ${plan.totals.files} ficheros (+${plan.totals.added} −${plan.totals.removed}). Pulsa Verificar y te digo qué queda para ti.`;
   }
   const b = brief;
+  if (b.version >= 2) {
+    if (/juez|juicio|decid|pregunt|duda|fiable/.test(s)) return `${b.verdict.label}.\n${b.verdict.semantic?.explanation || ''}\nPendiente:\n${ul(b.verdict.pending)}`;
+    if (/r[eé]plica|agente|rehac|coincid|consenso/.test(s)) return `Alternativas reconstruidas desde la base:\n${ul(b.candidates.map(c => `${c.id}: ${c.status}${c.final ? ' (candidato final)' : ''} · ${c.model}`))}\nLas diferencias abren investigaciones; no se decide por votos.`;
+    if (/prompt|procedenc|entire|sesi[oó]n/.test(s)) return `El prompt histórico: ${b.provenance.status === 'none' ? 'no está disponible; usamos el requisito' : b.provenance.status}.\nCheckpoints de nuestras alternativas:\n${ul(b.candidates.map(c => `${c.id}: ${c.checkpoint?.status || 'pendiente'}${c.checkpoint?.id ? ' · ' + c.checkpoint.id : ''}`))}`;
+  }
   if (/apr[uo]eb|est[aá] bien|es correcto|puedo (hacer )?merge|mergeo|lo acepto|es seguro/.test(s)) {
     return `Eso no lo decido yo. Te digo lo que está comprobado y lo que no, y firmas tú.\nCarril: ${b.lane.name}. Te quedan ${b.residue.lines} líneas por leer y ${b.questions.length} pregunta(s) por responder.`;
   }

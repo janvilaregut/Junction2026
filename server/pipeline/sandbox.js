@@ -2,13 +2,30 @@
 // in a tree created here and removed when the run ends.
 import fs from 'node:fs';
 import path from 'node:path';
-import { run } from '../util.js';
+import os from 'node:os';
+import { run, DATA } from '../util.js';
 import { git } from '../git.js';
 
 const ID = ['-c', 'user.name=replica', '-c', 'user.email=replica@localhost', '-c', 'commit.gpgsign=false'];
 
+export function assertScratch(repo, dir) {
+  const target = path.resolve(dir);
+  const roots = [path.join(DATA, 'runs'), path.join(os.tmpdir(), 'katse')];
+  const inside = (root, value) => { const r = path.relative(path.resolve(root), value); return r !== '' && !r.startsWith('..') && !path.isAbsolute(r); };
+  const testRoot = path.relative(os.tmpdir(), target).split(path.sep)[0];
+  if (/^katse-test-[a-zA-Z0-9]+$/.test(testRoot)) roots.push(path.join(os.tmpdir(), testRoot));
+  if (!roots.some(root => inside(root, target))) throw new Error('Refusing to remove a directory outside Katse scratch roots');
+  if (target === path.resolve(repo) || inside(target, path.resolve(repo))) throw new Error('Scratch directory contains the source repository');
+  let existing = target;
+  while (!fs.existsSync(existing)) existing = path.dirname(existing);
+  const resolved = fs.realpathSync(existing);
+  if (!roots.some(root => resolved === path.resolve(root) || inside(root, resolved))) throw new Error('Scratch directory resolves outside its permitted root');
+  return target;
+}
+
 /** A detached git worktree at `ref`. Shares objects with the repo, so it is fast to create. */
 export async function worktree(repo, dir, ref) {
+  assertScratch(repo, dir);
   fs.rmSync(dir, { recursive: true, force: true });
   await git(repo, ['worktree', 'prune'], { allowFail: true });
   await git(repo, ['worktree', 'add', '--detach', '--force', dir, ref], { timeout: 180_000 });
@@ -16,6 +33,7 @@ export async function worktree(repo, dir, ref) {
 }
 
 export async function removeWorktree(repo, dir) {
+  assertScratch(repo, dir);
   await git(repo, ['worktree', 'remove', '--force', dir], { allowFail: true });
   fs.rmSync(dir, { recursive: true, force: true });
   await git(repo, ['worktree', 'prune'], { allowFail: true });
@@ -52,6 +70,7 @@ export async function resetTree(dir) {
  * It carries no branches and no log, so the agent cannot look at the PR it is re-deriving.
  */
 export async function blindCopy(repo, dir, sha) {
+  assertScratch(repo, dir);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   const archive = `${dir}.tar`;
@@ -64,7 +83,15 @@ export async function blindCopy(repo, dir, sha) {
   }
   await git(dir, ['init', '--quiet']);
   if (process.platform === 'win32') await git(dir, ['config', 'core.longpaths', 'true']);
-  await git(dir, ['add', '-A'], { timeout: 180_000 });
+  // A tracked source file may match .gitignore (the Tieto fixture does this).
+  // Preserve it in the fresh history, and preserve executable bits lost by Windows tar.
+  await git(dir, ['add', '-f', '-A'], { timeout: 180_000 });
+  const entries = (await git(repo, ['ls-tree', '-r', sha])).stdout.split('\n');
+  const executable = entries.filter(l => l.startsWith('100755 ')).map(l => l.split('\t')[1]).filter(Boolean);
+  for (let i = 0; i < executable.length; i += 50) await git(dir, ['update-index', '--chmod=+x', '--', ...executable.slice(i, i + 50)]);
+  const expected = (await git(repo, ['rev-parse', `${sha}^{tree}`])).stdout.trim();
+  const actual = (await git(dir, ['write-tree'])).stdout.trim();
+  if (expected !== actual) throw new Error('Blind copy differs from source tree (archive attributes or unsupported file modes).');
   await git(dir, [...ID, 'commit', '--quiet', '--no-verify', '-m', 'base'], { timeout: 180_000 });
   return dir;
 }

@@ -4,21 +4,21 @@
 //   test(cwd, { names })       → { ok, ran, passed, failed, skipped, tests: [{ name, outcome }], ms, log, filtered }
 import fs from 'node:fs';
 import path from 'node:path';
-import { run, tail, toolEnv } from '../util.js';
+import { run, tail, runnerEnv } from '../util.js';
 import { out } from '../git.js';
 
-const sh = (cmd, cwd, timeout) => run(process.platform === 'win32' ? 'cmd.exe' : '/bin/sh', process.platform === 'win32' ? ['/d', '/s', '/c', cmd] : ['-c', cmd], { cwd, timeout, env: toolEnv() });
+const sh = (cmd, cwd, timeout) => run(process.platform === 'win32' ? 'cmd.exe' : '/bin/sh', process.platform === 'win32' ? ['/d', '/s', '/c', cmd] : ['-c', cmd], { cwd, timeout, env: runnerEnv() });
 
-function parseTrx(dir) {
+export function parseTrx(dir) {
   const tests = [];
   if (!fs.existsSync(dir)) return tests;
   for (const f of fs.readdirSync(dir)) {
     if (!f.endsWith('.trx')) continue;
     const xml = fs.readFileSync(path.join(dir, f), 'utf8');
-    for (const m of xml.matchAll(/<UnitTestResult\b[^>]*>/g)) {
+    for (const m of xml.matchAll(/<UnitTestResult\b[^>]*?(?:\/\s*>|>[\s\S]*?<\/UnitTestResult>)/g)) {
       const name = m[0].match(/\btestName="([^"]*)"/)?.[1];
       const outcome = m[0].match(/\boutcome="([^"]*)"/)?.[1];
-      if (name) tests.push({ name: name.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'), outcome });
+      if (name) tests.push({ name: name.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'), outcome, error: m[0].match(/<Message>([\s\S]*?)<\/Message>/)?.[1] || null });
     }
   }
   return tests;
@@ -58,6 +58,9 @@ async function dotnetToolchain(treePaths, changedPaths) {
   const short = (p) => path.basename(p, '.csproj');
   const tc = {
     kind: 'dotnet',
+    // Standard layout plus the central obj/<project-directory> layout used by
+    // the supplied repository. Unrecognized layouts disable result reuse.
+    dependencyFiles: csprojs.flatMap(p => [path.posix.join(path.posix.dirname(p), 'obj/project.assets.json'), path.posix.join('obj', path.posix.dirname(p), 'project.assets.json')]),
     testProjects,
     excluded: [],
     otherTestProjects: others,
@@ -77,7 +80,7 @@ async function dotnetToolchain(treePaths, changedPaths) {
       let ms = 0;
       const failed = [];
       for (const p of [...testProjects]) {
-        const r = await run('dotnet', ['build', p, '-v', 'q', '-nologo', '-clp:NoSummary'], { cwd, timeout: 20 * 60_000 });
+        const r = await run('dotnet', ['build', p, '-v', 'q', '-nologo', '-clp:NoSummary'], { cwd, timeout: 20 * 60_000, env: runnerEnv() });
         ms += r.ms;
         log += `$ dotnet build ${p}\n${tail(r.stdout + r.stderr, 6000)}\n`;
         if (r.code !== 0) failed.push(p);
@@ -91,19 +94,21 @@ async function dotnetToolchain(treePaths, changedPaths) {
       let log = '';
       let ms = 0;
       let executionFailed = false;
+      let timedOut = false; const exitCodes = [];
       for (const p of testProjects) {
         const args = ['test', p, '--no-build', '-v', 'q', '-nologo', '--results-directory', resDir, '--logger', `trx;LogFileName=${short(p)}.trx`];
         if (names?.length) args.push('--filter', names.map((n) => `FullyQualifiedName~${n}`).join('|'));
-        const r = await run('dotnet', args, { cwd, timeout: 30 * 60_000 });
+        const r = await run('dotnet', args, { cwd, timeout: 30 * 60_000, env: runnerEnv() });
         executionFailed ||= r.code !== 0;
-        executionFailed ||= r.code !== 0;
+        timedOut ||= r.timedOut; exitCodes.push(r.code);
         ms += r.ms;
         log += `$ dotnet ${args.slice(0, 2).join(' ')}${names?.length ? ` --filter (${names.length} tests)` : ''}\n${tail(r.stdout + r.stderr, 6000)}\n`;
       }
       const tests = parseTrx(resDir);
+      const trx = fs.existsSync(resDir) ? fs.readdirSync(resDir).filter(f => f.endsWith('.trx')).map(f => fs.readFileSync(path.join(resDir, f), 'utf8')) : [];
       fs.rmSync(resDir, { recursive: true, force: true });
       const s = summarize(tests);
-      return { ok: !executionFailed && s.failed === 0 && s.ran > 0, ...s, tests, ms, log, filtered: !!names?.length };
+      return { ok: !executionFailed && s.failed === 0 && s.ran > 0, ...s, tests, ms, log, trx, exitCodes, timedOut, executionComplete: !timedOut && exitCodes.every(c => c === 0 || (c === 1 && s.failed > 0)), filtered: !!names?.length };
     },
   };
   return tc;
@@ -126,10 +131,10 @@ function shellToolchain(kind, describe, buildCmd, testCmd, filterArg) {
       const passed = num(/(\d+)\s+pass(?:ed|ing)?\b/i);
       const failed = num(/(\d+)\s+fail(?:ed|ing|ures)?\b/i);
       // Without a per-test report the exit code is the result; individual names are unknown.
-      const tests = (names || []).map((n) => ({ name: n, outcome: r.code === 0 ? 'Passed' : 'Failed' }));
+      const tests = [];
       return {
-        ok: r.code === 0, ran: passed + failed || (r.code === 0 ? 1 : 1), passed: passed || (r.code === 0 ? 1 : 0),
-        failed: failed || (r.code === 0 ? 0 : 1), skipped: 0, tests, ms: r.ms, log: `$ ${cmd}\n${tail(text, 6000)}`, filtered,
+        ok: r.code === 0 && passed + failed > 0, ran: passed + failed, passed,
+        failed, skipped: 0, tests, ms: r.ms, log: `$ ${cmd}\n${tail(text, 6000)}`, filtered,
       };
     },
   };

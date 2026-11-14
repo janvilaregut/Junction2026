@@ -1,115 +1,77 @@
 # Katse
 
-**No lo leas: reprodúcelo.** Katse verifica pull requests escritos por agentes con evidencia que se puede ejecutar, y deja a una persona con nombre solo lo que no se pudo comprobar.
+Valida cambios generados por IA mediante reconstrucción desde la base, ataques ejecutables y una decisión humana respaldada por evidencia. Proyecto para Junction 2026, reto Tieto «Earned Trust in AI Code».
 
-Proyecto para Junction 2026 · reto *Earned Trust in AI Code* (Tieto) y *Best Use of Entire* (MLH).
-El concepto completo está en [PLANNING.md](PLANNING.md) y en la carpeta [concept/](concept/).
+## Backend completo: reconstrucción y ataques ejecutables
 
-## Qué hace
+La rama `fabian` añade el pipeline v2 a `mode: completo`. Conserva la API, eventos y lectura de informes v1. El alcance ejecutable del MVP es Windows y C#/.NET, con el caso Tieto #2283.
 
-Eliges un repositorio. Katse te enseña sus pull requests: los que **recibes** (ramas remotas) y los que vas a **enviar** (tus ramas locales). Pulsas **Verificar** y, en una copia aislada del repo:
+### Preparación en Windows
 
-| Nivel | Qué hace | Usa IA |
-|---|---|---|
-| 1 · Determinista | Clasifica cada fichero. En los derivados (snapshots, código generado) detecta el mismo cambio repetido y aísla el que cambia distinto | No |
-| 2 · Conductual | Mezcla sobre la base, compila, pasa la suite. Comprueba que los tests nuevos **fallan sin el cambio y pasan con él**. Siembra defectos en las líneas cambiadas y mira si algún test los detecta. **Rebobina**: quita cada cambio de uno en uno y mira si algún test lo nota | No |
-| 3 · Generativa | Varios agentes rehacen el cambio **a ciegas** desde el requisito. Cuántos: `mín(6, 1 + grupos de cambios + grupos de alto riesgo)`, cada uno con una misión distinta. Compara zona a zona y cruza los tests: los del PR contra cada réplica y los de cada réplica contra el PR | Sí |
+1. Instala Node 22.15+ (probado con 24.19), Git y el SDK que indique el `global.json` del repositorio. #2283 usa .NET 8.0.402; Katse también detecta `%USERPROFILE%/.dotnet`.
+2. Ejecuta `npm ci`. OpenCode queda fijado en 1.19.5.
+3. Ejecuta `powershell -File scripts/setup-tools.ps1` para instalar Entire 0.13.4 con verificación SHA256. También puedes indicar `KATSE_ENTIRE_PATH`.
+4. Copia `.env.example` a `.env.local` y rellena `GEMINI_API_KEY` y `VERDA_INFERENCE_KEY`. Este archivo está ignorado por Git. Las claves nunca se guardan en la configuración de OpenCode ni se pasan al runner .NET.
+5. Ejecuta `npm run doctor`: verifica los modelos, JSON, herramientas y un checkpoint real de Entire. Consume llamadas reales a los proveedores.
+6. Ejecuta `npm start` y abre `http://localhost:4173`. Abre la copia local de Tieto desde el selector de proyecto si aún no aparece. Selecciona `ju26-issue-2283` → **Completa · reconstrucción** → **Verificar** (o **Verificar de nuevo**).
 
-Con eso da una **recomendación** (pedir cambios, evidencia insuficiente o lista para aprobación humana) y decide un **carril** mediante reglas que se pueden leer (no hay puntuación):
+Se usan `gemini-4-hydrogen`, `gemini-4-carbon` y `nemotron-3.5-super-vl`; los identificadores y el endpoint son configurables. `KATSE_THINKING_LEVEL=low` mantiene acotada la latencia de Gemini. [Control de razonamiento de Gemini](https://aistudio.google.com/docs/thinking). El perfil está adaptado a la versión fijada de OpenCode; no se debe copiar una configuración v2 en una instalación v1 sin comprobar compatibilidad.
 
-`Reproducido` · `Solo residuo` · `Decides tú` · `Lectura completa` · `Devolver`
+### Entrada y ejecución
 
-El informe dice **qué se comprobó** (con su evidencia), **qué no se comprobó y por qué**, **qué se negó a decidir** y **qué líneas tiene que leer una persona**. Esa persona responde, escribe el riesgo que acepta y firma. Katse nunca aprueba ni hace merge.
+`POST /api/projects/:id/verify` sigue admitiendo `{ "pr": "in:ju26-issue-2283", "options": { "mode": "completo" } }`.
 
-## Arrancar
+También admite referencias sin PR:
 
-Requisitos: Node 20 o superior y git. Para los tests del repo de ejemplo, .NET SDK 8 (Katse lo busca en `~/.dotnet` y en el `PATH`).
-
-```bash
-npm start
+```json
+{
+  "baseRef": "rama-destino",
+  "proposedRef": "rama-propuesta",
+  "requirement": "Comportamiento que el cambio debe cumplir",
+  "options": { "mode": "completo", "budgetMs": 900000 }
+}
 ```
 
-Abre http://localhost:4173. La primera vez registra el repo de ejemplo si existe en `workspace/messagepack-csharp`. Para usar otro, pulsa **+** y escribe la ruta de un repo local o una URL para clonarlo.
+El máximo es 900000 ms. Se permiten dos sesiones de modelo y un runner a la vez. La generación se cierra a los diez minutos, los ataques a los catorce y el último minuto se reserva al informe. Los presupuestos menores conservan esa proporción. Al agotarse el plazo se cancelan los procesos hijos y se guarda un informe parcial.
 
-Desde la terminal:
+1. Fija hashes de propuesta, destino, ancestro e integración. Ejecuta compilación, suite, reproducción en la base, mutaciones y retirada controlada.
+2. Hydrogen reconstruye expectativas a partir del requisito y fuentes anteriores. Carbon las revisa. Las citas se comprueban literalmente; una fuente inexistente queda pendiente. Roslyn analiza símbolos, condiciones y referencias directas; la compilación parcial y las dependencias sin resolver se declaran como límite.
+3. Crea entre dos y cuatro alternativas desde copias de la base sin remotos ni historial del parche. Puede conservar dos estrategias y generar hasta dos descendientes. La selección prioriza resultados ejecutados, cobertura del contrato y diversidad; la similitud de texto no demuestra corrección.
+4. Los ataques proponen tests; un defensor verifica escenario y expectativa. Una disputa permite una revisión y después queda pendiente si sigue sin resolver. Los tests admitidos se aplican al original y a las alternativas. La suite final del candidato recibe también los tests que añadió el PR.
+5. Congela original y candidato final, ejecuta tres misiones nuevas y alterna modelos con etiquetas A/B. El juez determinista exige evidencia real; Carbon revisa el significado y las fuentes. Un fallo solo del candidato no condena el original.
 
-```bash
-node server/cli.js workspace/messagepack-csharp ju26-issue-2283
-```
+Las reglas de población y prioridad son heurísticas registradas en `budget`, no probabilidades de corrección. No se devuelve un porcentaje de confianza. Las salidas son **Pedir cambios**, **Evidencia insuficiente** y **Lista para aprobación humana**. La firma vincula commit, contrato e informe y rechaza referencias o artefactos modificados.
 
-```bash
-node server/cli.js workspace/messagepack-csharp ju26-issue-2283 --completo
-```
+### Evidencia y comprobación
 
-`--completo` lanza las réplicas. Otras opciones: `--mutantes N`, `--agentes glm-5.3-flash,claude-sonnet`, `--base rama`.
+Cada ejecución conserva en `data/runs/<proyecto>/<run>/artifacts` el contrato, parches, sesiones, checkpoints, tests, TRX, comandos, resultados, presupuesto y veredicto. `GET /api/projects/:id/runs/:run/artifact?name=pipeline.json` expone el expediente, y `/report` el informe Markdown. Los nuevos eventos son `contract`, `candidate`, `attack`, `result` y `judgment`.
 
-## Agentes para las réplicas
+- `npm test`: pruebas del orquestador, límites, caché, evidencia, formato inválido, cuota, duplicados y firmas.
+- `npm run test:controls`: ejecuta sobre #2283 una **regresión preparada** y una **acusación falsa preparada**; se etiquetan como controles, no como descubrimientos de la IA.
+- `npm run evaluate -- <run-id> 240000`: compara revisión directa y reconstrucción con el mismo presupuesto y contrato. Guarda tokens, duración, tests ejecutados y hallazgos pendientes de validación. Un caso aislado no permite afirmar que una estrategia sea superior.
 
-Katse usa los CLIs de agentes que encuentre instalados y con sesión iniciada:
+Las copias locales de Windows y las restricciones de herramientas no son un sandbox del sistema operativo. El runner ejecuta código del repositorio; este MVP está preparado para el repositorio de Tieto. La compilación y las copias se hacen bajo `%TEMP%/katse` para reducir la carga de OneDrive; los informes permanecen en `data/`. Se conservan copias y checkpoints locales para auditoría. La caché .NET exige también los hashes de las dependencias efectivamente restauradas. Entire aporta procedencia, no garantiza que el código sea correcto. Se extraen solo mensajes de usuario de la transcripción, nunca se interpreta todo `checkpoint explain` como el prompt original. [Integración de Entire](https://docs.entire.com/agents/opencode).
 
-- **opencode** (`opencode run`): aparecen todos sus modelos `opencode/*`. Los gratuitos tienen una cuota pequeña por modelo; un PR sobre un repo grande la puede agotar.
-- **Claude Code** (`claude -p`): necesita sesión iniciada con `claude auth login`.
+`entire-graph` es opcional y no es una dependencia de este MVP: el análisis local funciona con Roslyn. No se consulta ningún grafo de la propuesta desde los constructores.
 
-Antes de empezar se comprueba que cada agente responde. Una réplica solo cuenta si cambia código de producto, compila y pasa sus propios tests; las demás aparecen en el informe con el motivo por el que se descartaron.
+## Validación local y límites observados (14/11/2026)
 
-Conviene mezclar modelos de familias distintas: si todas las réplicas salen del mismo modelo, comparten los mismos puntos ciegos, y el informe lo avisa.
+- 27 pruebas del backend superadas. Los controles preparados detectan una regresión deliberada y descartan una acusación falsa mediante ejecución real.
+- Recorrido desde la web de #2283: 13 min 3 s; suite original de 170 tests correctos; tres reproducciones rojo→verde; tres de cuatro mutantes detectados. Cuatro propuestas produjeron tres alternativas distintas, con tres checkpoints reales de Entire; la cuarta era un duplicado.
+- Resultado: **Evidencia insuficiente**. Una alternativa introduce fallos que el original no presenta. Quedan ataques inválidos/disputados, una validación de candidato agotó su fase y existe una ambigüedad sobre diagnósticos de miembros de tipos externos. Esto impide aprobar automáticamente el expediente.
+- Comparación con el mismo límite de 300 s por estrategia y revisión de fuentes: diff directo 95 s / 13.851 tokens; reconstrucción 137 s / 45.198 tokens. Cada una produjo un test ejecutable, pero ambos repetían un caso ya existente. Cero casos nuevos y cero fallos confirmados: **este experimento no demuestra una ventaja de la reconstrucción**. Los tokens incluyen el total comunicado por el proveedor y la auditoría adicional de novedad.
+- Una comprobación posterior validó la compilación en la carpeta temporal, los 170 tests y las tres reproducciones; el helper Roslyn identifica las condiciones que contienen las líneas cambiadas. La caché real se reutilizó tras comprobar seis archivos de dependencias restauradas. Los logs y experimentos locales quedan en `data/acceptance`, `data/evaluation` y `data/runs`; no se versionan.
 
-Los agentes corren dentro del sandbox de macOS (`sandbox-exec`): no pueden leer ni escribir tu repositorio, las demás verificaciones ni los ficheros de Katse. En otros sistemas trabajan en una copia sin historial y el informe avisa de que no hay sandbox.
+Para mejorar el MVP, la siguiente prioridad es la calidad y novedad de los ataques y la resolución del contrato. Aumentar el número de agentes por sí solo no ha demostrado mejorar la evidencia. No están cubiertos NativeAOT, .NET 10, los otros siete proyectos de test, otros lenguajes ni un sandbox de ejecución del sistema operativo. `entire-graph` no está conectado.
 
-## Procedencia: el prompt de cada commit (Entire)
+## Archivos principales
 
-Si el repo tiene [Entire](https://entire.io) activo, cada commit hecho con un agente lleva el trailer `Entire-Checkpoint`. Katse lee esa sesión con `entire checkpoint explain` y da a las réplicas **el mismo prompt** que recibió el autor. Sin Entire usa el texto de la issue y lo marca en el informe como menos confianza.
+- `server/pipeline/complete.js`: presupuesto, generaciones y juicio final.
+- `server/agents.js`: proveedores, sesiones independientes de OpenCode y checkpoints Entire.
+- `server/pipeline/contract.js` y `tools/Katse.Analyze`: fuentes, expectativas y análisis Roslyn.
+- `server/pipeline/evidence.js`: runner, caché, selección y reglas del veredicto.
+- `server/pipeline/messagepack-harness.js`: adaptador de escenarios del caso #2283; los modelos eligen inputs y expectativas y el adaptador genera la infraestructura repetitiva de los tests.
+- `server/integrity.js`: manifiesto de artefactos y validación de firmas.
+- `mvp/`: interfaz existente, ampliada para mostrar los datos v2.
 
-```bash
-brew install --cask entireio/tap/entire
-```
-
-```bash
-entire enable
-```
-
-## Estructura
-
-```
-server/
-  index.js            servidor HTTP: interfaz, API y eventos en vivo (solo localhost)
-  cli.js              verificación desde la terminal
-  projects.js         proyectos y descubrimiento de PRs (ramas por delante de la base)
-  requirements.js     requisito (issue) y procedencia (Entire)
-  runs.js             registro de verificaciones
-  ledger.js           libro de confianza: firmas, escapes, confianza por área, medidas
-  report.js           informe en Markdown, líneas de firma y respuestas del asistente
-  llm.js              llamadas a modelos (solo para redactar, nunca para decidir)
-  pipeline/
-    run.js            orquestador de las etapas
-    classify.js       nivel 1: tipos de fichero y cambios mecánicos
-    toolchain.js      compilar y pasar tests (.NET, Node, Python o comandos propios)
-    sandbox.js        copias aisladas: worktrees y copias sin historial para las réplicas
-    mutation.js       defectos sembrados
-    replicas.js       nivel 3: agentes a ciegas
-    compare.js        comparación PR ↔ réplicas por zonas
-    judge.js          redacta lo que la IA se niega a decidir
-    lanes.js          reglas de riesgo → carril, residuo, preguntas, no comprobado
-mvp/                  interfaz (HTML, CSS y JavaScript sin compilación)
-data/                 resultados, evidencias y libro de confianza (no se versiona)
-workspace/            repos clonados para probar (no se versiona)
-```
-
-## Principios que el código hace cumplir
-
-- **La evidencia es ejecutable.** Cada afirmación del informe enlaza el registro o el parche que la respalda.
-- **El consenso no aprueba.** Que las réplicas coincidan solo decide dónde mira la persona.
-- **Negarse es un resultado.** El juez solo puede formular preguntas; no tiene veredicto de aprobación.
-- **Antes de culpar al PR, se mira la base.** Si algo no compila o falla con el PR, se comprueba si ya fallaba sin él.
-- **Lo no ejecutado se dice.** Un test que no se pudo ejecutar aparece como «no ejecutado», nunca como «pasa».
-- **Firma una persona.** La firma exige responder cada pregunta, confirmar lo leído y escribir el riesgo aceptado.
-- **Tu repositorio no se toca.** Todo ocurre en copias temporales. La única escritura opcional es adjuntar el informe como `git notes`, y solo si lo pides.
-
-## Límites conocidos
-
-- Las réplicas corren en tu máquina. En macOS van dentro de `sandbox-exec` con el repositorio original vetado, pero conservan acceso a la red (lo necesitan para hablar con el modelo). No es un contenedor.
-- La comparación entre el PR y las réplicas es textual (por zonas y similitud de tokens). La equivalencia de comportamiento la dan los tests cruzados.
-- Los defectos sembrados son operadores sencillos. Un mutante que sobrevive puede ser equivalente al original.
-- Solo se ejecutan los proyectos de test afectados por el cambio.
-- No hay benchmarks ni análisis de seguridad dedicado: aparece siempre en «no comprobado».
-- La interfaz está en español. Los textos están en `mvp/app.js`, `server/pipeline/lanes.js` y `server/report.js`.
+La verificación rápida sigue disponible. Desde terminal: `node server/cli.js workspace/messagepack-csharp ju26-issue-2283 --completo`. Los modelos del pipeline completo se configuran por variables o `options.providers`, no mediante la antigua selección de réplicas del modo rápido.
