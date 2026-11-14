@@ -54,10 +54,16 @@ export async function resetTree(dir) {
 export async function blindCopy(repo, dir, sha) {
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
-  const q = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
-  const r = await run('/bin/sh', ['-c', `git -C ${q(repo)} archive --format=tar ${q(sha)} | tar -x -C ${q(dir)}`], { timeout: 300_000 });
-  if (r.code !== 0) throw new Error(`No se pudo crear la copia aislada: ${r.stderr.trim()}`);
+  const archive = `${dir}.tar`;
+  try {
+    await git(repo, ['archive', '--format=tar', '--output', archive, sha], { timeout: 300_000 });
+    const extracted = await run('tar', ['-xf', archive, '-C', dir], { timeout: 300_000 });
+    if (extracted.code !== 0) throw new Error(`No se pudo crear la copia aislada: ${extracted.stderr.trim()}`);
+  } finally {
+    fs.rmSync(archive, { force: true });
+  }
   await git(dir, ['init', '--quiet']);
+  if (process.platform === 'win32') await git(dir, ['config', 'core.longpaths', 'true']);
   await git(dir, ['add', '-A'], { timeout: 180_000 });
   await git(dir, [...ID, 'commit', '--quiet', '--no-verify', '-m', 'base'], { timeout: 180_000 });
   return dir;

@@ -219,7 +219,7 @@ export async function verify({ project, pr, options, runDir, emit }) {
         const newFailures = failing.filter((n) => !newNames.some((m) => matches(n, m)));
         const teeth = newTests.filter((t) => t.green === 'Passed' && (t.red === 'Failed' || t.red === 'NoCompila')).length;
         return {
-          suite: { ran: suite.ran, passed: suite.passed, failed: suite.failed, skipped: suite.skipped, ms: suite.ms },
+          suite: { ok: suite.ok, ran: suite.ran, passed: suite.passed, failed: suite.failed, skipped: suite.skipped, ms: suite.ms },
           newTests, newFailures, preexisting, redBuilt, teeth,
           detail: `${suite.passed} de ${suite.ran} tests pasan con el PR · ${newNames.length ? `${teeth} de ${newNames.length} tests nuevos fallan sin el cambio y pasan con él` : 'el PR no añade tests'}`,
         };
@@ -229,7 +229,7 @@ export async function verify({ project, pr, options, runDir, emit }) {
     }
 
     // 4 ── Seeded defects ──────────────────────────────────────────────────
-    const l2ok = ctx.l2 && !ctx.l2.skipped && !ctx.l2.newFailures.length;
+    const l2ok = ctx.l2 && !ctx.l2.skipped && ctx.l2.suite.ok && ctx.l2.suite.ran > 0 && !ctx.l2.newFailures.length;
     ctx.mutation = await stage('mutacion', 'Defectos sembrados en las líneas cambiadas', async () => {
       if (!options.mutants) return { skipped: true, reason: 'Desactivado en esta verificación.', detail: 'Desactivado' };
       if (!l2ok) return { skipped: true, reason: 'No se ejecuta si el PR no compila o rompe tests.', detail: 'No aplicable' };
@@ -444,7 +444,7 @@ function buildBrief({ project, pr, it, ctx, routed, stages, started, costUsd }) 
       claims.push(claim('rojo-verde', 'Hay tests nuevos que fallan sin el cambio', files.some((f) => f.kind === 'source') ? 'fallo' : 'no-ejecutado', 'El PR no añade ningún test.'));
     }
     claims.push(claim('suite', `No rompe los tests existentes (${l2.suite.ran} ejecutados)`,
-      l2.newFailures.length ? 'fallo' : 'reproducido',
+      l2.suite.ran === 0 || (l2.suite.ok === false && l2.suite.failed === 0) ? 'no-ejecutado' : l2.newFailures.length ? 'fallo' : 'reproducido',
       l2.newFailures.length ? `${l2.newFailures.length} fallan con el PR y no en la base` : `${l2.suite.passed} pasan${l2.preexisting.length ? ` · ${l2.preexisting.length} ya fallaban antes del PR` : ''} · ${sec(l2.suite.ms)}`,
       [{ label: 'Suite con el PR', artifact: 'suite-merged.log' }]));
   } else {

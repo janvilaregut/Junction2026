@@ -3,6 +3,7 @@
 //   incoming = remote branches (someone pushed them for you to review)
 //   outgoing = your local branches that are not pushed yet or are ahead of their upstream
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { DATA, readJSON, writeJSON, slug, which, run } from './util.js';
 import { clis } from './llm.js';
@@ -22,7 +23,7 @@ export function getProject(id) {
 }
 
 export async function addProject(dir) {
-  const abs = path.resolve(dir.replace(/^~(?=$|\/)/, process.env.HOME));
+  const abs = path.resolve(dir.replace(/^~(?=$|\/)/, os.homedir()));
   if (!fs.existsSync(abs)) throw new Error(`No existe la carpeta ${abs}`);
   const top = await isRepo(abs);
   if (!top) throw new Error(`${abs} no es un repositorio git`);
@@ -51,7 +52,7 @@ export async function cloneProject(url, intoDir) {
   const name = slug(url.split('/').pop().replace(/\.git$/, ''));
   const dest = path.resolve(intoDir, name);
   if (!fs.existsSync(dest)) {
-    const r = await run('git', ['clone', '--quiet', url, dest], { timeout: 20 * 60_000 });
+    const r = await run('git', ['clone', '--quiet', ...(process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : []), url, dest], { timeout: 20 * 60_000 });
     if (r.code !== 0) throw new Error(`git clone falló: ${r.stderr.trim()}`);
   }
   return addProject(dest);
@@ -82,7 +83,7 @@ export async function projectStatus(p) {
   const have = await clis();
   const [entire, dotnet] = await Promise.all([
     which('entire'),
-    fs.existsSync(path.join(process.env.HOME, '.dotnet', 'dotnet')) ? 'user' : which('dotnet'),
+    which('dotnet'),
   ]);
   let entireEnabled = false;
   if (entire) {

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { run, tail, toolEnv } from '../util.js';
 import { out } from '../git.js';
 
-const sh = (cmd, cwd, timeout) => run('/bin/sh', ['-c', cmd], { cwd, timeout, env: toolEnv() });
+const sh = (cmd, cwd, timeout) => run(process.platform === 'win32' ? 'cmd.exe' : '/bin/sh', process.platform === 'win32' ? ['/d', '/s', '/c', cmd] : ['-c', cmd], { cwd, timeout, env: toolEnv() });
 
 function parseTrx(dir) {
   const tests = [];
@@ -36,8 +36,8 @@ async function dotnetToolchain(treePaths, changedPaths) {
   const owner = (file) => {
     let best = null;
     for (const p of csprojs) {
-      const dir = path.dirname(p);
-      if ((file === p || file.startsWith(dir + '/')) && (!best || dir.length > path.dirname(best).length)) best = p;
+      const dir = path.posix.dirname(p);
+      if ((file === p || file.startsWith(dir + '/')) && (!best || dir.length > path.posix.dirname(best).length)) best = p;
     }
     return best;
   };
@@ -90,17 +90,20 @@ async function dotnetToolchain(treePaths, changedPaths) {
       fs.rmSync(resDir, { recursive: true, force: true });
       let log = '';
       let ms = 0;
+      let executionFailed = false;
       for (const p of testProjects) {
         const args = ['test', p, '--no-build', '-v', 'q', '-nologo', '--results-directory', resDir, '--logger', `trx;LogFileName=${short(p)}.trx`];
         if (names?.length) args.push('--filter', names.map((n) => `FullyQualifiedName~${n}`).join('|'));
         const r = await run('dotnet', args, { cwd, timeout: 30 * 60_000 });
+        executionFailed ||= r.code !== 0;
+        executionFailed ||= r.code !== 0;
         ms += r.ms;
         log += `$ dotnet ${args.slice(0, 2).join(' ')}${names?.length ? ` --filter (${names.length} tests)` : ''}\n${tail(r.stdout + r.stderr, 6000)}\n`;
       }
       const tests = parseTrx(resDir);
       fs.rmSync(resDir, { recursive: true, force: true });
       const s = summarize(tests);
-      return { ok: s.failed === 0 && s.ran > 0, ...s, tests, ms, log, filtered: !!names?.length };
+      return { ok: !executionFailed && s.failed === 0 && s.ran > 0, ...s, tests, ms, log, filtered: !!names?.length };
     },
   };
   return tc;

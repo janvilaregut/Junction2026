@@ -15,9 +15,10 @@ const DOTNET_HOME = path.join(os.homedir(), '.dotnet');
 /** Environment for every child process: adds a user-local .NET install and silences telemetry. */
 export function toolEnv(extra = {}) {
   const env = { ...process.env, ...extra };
-  if (fs.existsSync(path.join(DOTNET_HOME, 'dotnet'))) {
+  if (fs.existsSync(path.join(DOTNET_HOME, process.platform === 'win32' ? 'dotnet.exe' : 'dotnet'))) {
     env.DOTNET_ROOT = DOTNET_HOME;
-    env.PATH = `${DOTNET_HOME}:${env.PATH}`;
+    const pathKey = Object.keys(env).find(k => k.toLowerCase() === 'path') || 'PATH';
+    env[pathKey] = `${DOTNET_HOME}${path.delimiter}${env[pathKey] || ''}`;
   }
   env.DOTNET_CLI_TELEMETRY_OPTOUT = '1';
   env.DOTNET_NOLOGO = '1';
@@ -64,8 +65,10 @@ export function run(cmd, args, { cwd, timeout = 10 * 60_000, env, input, onLine 
 }
 
 export async function which(cmd) {
-  const r = await run('/bin/sh', ['-c', `command -v ${cmd}`], { timeout: 5000 });
-  return r.code === 0 ? r.stdout.trim() : null;
+  const r = process.platform === 'win32'
+    ? await run('where.exe', [cmd], { timeout: 5000 })
+    : await run('/bin/sh', ['-c', `command -v ${cmd}`], { timeout: 5000 });
+  return r.code === 0 ? r.stdout.trim().split(/\r?\n/)[0] : null;
 }
 
 export const sha256 = (s) => createHash('sha256').update(s).digest('hex');
