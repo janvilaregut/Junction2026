@@ -92,7 +92,7 @@ export function impact(u) {
   const c = u.centrality || {};
   // The cube keeps the middle of the ranking small: the median function gets 0.13, the top 10% 0.73, the top 1% 0.97.
   const rank = Math.max(c.pagerankPct || 0, c.dependentsPct || 0, c.fanInPct || 0);
-  let v = Math.pow(rank, 3), why = c.dependents > 0 ? `${plural(c.dependents, 'function')} depend on it (top ${pct(Math.max(0.01, 1 - rank))} of the repository)` : 'nothing else in the repository depends on it';
+  let v = Math.pow(rank, 3), why = c.dependents > 0 ? `${plural(c.dependents, 'function')} depend on it (top ${pct(Math.max(0.01, 1 - rank))} of the repository)` : c.unlinked > 0 ? `no caller could be linked to it: ${plural(c.unlinked, 'call')} by this name could not be resolved, so it may still be used` : 'nothing else in the repository was found to depend on it';
   if (u.isTest) return { v: 0.12, why: 'a test: it guards code, nothing depends on it', rank };
   if (u.exported && v < POLICY.exportedFloor) { v = POLICY.exportedFloor; if (!(c.dependents > 0)) why = 'public: callers outside this repository cannot be seen'; }
   const floor = POLICY.sensitiveFloor[u.sensitive?.level];
@@ -135,7 +135,7 @@ export function evidence(u, L, I, v) {
   if (u.proof?.proved) row('proof', 'Proof', u.proof.level === 'alpha' ? 'renaming only' : 'same tokens', 'ok', u.proof.claim);
   for (const f of (u.findings || []).filter((x) => x.severity !== 'info').slice(0, 2)) row('check:' + f.id, 'Check', f.title, f.severity === 'bad' ? 'bad' : 'warn', f.detail);
   const c = u.centrality || {};
-  row('impact', 'Depends on it', c.dependents > 0 ? `${c.dependents} · top ${pct(Math.max(0.01, 1 - I.rank))}` : 'nothing', I.v >= 0.6 ? 'warn' : 'ok', I.why);
+  row('impact', 'Depends on it', c.dependents > 0 ? `${c.dependents} · top ${pct(Math.max(0.01, 1 - I.rank))}` : c.unlinked > 0 ? `unknown · ${c.unlinked} unresolved` : 'nothing found', I.v >= 0.6 || (!(c.dependents > 0) && c.unlinked > 0) ? 'warn' : 'ok', `${I.why[0].toUpperCase()}${I.why.slice(1)}. The graph is built from names, without type inference: a count is an estimate.`);
   if (v !== 'proved') {
     const lines = (u.lines?.added || 0) + (u.lines?.removed || 0), m = u.metrics?.after, b = u.metrics?.before;
     if (m) { const grew = (u.rates || []).filter((r) => !b || !(r.id in b) || m[r.id] > b[r.id]); row('change', 'Change', `${lines} lines · complexity ${b && b.cyclomatic !== m.cyclomatic ? `${b.cyclomatic} → ` : ''}${m.cyclomatic}`, grew.some((r) => r.tone === 'bad') ? 'bad' : grew.some((r) => r.tone === 'warn') || lines > 60 || m.cyclomatic > 20 ? 'warn' : 'ok', `Cyclomatic complexity: the number of independent paths through the function (McCabe 1976).${b && b.cyclomatic === m.cyclomatic && m.cyclomatic > 20 ? ' It was already this complex before the change.' : ''}`); }

@@ -94,6 +94,27 @@ if (x) { y(); }`;
   assert.equal(by.add.exported, true);
 });
 
+test('bugs the dependency-graph review found in this extractor stay fixed', () => {
+  const keys = (src, p) => parseFile(src, p).symbols.map((s) => s.key);
+  // a declaration that starts with `static` is a declaration; a bare accessor or static block is not
+  assert.deepEqual(keys('class A { static int F(int x) { return x; } int G() { return 1; } static A() { } int P { get { return 1; } set { } } }', 'a.cs'), ['A', 'A.F', 'A.G', 'A.A', 'A.P']);
+  assert.deepEqual(keys('final class U { static int twice(int x) { return 2 * x; } }', 'U.java'), ['U', 'U.twice']);
+  assert.deepEqual(keys('static int helper(int n) { return n; }', 'h.c'), ['helper']);
+  assert.deepEqual(keys('class K { static { init(); } static make() { return new K(); } get size() { return 1; } }', 'k.js'), ['K', 'K.make', 'K.size']);
+  // `object? a` is a nullable type, not an optional parameter; TypeScript's `a?: T` is optional
+  const f = parseFile('class A { void F(object? a, int b) { } void G(int a, int b = 2, params int[] r) { } }', 'a.cs').symbols;
+  assert.deepEqual([f[1].minParams, f[1].maxParams, f[2].minParams, f[2].maxParams], [2, 2, 1, Infinity]);
+  assert.deepEqual(parseFile('function f(a: number, b?: string) { }', 'f.ts').symbols.map((s) => [s.minParams, s.maxParams]), [[1, 2]]);
+  // a lambda with one bare parameter has one parameter
+  assert.deepEqual(parseFile('const inc = x => x + 1;\nconst run = y => { return y; };', 'a.js').symbols.map((s) => [s.key, s.params, s.paramNames]), [['inc', 1, ['x']], ['run', 1, ['y']]]);
+  assert.deepEqual(parseFile('class A { static readonly System.Func<int, int> twice = t => t * 2; }', 'a.cs').symbols.map((s) => [s.key, s.params]), [['A', 0], ['A.twice', 1]]);
+  // block namespaces are recorded like file-scoped ones
+  assert.deepEqual(parseFile('namespace N.M { class A { void F() { } } namespace Inner { class B { } } }', 'ns.cs').symbols.map((s) => [s.key, s.ns]), [['A', 'N.M'], ['A.F', 'N.M'], ['B', 'N.M.Inner']]);
+  assert.equal(parseFile('namespace N;\nclass A { void F() { } }', 'ns.cs').symbols[1].ns, 'N');
+  // an alias to a generic type is an alias
+  assert.deepEqual(parseFile('using V = N.Verifier<N.Thing, int>;\nusing W = N.Plain;\nusing System;\nclass A { }', 'al.cs').imports.map((i) => [i.ns, i.source]), [['V', 'N.Verifier'], ['W', 'N.Plain'], [null, 'System']]);
+});
+
 test('files the engine does not read as code have no language', () => {
   assert.equal(langOf('README.md'), null);
   assert.equal(langOf('a/b/C.CS'), 'cs');

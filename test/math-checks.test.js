@@ -222,6 +222,60 @@ test('imports: a C# using for a namespace nobody declares is a warning; known on
   assert.equal(f[0].title, 'Namespace not found in this repository');
 });
 
+test('imports: specifiers that are built at run time, guarded, or resolved by a bundler are left alone', () => {
+  const c = pr({
+    head: {
+      'src/a.js': src(
+        "import Comp from './Comp';", //                                         Comp.vue: a bundler's extension list decides
+        "import gen from './dist/bundle.js';", //                                line 2: an output folder is usually not committed
+        "import util from './Utils.js';", //                                     line 3: utils.js exists
+        "const lang = require('./locales/' + name);", //                         a concatenation: only its first piece is a literal
+        "let opt; try { opt = require('./optional.js'); } catch { opt = null; }", // its failure is caught
+        'const mod = await import(`./plugins/${id}.js`);', //                    a template with a hole
+      ),
+      'src/utils.js': src('export default 1;'),
+    },
+    tree: ['src/Comp.vue'],
+  });
+  const f = unresolvedImports(c);
+  assert.deepEqual(brief(f), ['bad import.missing-file src/a.js:3', 'warn import.missing-file src/a.js:2']);
+  assert.match(f.find((x) => x.line === 3).detail, /src\/utils\.js differs only in letter case/);
+  assert.match(f.find((x) => x.line === 2).basis, /output folder, which is why this is a warning/);
+});
+
+test('imports: an export list that cannot be closed from the tokens says nothing', () => {
+  const head = {
+    'src/view.jsx': src('export const A = () => <div>hi</div>;', 'export const B = 1;'), // JSX: brackets cannot be trusted to balance
+    'src/tags.js': src('export const C = () => <b>x</b>;'), //                              JSX inside a .js file
+    'src/ns.ts': src('export namespace N { export const inner = 1; }', 'export const outer = 2;'), // an export below the top level
+    'src/types.d.ts': src('export const declared: number;'), //                             a declaration file
+    'src/use.ts': src("import { Z } from './view.jsx';", "import { Y } from './tags.js';", "import { X } from './ns';", "import { W } from './types';"),
+  };
+  assert.deepEqual(unresolvedImports(pr({ head })), []);
+});
+
+test('imports: an undeclared name the repository already lived with is not new; a resolver config in the diff makes it a warning', () => {
+  const old = src("import a from '@app/core';", 'export default a;');
+  const fresh = src("import b from '@app/feature';", "import * as vscode from 'vscode';", "import c from 'brand-new-thing';", 'export default [b, vscode, c];');
+  const base = { 'package.json': '{}', 'src/old.ts': old };
+  // `@app/…` was imported, undeclared, before this pull request (a path alias); `vscode` is provided by its host.
+  assert.deepEqual(brief(unresolvedImports(pr({ base, head: { ...base, 'src/new.ts': fresh }, manifests: pkg({ dependencies: {} }) }))), ['bad import.undeclared-package src/new.ts:3']);
+  const withConfig = unresolvedImports(pr({ base, head: { ...base, 'src/new.ts': fresh, 'tsconfig.json': '{ "compilerOptions": { "paths": {} } }' }, manifests: pkg({ dependencies: {} }) }));
+  assert.deepEqual(brief(withConfig), ['warn import.undeclared-package src/new.ts:3']);
+  assert.match(withConfig[0].basis, /resolver configuration that may define it as an alias/);
+});
+
+test('imports: a Python import inside try is optional, and a module a build tool writes is only a warning', () => {
+  const head = { 'pkg/__init__.py': src(
+    'try:', '    from ._speedups import fast', 'except ImportError:', '    fast = None', // guarded
+    'from ._version import version', //                                                  line 5: setuptools_scm writes it
+    'try:', '    import ujson', 'except ImportError:', '    ujson = None', //             guarded
+    'import made_up_pkg', //                                                             line 10
+  ) };
+  const f = unresolvedImports(pr({ head, manifests: { pythonRequirements: new Set(['requests']) } }));
+  assert.deepEqual(brief(f), ['warn import.missing-module pkg/__init__.py:5', 'warn import.unknown-package pkg/__init__.py:10']);
+});
+
 // ── arityMismatches ─────────────────────────────────────────────────────────────────────────────────────────
 test('arity: a new required parameter breaks the unchanged callers that import the function', () => {
   const caller = src("import { price } from './lib.js';", 'export function total(items) {', '  return items.map((i) => price(i)).length;', '}');
@@ -365,6 +419,45 @@ test('arity: Python counts self, defaults, the / and * markers and *args correct
   assert.equal(f.find((x) => x.line === 11).title, 'Call passes 0 arguments, function takes 1');
 });
 
+test('arity: JavaScript parameters the body tests for absence are optional, and error-path tests are wrong on purpose', () => {
+  const head = {
+    'src/lib.js': src(
+      'export function withOptions(a, options) {', '  options = options || {};', '  return a + options.x;', '}', // 1-2 in practice
+      'export function strict(a, b) {', '  return a + b;', '}',
+    ),
+    'test/lib.test.js': src(
+      "import { strict, withOptions } from '../src/lib.js';",
+      "test('errors', () => {",
+      '  assert.throws(() => strict(1));', //         expects the error
+      '  expect(() => strict()).toThrow();', //       expects the error
+      '  withOptions(1);', //                         the body handles a missing `options`
+      '  strict(1);', //                              line 6
+      '});',
+    ),
+  };
+  const f = arityMismatches(pr({ head }));
+  assert.deepEqual(brief(f), ['bad arity.mismatch test/lib.test.js:6']);
+  assert.equal(f[0].title, 'Call passes 1 argument, function takes 2');
+});
+
+test('arity: what can and cannot be bound — interfaces, reassigned members, a field of the same name', () => {
+  const cs = (...types) => src('namespace N {', ...types, '}');
+  // An interface from outside adds no member an unqualified call could find: the call is still bound.
+  const disposable = cs('  public class Res : IDisposable {', '    public void Dispose() { }', '    void Step(int a, int b) { }', '    void Go() { Step(1); }', '  }');
+  assert.deepEqual(brief(arityMismatches(pr({ head: { 'Res.cs': disposable } }))), ['bad arity.mismatch Res.cs:5']);
+  // IOException is a class despite its first letter: its members are not in this repository.
+  const derived = cs('  public class Oops : IOException {', '    void Step(int a, int b) { }', '    void Go() { Step(1); }', '  }');
+  assert.deepEqual(brief(arityMismatches(pr({ head: { 'Oops.cs': derived } }))), ['warn arity.mismatch Oops.cs:4']);
+  // A field called Tick exists somewhere: `Tick(` may invoke it, so only the name-only warning is left.
+  const field = cs('  public class A {', '    void Tick(int a) { }', '    void Go() { Tick(); }', '  }', '  public class Info {', '    static readonly MethodInfo Tick = null;', '  }');
+  assert.deepEqual(brief(arityMismatches(pr({ head: { 'A.cs': field } }))), ['warn arity.mismatch A.cs:4']);
+  // this.render2 is reassigned in the constructor: the method declaration is not what the call reaches.
+  const js = src('export class W {', '  constructor(o) { this.render2 = o.render2; }', '  render2(a, b) { return a + b; }', '  go() { return this.render2(1); }', '}');
+  assert.deepEqual(arityMismatches(pr({ head: { 'w.js': js } })), []);
+  // Without the reassignment the same call is bound to the class's own method.
+  assert.deepEqual(brief(arityMismatches(pr({ head: { 'w.js': js.replace('this.render2 = o.render2;', '') } }))), ['bad arity.mismatch w.js:4']);
+});
+
 // ── danglingReferences ──────────────────────────────────────────────────────────────────────────────────────
 test('dangling: a removed function that an importer still calls is bad, at each call site', () => {
   const user = src("import { keep, legacyRound } from './lib.js';", 'export function total(x) {', '  // legacyRound(x) in a comment does not count', "  const label = 'legacyRound(x)';", '  return keep(legacyRound(x)) + label.length;', '}');
@@ -397,12 +490,32 @@ test('dangling: in C# an unqualified call inside a closed type is bad, a call on
   const cls = (members) => src('namespace N {', '  public class Service {', ...members, '  }', '}');
   const other = src('namespace N {', '  public class Client {', '    public int Call(Service s) { return s.Normalize(1); }', '  }', '}');
   const c = pr({
-    base: { 'Service.cs': cls(['    private int Normalize(int a) { return a; }', '    public int Run() { return Normalize(2); }']), 'Client.cs': other },
+    base: { 'Service.cs': cls(['    internal int Normalize(int a) { return a; }', '    public int Run() { return Normalize(2); }']), 'Client.cs': other },
     head: { 'Service.cs': cls(['    public int Run() { return Normalize(2); }']), 'Client.cs': other },
   });
   const f = danglingReferences(c);
   assert.deepEqual(brief(f), ['bad dangling.call Service.cs:3', 'warn dangling.call Client.cs:3']);
   assert.match(f.find((x) => x.severity === 'warn').basis, /library method of the same name would still resolve/);
+});
+
+test('dangling: a name-only call must have been able to reach the removed declaration', () => {
+  const cls = (members) => src('namespace N {', '  public class Service {', ...members, '  }', '}');
+  const client = (call) => src('namespace N {', '  public class Client {', `    public int Call(Service s) { return ${call}; }`, '  }', '}');
+  const run = (decl, call) => brief(danglingReferences(pr({ base: { 'Service.cs': cls([`    ${decl}`]), 'Client.cs': client(call) }, head: { 'Service.cs': cls(['    public int Other() { return 0; }']), 'Client.cs': client(call) } })));
+  // A private method was never reachable from another type: that call is somebody else's Normalize.
+  assert.deepEqual(run('private int Normalize(int a) { return a; }', 's.Normalize(1)'), []);
+  // A static method is reached through the name of its type, not through another receiver …
+  assert.deepEqual(run('public static int Normalize(int a) { return a; }', 'Math.Normalize(1)'), []);
+  assert.deepEqual(run('public static int Normalize(int a) { return a; }', 'Service.Normalize(1)'), ['warn dangling.call Client.cs:3']);
+  // … and with a number of arguments the removed declaration accepted.
+  assert.deepEqual(run('public int Normalize(int a) { return a; }', 's.Normalize(1, 2, 3)'), []);
+  // When the type itself left the repository, `Type.name(…)` belongs to another library's type of that name.
+  const shim = src('namespace Shims {', '  public static class Assert {', '    public static void Equal(object a, object b) { }', '  }', '}');
+  const user = src('namespace T {', '  public class Tests {', '    public void M() { Assert.Equal(1, 1); }', '  }', '}');
+  assert.deepEqual(danglingReferences(pr({ base: { 'Shim.cs': shim, 'src/User.cs': user }, head: { 'src/User.cs': user } })), []);
+  // In JavaScript a function its module never exported was reachable only inside its file.
+  const js = (lib) => ({ 'src/lib.js': lib, 'src/other.js': src('export const v = localHelper(1);') });
+  assert.deepEqual(danglingReferences(pr({ base: js(src('function localHelper(a) { return a; }', 'export const z = localHelper(2);')), head: js(src('export const z = 2;')) })), []);
 });
 
 test('dangling: at most ten call sites are reported for one removed name', () => {
@@ -412,6 +525,18 @@ test('dangling: at most ten call sites are reported for one removed name', () =>
   assert.equal(f.length, 10);
   assert.ok(f.every((x) => x.severity === 'bad' && x.id === 'dangling.call'));
   assert.deepEqual(f.map((x) => x.line), [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+});
+
+test('dangling: built-ins, star imports and modules with an open export list are not taken as broken', () => {
+  // A local stand-in for a runtime global is removed: the calls now reach the global.
+  assert.deepEqual(danglingReferences(pr({ base: { 'a.js': src('function fetch(u) { return u; }', "export const v = fetch('x');") }, head: { 'a.js': src("export const v = fetch('x');") } })), []);
+  // `from lib import *`: the name may still arrive through the star.
+  const star = danglingReferences(pr({ base: { 'lib.py': src('def helper_fn(a):', '    return a'), 'use.py': src('from lib import *', 'x = helper_fn(1)') }, head: { 'lib.py': src('VALUE = 1'), 'use.py': src('from lib import *', 'x = helper_fn(1)') } }));
+  assert.deepEqual(brief(star), ['warn dangling.call use.py:2']);
+  // The module now re-exports another one wholesale: its export list is open.
+  const user = src("import { gadget } from './lib.js';", 'export const v = gadget(1);');
+  const open = danglingReferences(pr({ base: { 'src/lib.js': src('export function gadget(a) { return a; }'), 'src/user.js': user }, head: { 'src/lib.js': src("export * from './impl.js';"), 'src/impl.js': src('export const other = 1;'), 'src/user.js': user } }));
+  assert.deepEqual(brief(open), ['warn dangling.call src/user.js:2']);
 });
 
 // ── testWeakening ───────────────────────────────────────────────────────────────────────────────────────────
@@ -440,6 +565,22 @@ test('tests: a deleted test is bad; a moved, renamed or rewritten-in-place test 
   assert.equal(gone[0].symbol, null);
   // The whole file renamed: the tests survive under the same names.
   assert.deepEqual(testWeakening(pr({ base: { 'tests/CalcTests.cs': xunit(...a, ...b) }, head: { 'tests/ArithmeticTests.cs': xunit(...a, ...b) }, renames: { 'tests/ArithmeticTests.cs': 'tests/CalcTests.cs' } })), []);
+});
+
+test('tests: a test that reappears with the same body in another class of the diff was moved, not removed', () => {
+  const cls = (name, ...members) => src('using Xunit;', 'namespace T {', `  public class ${name} {`, ...members, '  }', '}');
+  const works = ['Assert.Equal(3, Calc.Add(1, 2));', 'Assert.Equal(5, Calc.Add(2, 3));'];
+  const c = pr({
+    base: { 'tests/ATests.cs': cls('ATests', ...fact('Works', ...works), ...fact('Stays', 'Assert.True(true);')) },
+    head: { 'tests/ATests.cs': cls('ATests', ...fact('Stays', 'Assert.True(true);')), 'tests/BTests.cs': cls('BTests', ...fact('WorksForSmallNumbers', ...works)) },
+  });
+  assert.deepEqual(testWeakening(c), []);
+  // With a different body it is a removal: nothing shows the new test stands in for the old one.
+  const d = pr({
+    base: { 'tests/ATests.cs': cls('ATests', ...fact('Works', ...works), ...fact('Stays', 'Assert.True(true);')) },
+    head: { 'tests/ATests.cs': cls('ATests', ...fact('Stays', 'Assert.True(true);')), 'tests/BTests.cs': cls('BTests', ...fact('Other', 'Assert.Equal(1, Calc.Add(1, 0));')) },
+  });
+  assert.deepEqual(brief(testWeakening(d)), ['bad test.removed tests/ATests.cs:4']); // the hunk starts after the [Fact] line both tests share
 });
 
 test('tests: fewer assertion calls in a test that exists on both sides is a warning with both counts', () => {
@@ -547,6 +688,7 @@ test('practices: credentials by format or by name are bad; placeholders, referen
     'const auth = "Bearer abcdef0123456789abcdef0123456789";', //                  16 a bearer token
     'const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk";', // 17
     'const password2 = "correct horse battery staple";', //                        a sentence, not a generated value
+    'const PublicKeyToken = "b03f5f7f11d50a3a";', 'const nextPageToken = "abc123def456";', // an assembly identity and a paging cursor
   ];
   const f = practices(pr({ head: { 'src/config.js': src(...lines), 'test/config.test.js': src(...lines) } }));
   assert.deepEqual(brief(f), [1, 15, 16, 17, 5, 6].map((l) => `bad practice.secret src/config.js:${l}`).sort());

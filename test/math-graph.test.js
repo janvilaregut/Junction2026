@@ -562,8 +562,8 @@ namespace Edge
     public static class Verifier<T> { public static int Check(int n) { return n; } }
 }` });
   const e = (k) => `src/Edge/E.cs::${k}`;
-  // the parser reports `twice = t => …` with no parameters; it takes one, so twice(4) is admitted
-  assert.equal(g.nodes.get(e('Thing.twice')).maxParams, 0);
+  // `twice = t => …` takes one parameter, so twice(4) is admitted
+  assert.equal(g.nodes.get(e('Thing.twice')).maxParams, 1);
   assert.deepEqual(uses(g, e('Thing.Go')), [e('Thing'), e('Thing.Size'), e('Thing.twice'), e('Verifier.Check')]);
   assert.deepEqual(callSites(g, 'Thing'), [{ from: e('Thing.Go'), file: 'src/Edge/E.cs', line: 8, args: 0, kind: 'new', to: [e('Thing')], status: 'resolved' }]);
   // Inner means Thing.Inner inside Thing, not Other.Inner

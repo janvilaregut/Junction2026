@@ -97,7 +97,7 @@ function sideOf(tree, files) {
   };
 }
 
-const isTestFile = (P, d) => isTestPath(d.path) || isTestPath(d.oldPath) || !!(P.head.get(d.path) || P.base.get(d.oldPath))?.symbols.some((s) => s.isTest);
+const isTestFile = (P, d) => isTestPath(d.path) || isTestPath(d.oldPath) || !!(P.head.get(d.path) || P.base.get(d.oldPath))?.symbols?.some((s) => s.isTest);
 
 /** A finding. `symbol` is the innermost symbol at head around the line, unless the caller names one (or null). */
 function mk(P, id, severity, file, line, title, detail, basis, sym) {
@@ -626,6 +626,23 @@ function occurrenceKind(F, i, name) {
   return { kind: 'call', open, recv: null, owner, body };
 }
 
+const THROW_WORD = /^(throws|throwsAsync|rejects|toThrow|toThrowError|raises|assertRaises|assertRaisesRegex|assert_raises)$/;
+/** Is token i inside something that expects an error: assert.throws(() => f()), expect(() => f()).toThrow(), with pytest.raises(E): f()? */
+function expectsThrow(F, i) {
+  const T = F.tokens, M = F.match;
+  for (let hops = 0; hops < 6; hops++) {
+    const g = enclosingOpen(F, i); if (g < 0) return false;
+    const callee = T[g - 1], close = M[g];
+    if (isOpTok(T[g], '(') && callee && callee.k === 'id') {
+      if (THROW_WORD.test(callee.v)) return true;
+      if (callee.v === 'expect' && close > 0) for (let k = close + 1; k < close + 8 && T[k] && (isOpTok(T[k], '.') || isWord(T[k])); k++) if (THROW_WORD.test(T[k].v)) return true;
+    }
+    if (isOpTok(T[g], '{') && isOpTok(callee, ':') && isOpTok(T[g - 2], ')') && M[g - 2] > 0 && T[M[g - 2] - 1] && THROW_WORD.test(T[M[g - 2] - 1].v)) return true; // with pytest.raises(E):
+    i = g;
+  }
+  return false;
+}
+
 /** `Type name` at the level of a type body in C# or Java: a field or event of that name, which `name(` would invoke. */
 function fieldLike(x) {
   if (x.o.kind !== 'ref' || (x.o.owner && x.o.owner.kind !== 'type')) return false;
@@ -695,12 +712,35 @@ function basesOf(F, s) {
   return out;
 }
 
-/** Is every type this name inherits from declared in the repository, all the way up? Then no member can come from outside. */
+/** class, struct, interface, record or enum: the keyword a type was declared with. */
+function typeKeyword(F, s) {
+  for (let i = s.a; i < s.bodyA; i++) { const t = F.tokens[i]; if (t.k === 'kw' && (t.v === 'class' || t.v === 'struct' || t.v === 'interface' || t.v === 'enum')) return t.v; }
+  return 'class';
+}
+
+/**
+ * Can a member reach this type only from declarations in the repository? True when every type it inherits members
+ * from is declared here, all the way up. In C# an interface gives its implementers no member that an unqualified
+ * call could find, and only the first entry of a class's base list can be a class, so there the question is only
+ * about that first entry: it must be declared in the repository, or be an interface (declared as one here, or named
+ * I + capital + lower-case letter, the .NET naming rule CA1715, when it is declared elsewhere). Everywhere else
+ * (Java default methods, Python and JavaScript mixins) every base counts.
+ */
 function closedHierarchy(P, name) {
   if (P.closed.has(name)) return P.closed.get(name);
   P.closed.set(name, true); // a cycle closes on itself
   const types = (P.headNames().get(name) || []).filter((s) => s.kind === 'type');
-  const ok = types.length > 0 && types.every((s) => basesOf(P.head.get(s.file), s).every((b) => b === 'object' || b === 'Object' || closedHierarchy(P, b)));
+  const declared = (n) => (P.headNames().get(n) || []).filter((s) => s.kind === 'type');
+  const ok = types.length > 0 && types.every((s) => {
+    const F = P.head.get(s.file), bases = basesOf(F, s).filter((b) => b !== 'object' && b !== 'Object');
+    if (F.lang !== 'cs') return bases.every((b) => closedHierarchy(P, b));
+    const kw = typeKeyword(F, s);
+    if (kw === 'struct' || kw === 'enum' || !bases.length) return true;
+    if (kw === 'interface') return bases.every((b) => closedHierarchy(P, b));
+    const first = declared(bases[0]);
+    if (!first.length) return /^I[A-Z][a-z]/.test(bases[0]);
+    return first.every((b) => typeKeyword(P.head.get(b.file), b) === 'interface') || closedHierarchy(P, bases[0]);
+  });
   P.closed.set(name, ok);
   return ok;
 }
@@ -763,14 +803,14 @@ function arityOf(F, s) {
     if (F.lang === 'ts' && s.paramNames && s.paramNames[0] === 'this') { lo = Math.max(0, lo - 1); hi -= 1; }
     for (let i = s.bodyA; i < s.bodyB; i++) if (T[i].k === 'id' && T[i].v === 'arguments') { lo = 0; hi = Infinity; break; }
     // Plain JavaScript has no way to mark a parameter optional except a default. A trailing parameter that the body
-    // tests for absence (!p, typeof p, p ||, p ??, p === …, p ?, p &&, if (p)) is optional by intent: omitting it is no defect.
+    // tests for absence (!p, typeof p, p ||, p ??, p === …, p ?, p?., p &&, if (p)) is optional by intent: omitting it is no defect.
     if (F.lang === 'js' && Array.isArray(s.paramNames)) {
       const tested = (name) => {
         for (let i = s.bodyA; i < s.bodyB; i++) {
           if (T[i].k !== 'id' || T[i].v !== name || op(i - 1, '.')) continue;
           const p = T[i - 1], n = T[i + 1];
           if (isOpTok(p, '!') || (p && p.k === 'kw' && p.v === 'typeof')) return true;
-          if (n && n.k === 'op' && ['||', '??', '===', '==', '!==', '!=', '?', '&&', '||=', '??='].includes(n.v)) return true;
+          if (n && n.k === 'op' && ['||', '??', '===', '==', '!==', '!=', '?', '?.', '&&', '||=', '??='].includes(n.v)) return true;
           if (isOpTok(p, '(') && isOpTok(n, ')') && T[i - 2] && T[i - 2].k === 'kw' && T[i - 2].v === 'if') return true;
         }
         return false;
@@ -796,10 +836,34 @@ function arityOf(F, s) {
     };
     for (let i = open + 1; i < M[open]; i++) { if ((op(i, '(') || op(i, '[') || op(i, '{')) && M[i] > i) i = M[i]; else if (op(i, ',')) { seg(start, i); start = i + 1; } }
     seg(start, M[open]);
-  } else if (fam === 'cs') {
-    for (let i = s.a; i < s.bodyA; i++) if (T[i].k === 'id' && T[i].v === s.name) { const o = callOpen(F, i); if (o > 0) { if (T[o + 1] && T[o + 1].k === 'kw' && T[o + 1].v === 'this') lo = Math.max(0, lo - 1); break; } }
-  }
+  } else if (fam === 'cs' && isExtension(F, s)) lo = Math.max(0, lo - 1); // the receiver is the first parameter, written or not
   return { lo, hi };
+}
+
+/** A C# extension method: its first parameter is `this T x`. */
+function isExtension(F, s) {
+  const T = F.tokens;
+  for (let i = s.a; i < s.bodyA; i++) if (T[i].k === 'id' && T[i].v === s.name) { const o = callOpen(F, i); if (o > 0) return !!T[o + 1] && T[o + 1].k === 'kw' && T[o + 1].v === 'this'; }
+  return false;
+}
+
+/**
+ * Could this call reach that declaration at all? Exact language rules, read from the declaration's own modifiers:
+ *   C#, Java  a private member is reachable only from inside its type (or a type nested in it);
+ *   C#        a static method that is not an extension method is reachable through a receiver only when the
+ *             receiver is the name of its type (an instance cannot be used to call it);
+ *   JS, TS    a top-level function its module does not export is reachable only from its own file.
+ * `F` is the file of the declaration, `here` the path of the calling file on the same side (head or merge base).
+ */
+function reachable(x, s, F, here) {
+  const fam = family(F.lang), o = x.o, mods = s.modifiers || [];
+  const inType = o.owner ? (o.owner.kind === 'type' ? o.owner.qname : o.owner.container) : null;
+  if ((fam === 'cs' || fam === 'java') && s.container) {
+    if (mods.includes('private') && !mods.includes('protected') && !(inType && (inType === s.container || inType.startsWith(`${s.container}.`)))) return false;
+    if (fam === 'cs' && mods.includes('static') && o.recv && o.recv.k === 'id' && o.recv.v !== s.container.split('.').pop() && !isExtension(F, s)) return false;
+  }
+  if (fam === 'js' && !s.container && !o.recv && here !== s.file) { const ex = jsExports(F); if (!ex.open && !ex.names.has(s.name)) return false; }
+  return true;
 }
 const showRange = (r) => (r.hi === Infinity ? `${r.lo}+` : r.lo === r.hi ? `${r.lo}` : `${r.lo}-${r.hi}`);
 
@@ -841,7 +905,7 @@ function bindCall(P, side, here, F, x, name, decls, sites, needClosed) {
     if (!member || !member.container || hasStaticImport(F) || (fam === 'cs' && P.globalStatic()) || P.unread(fam)) return null;
     if (!member.container.split('.').every((c) => closedHierarchy(P, c))) return null;
     for (const y of sites) if (y.F === F && y.o.kind === 'ref' && y.i >= member.a && y.i < member.b && !isOpTok(T[y.i - 1], '.')) return 'foreign'; // a local, a parameter or a method group of that name
-    return { syms: decls, how: `an unqualified call inside ${member.container}, whose base types are all declared in this repository` };
+    return { syms: decls, how: `an unqualified call inside ${member.container}, which inherits members only from types declared in this repository` };
   }
   if (o.recv) {
     const rv = o.recv.v;
@@ -907,10 +971,11 @@ function bindCall(P, side, here, F, x, name, decls, sites, needClosed) {
  *         count. The receiver's type is not resolved, so a library method of the same name is not excluded.
  * A call on a line the pull request did not add is reported only when a declaration at the merge base accepted its
  * count: the mismatch is then a consequence of the change. Counting is conservative: optional, default, rest and
- * params parameters widen the accepted range, an extension method accepts its receiver either way, calls with a
- * spread are skipped, and a name is skipped entirely when it is on the ubiquitous-name list, when a type or
- * property shares it, when any declaration of it cannot be counted, or when a declaration the symbol table does
- * not have (local function, delegate) exists.
+ * params parameters widen the accepted range, a JavaScript parameter the body tests for absence counts as optional,
+ * an extension method accepts its receiver either way, calls with a spread and calls inside an assertion that
+ * expects an error are skipped, and a name is skipped entirely when it is on the ubiquitous-name list, when a type
+ * or property shares it, when any declaration of it cannot be counted, or when a declaration the symbol table does
+ * not have (local function, delegate) exists. A field of the same name leaves only the name-only warning.
  * Does not establish: argument types, overload resolution by type, or anything about constructors (`new X(...)`).
  */
 export function arityMismatches(ctx) {
@@ -946,10 +1011,13 @@ export function arityMismatches(ctx) {
     for (const x of sites) {
       if (x.o.kind !== 'call') continue;
       const n = argCount(x.F, x.o.open); if (n < 0) continue;
+      if ((fam === 'js' || fam === 'py') && expectsThrow(x.F, x.i)) continue; // a test of the error path passes the wrong arguments on purpose
       let b = bindCall(P, side, x.F.path, x.F, x, name, all, sites, false);
       if (b === 'foreign') continue;
       if (hasField) b = null;
-      const cands = b ? b.syms : all, rs = cands.map((s) => range.get(s));
+      const cands = b ? b.syms : all.filter((s) => reachable(x, s, P.head.get(s.file), x.F.path));
+      if (!cands.length) continue; // every declaration of that name is private to another type, static on another type, or not exported
+      const rs = cands.map((s) => range.get(s));
       // A Python method may also be called on the class with the instance passed explicitly.
       if (rs.some((r, k) => n >= r.lo && n <= r.hi + (fam === 'py' && cands[k].container && x.o.recv ? 1 : 0))) continue;
       const line = x.F.tokens[x.i].l, fresh = P.added(x.F.path).has(line);
@@ -964,7 +1032,7 @@ export function arityMismatches(ctx) {
       const detail = `${name}(…) at ${x.F.path}:${line} passes ${plural(n, 'argument')}, but ${decl}${fam === 'js' && tooMany ? '; JavaScript drops the extra ones silently' : ''}.`;
       const basis = b
         ? `The call binds to the declaration by the text alone (${b.how}); both counts are read from the tokens${matchedBefore && !fresh ? ', and a declaration at the merge base accepted this count' : ''}. Not established: argument types.`
-        : `${all.length === 1 ? `The only declaration named ${name} in the source read at head does not accept` : `All ${all.length} declarations named ${name} in the source read at head were counted and none accepts`} ${plural(n, 'argument')}${matchedBefore ? '; one at the merge base did' : ''}. Not established: that the call resolves to ${all.length === 1 ? 'it' : 'one of them'}, because the receiver's type is not resolved; a library method of the same name would not be an error.`;
+        : `${cands.length === 1 ? `The only declaration named ${name} that this call could reach in the source read at head does not accept` : `The ${cands.length} declarations named ${name} that this call could reach in the source read at head were counted and none accepts`} ${plural(n, 'argument')}${matchedBefore ? '; one at the merge base did' : ''}. Not established: that the call resolves to ${cands.length === 1 ? 'it' : 'one of them'}, because the receiver's type is not resolved; a library method of the same name would not be an error.`;
       found.push({ sev: SEVERITY[severity], f: mk(P, 'arity.mismatch', severity, x.F.path, line, title, detail, basis) });
     }
     pushCapped(out, found);
@@ -986,7 +1054,8 @@ function pushCapped(out, found) {
  * is still called at head: `name(` in the token stream, so comments and strings do not count (dangling.call).
  *   bad   the call binds to the removed declaration by the text alone (see bindCall): the name resolves to nothing.
  *   warn  only the name matches (a call on a receiver whose type is not resolved): a library method of the same
- *         name would still resolve.
+ *         name would still resolve. Kept only when the call could have reached the removed declaration (see
+ *         reachable) and passes a number of arguments it accepted.
  * At most 10 call sites per removed name. A function that was moved or whose file was renamed is still declared
  * and is not reported.
  * Does not establish: uses that are not calls (a function passed by name), or calls built from strings.
@@ -1028,10 +1097,18 @@ export function danglingReferences(ctx) {
         const rh = resolveJs(P.sideHead(), x.F.path, b.source), TH = typeof rh === 'string' ? P.head.get(rh) : null;
         if (TH && isJsLike(TH.lang) && jsExports(TH).open) b = null;
       }
+      if (!b) { // only the name matches: could this call have reached a removed declaration, with this many arguments?
+        const n = argCount(x.F, x.o.open);
+        const could = decls.filter((s) => reachable(x, s, P.base.get(s.file), here)).filter((s) => { const r = arityOf(P.base.get(s.file), s); return !r || n < 0 || (n >= r.lo && n <= r.hi + (fam === 'py' ? 1 : 0)); });
+        if (!could.length) continue;
+        // `Type.name(…)` on a type that left the repository together with the method: the name now belongs to someone else's type.
+        const rv = x.o.recv && x.o.recv.k === 'id' ? x.o.recv.v : null;
+        if (rv && could.every((s) => s.container && s.container.split('.').pop() === rv) && !(P.headNames().get(rv) || []).some((s) => s.kind === 'type')) continue;
+      }
       const line = x.F.tokens[x.i].l, was = decls[0], severity = b ? 'bad' : 'warn';
       const basis = b
         ? `The call binds to the removed declaration by the text alone (${b.how}), and no source file read at head declares anything named ${name}. Not established: a declaration produced by a code generator at build time.`
-        : `A function named ${name} was declared at the merge base and no source file read at head declares that name, yet this call remains. Not established: that the call resolved to the removed function, because the receiver's type is not resolved; a library method of the same name would still resolve.`;
+        : `A function named ${name} was declared at the merge base, this call could reach it and passes a number of arguments it accepted, and no source file read at head declares that name. Not established: that the call resolved to the removed function, because the receiver's type is not resolved; a library method of the same name would still resolve.`;
       found.push({ sev: SEVERITY[severity], f: mk(P, 'dangling.call', severity, x.F.path, line, 'Still called, no longer defined',
         `${name}(…) is called at ${x.F.path}:${line}, but ${was.qname} (${was.file}:${was.start} at the merge base) was removed and nothing named ${name} is declared at head.`, basis) });
     }
@@ -1123,9 +1200,10 @@ function jsSkips(F) {
  * testWeakening(ctx) → Finding[]
  *
  * Facts about the tests in files the diff touches, comparing test symbols at the merge base and at head:
- *   test.removed             bad   a test declared at the merge base that no file declares at head. Not reported
- *                                  when the same test name survives in another file (moved), when a new test in the
- *                                  file has the identical body (renamed), or when its declaration line was rewritten
+ *   test.removed             bad   a test declared at the merge base that is gone at head. Not reported when the
+ *                                  same qualified name survives in another file (moved) or an identical copy of it
+ *                                  remains, when a test that is new in the changed files has its name (class
+ *                                  renamed) or its body (test renamed), or when its declaration line was rewritten
  *                                  in place into a new test (renamed and edited: the two are then compared as one).
  *   test.disabled            bad   a test or test class that exists on both sides and gained a skip marker
  *   test.assertions-removed  warn  a test on both sides whose body makes fewer assertion calls than before
@@ -1143,12 +1221,15 @@ export function testWeakening(ctx) {
     tally(P.base, 0); tally(P.head, 1); return m;
   });
   const sig = (F, s) => signature(F.tokens.slice(s.bodyA, s.bodyB));
-  // Bodies of the tests that are new at head (their name is more frequent at head than at the merge base), in the files of the diff.
-  const newBodies = lazy(() => {
-    const set = new Set();
-    for (const d of P.diff) { const H = d.status === 'deleted' ? null : P.head.get(d.path); for (const s of testsOf(H)) { const g = everywhere().get(s.qname); if (g && g[1] > g[0] && s.bodyB - s.bodyA >= 6) set.add(sig(H, s)); } }
-    return set;
+  // Tests that are new at head (their qualified name is more frequent at head than at the merge base) in the files
+  // of the diff: their bodies, and their bare names (a test keeps its name when its class is renamed).
+  const arrivals = lazy(() => {
+    const bodies = new Set(), names = new Set();
+    for (const d of P.diff) { const H = d.status === 'deleted' ? null : P.head.get(d.path); for (const s of testsOf(H)) { const g = everywhere().get(s.qname); if (g && g[1] > g[0]) { names.add(s.name); if (s.bodyB - s.bodyA >= 6) bodies.add(sig(H, s)); } } }
+    return { bodies, names };
   });
+  // Every test at head by qualified name, to tell a removed copy from a removed test.
+  const atHead = lazy(() => { const m = new Map(); for (const F of P.head.values()) for (const s of testsOf(F)) (m.get(s.qname) || m.set(s.qname, []).get(s.qname)).push([F, s]); return m; });
   const rows = (s) => s.attrs.filter((a) => /^(InlineData|TestCase|DataRow)$/.test(a)).length;
 
   for (const d of P.diff) {
@@ -1201,9 +1282,11 @@ export function testWeakening(ctx) {
     const lineOf = (F, s, k) => F.tokens[Math.min(Math.max(k, s.a), F.tokens.length - 1)].l;
     for (const sb of bt) {
       if (pairedBase.has(sb) || disabled.has(sb.qname)) continue;
-      const g = everywhere().get(sb.qname);
+      const g = everywhere().get(sb.qname), body = sig(B, sb);
       if (g && g[1] >= g[0]) continue; // the same test lives on in another file
-      if (sb.bodyB - sb.bodyA >= 6 && newBodies().has(sig(B, sb))) continue; // renamed or moved to another class, body untouched
+      const twins = atHead().get(sb.qname) || [];
+      if (twins.some(([F, s]) => sig(F, s) === body)) continue; // one copy of a duplicated test went; an identical one remains
+      if ((sb.bodyB - sb.bodyA >= 6 && arrivals().bodies.has(body)) || arrivals().names.has(sb.name)) continue; // renamed, or moved to a class of another name
       if (H) { // rewritten in place: a hunk replaces its declaration line with the declaration line of a new test
         const a0 = sb.start, a1 = lineOf(B, sb, sb.bodyA);
         const h = d.hunks.find((x) => x.oldLines > 0 && x.newLines > 0 && x.oldStart <= a1 && x.oldStart + x.oldLines - 1 >= a0);
@@ -1213,8 +1296,8 @@ export function testWeakening(ctx) {
       const cut = H ? d.hunks.find((x) => x.oldStart <= sb.end && x.oldStart + Math.max(x.oldLines, 1) - 1 >= sb.start) : null;
       const extra = H && fresh.length ? `; the file gains ${plural(fresh.filter((s) => !paired.has(s)).length, 'other new test')}` : '';
       out.push(mk(P, 'test.removed', 'bad', file, H ? Math.max(1, cut ? cut.newStart : 1) : sb.start, 'Test removed',
-        `Test ${sb.qname} (${d.oldPath}:${sb.start} at the merge base) ${H ? 'is no longer in the file' : 'was deleted with its file'} and no test of that name exists at head${extra}.`,
-        'A test with this name is declared at the merge base and in no file at head; no new test in the changed files has the same body and none replaced its declaration line. Not established: whether another test covers the same behaviour.',
+        `Test ${sb.qname} (${d.oldPath}:${sb.start} at the merge base) ${H ? 'is no longer in the file' : 'was deleted with its file'} and ${twins.length ? 'the test of that name that remains at head has a different body' : 'no test of that name exists at head'}${extra}.`,
+        'A test with this name is declared at the merge base and is gone at head; no test that is new in the changed files has its name or its body, and none replaced its declaration line. Not established: whether another test covers the same behaviour.',
         (H && H.symbols.find((s) => s.kind === 'type' && s.qname === sb.container)) || null)); // the class it was in, never a neighbouring test
     }
 

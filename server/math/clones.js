@@ -30,6 +30,19 @@
 // every shift. The price, stated exactly: a shared run that is PURELY such a repetition from its first token
 // to its last is not detected. Every other shared run of t tokens or more is (proof at CloneIndex).
 //
+// Idioms. A span says two ranges are equal; it does not say that the equality is news. Code that everybody in a
+// repository writes the same way (a null check and an early return, the serialise-then-assert lines of a test,
+// the members a template stamps out) matches in dozens of places, and reporting a new function as a copy of one
+// of them misleads. The paper names the problem (section 5.2: "a very significant issue in a practical
+// copy-detection system is the ability to ignore boiler-plate") and MOSS, the system it describes, answers it
+// with a frequency rule: its -m option ignores a passage that appears in more than m programs, and its clients
+// ship m = 10. The same rule is applied here, per token and on verified matches only: a query token is COMMON
+// when at least `commonAt` indexed sequences each share with the query a run of k tokens or more that contains
+// it. Nothing is hidden: `common` is a count next to `tokens`, and tokens - common is the part of a match that
+// is not house style. The count is a lower bound (see query()), so code is never called common without that
+// many verified occurrences. What it cannot see: an idiom that is rare in the indexed repository (a framework
+// pattern used twice) is not common here, and stays a plain match.
+//
 // What a reported span IS: a proof, by token-by-token comparison, that two ranges have the same normalised
 // token sequence. Hashes only find candidates; no span is reported on the strength of a hash.
 // What it is NOT: proof that the code was copied, that the two ranges compute the same thing (every identifier
@@ -51,6 +64,10 @@ export const DEFAULTS = { k: 20, w: 21 };
 // bodies, each queried against all the others: 96% stayed under 5 000 and none reached 300 000. What gets near
 // the limit is a long block repeated hundreds of times in both the query and the index.
 const MAX_WORK = 2_000_000;
+
+// A passage shared with this many indexed sequences is common (see "Idioms" above). 10 is the MOSS default for
+// its -m option. With the query itself that is 11 occurrences; MOSS counts "more than m programs", the same line.
+const COMMON_AT = 10;
 
 // ---------------------------------------------------------------------------------------------------------
 // Normalisation
@@ -87,17 +104,23 @@ class Coder {
     if (c === undefined) { c = this.hash.length; this.ids.set(text, c); this.hash.push(tokenHash(text)); }
     return c;
   }
-  /** Lexer tokens → { n, codes, lines }: the same mapping as normalize(), as integers, with each token's line. */
-  encode(tokens) {
-    const m = tokens.length, codes = new Int32Array(m), lines = new Int32Array(m);
+  /**
+   * Lexer tokens → { n, codes, lines, texts }: the same mapping as normalize(), as integers, with each token's
+   * line and, when `keep` is set, its own text (what normalisation erased; only sameText reads it).
+   */
+  encode(tokens, keep = false) {
+    const m = tokens.length, codes = new Int32Array(m), lines = new Int32Array(m), texts = keep ? new Array(m) : null;
     let n = 0;
     for (let i = 0; i < m; i++) {
       const t = tokens[i], kind = t.k;
       if (kind === 'nl') continue;
       codes[n] = kind === 'id' ? 0 : kind === 'num' ? 1 : kind === 'str' ? 2 : this.code(String(t.v));
+      if (keep) texts[n] = t.v;
       lines[n++] = t.l;
     }
-    return n === m ? { n, codes, lines } : { n, codes: codes.slice(0, n), lines: lines.slice(0, n) };
+    if (n === m) return { n, codes, lines, texts };
+    if (keep) texts.length = n;
+    return { n, codes: codes.slice(0, n), lines: lines.slice(0, n), texts };
   }
   /** Already normalised strings → codes (for kgramHashes). */
   encodeNorm(norm) {
@@ -135,6 +158,7 @@ function roll(codes, n, k, table) {
 }
 
 const posInt = (v, name) => { if (!Number.isInteger(v) || v < 1) throw new RangeError(`${name} must be a positive integer, got ${v}`); return v; };
+const posIntOrInf = (v, name) => (v === Infinity ? v : posInt(v, name));
 
 /**
  * kgramHashes(norm, k) → Uint32Array of length max(0, norm.length − k + 1)
@@ -255,19 +279,20 @@ function extend(qc, qn, dc, dn, i, p, k, diag, base, cost) {
  * query range [a, e); side 1: the later range [b, b + e − a)). Longest first, a span is taken when it covers a
  * position no longer span did, so the longest evidence is always listed; then spans that the others make
  * redundant are dropped again, shortest first. `count` is a zeroed scratch array and is zeroed again on return.
- * Returns { kept, covered, repetitive }: positions covered, and how many of them `sum` marks repetitive.
+ * Returns { kept, covered, repetitive, common }: positions covered, and how many of them `sum` marks repetitive
+ * and `com` (optional, like `sum`) marks common.
  */
-function cover(spans, side, count, sum, any) {
+function cover(spans, side, count, sum, any, com) {
   const from = (s) => (side ? s[2] : s[0]), len = (s) => s[1] - s[0];
   spans.sort((x, y) => len(y) - len(x) || x[0] - y[0] || x[2] - y[2]);
   const kept = [], drop = new Set();
-  let covered = 0, repetitive = 0;
+  let covered = 0, repetitive = 0, common = 0;
   for (const s of spans) { // count[z]: how many kept spans cover z
     const lo = from(s), hi = lo + len(s);
     let fresh = 0;
     for (let z = lo; z < hi; z++) if (!count[z]) fresh++;
     if (!fresh) continue;
-    for (let z = lo; z < hi; z++) if (!count[z]++) { repetitive += sum[z + 1] - sum[z]; if (any) any[z] = 1; }
+    for (let z = lo; z < hi; z++) if (!count[z]++) { repetitive += sum[z + 1] - sum[z]; if (com) common += com[z + 1] - com[z]; if (any) any[z] = 1; }
     kept.push(s); covered += fresh;
   }
   for (let j = kept.length - 1; j >= 1; j--) { // shortest first (kept is sorted longest first); never the longest
@@ -279,7 +304,43 @@ function cover(spans, side, count, sum, any) {
     drop.add(kept[j]);
   }
   for (const s of kept) count.fill(0, from(s), from(s) + len(s));
-  return { kept: drop.size ? kept.filter((s) => !drop.has(s)) : kept, covered, repetitive };
+  return { kept: drop.size ? kept.filter((s) => !drop.has(s)) : kept, covered, repetitive, common };
+}
+
+/**
+ * How much of a match is the same TEXT, not only the same normalised tokens: over the query tokens of the span
+ * [a, e) aligned with the candidate from b, [characters in tokens whose text is identical on both sides,
+ * characters in all of them]. Token text is compared as strings; comments and layout never reach us.
+ */
+function sameText(qt, dt, a, e, b) {
+  let same = 0, all = 0;
+  for (let z = a; z < e; z++) {
+    const v = String(qt[z]), len = v.length;
+    all += len;
+    if (v === String(dt[b + z - a])) same += len;
+  }
+  return [same, all];
+}
+
+/**
+ * Prefix sums over query tokens of "common": sum[e] − sum[a] counts the tokens of [a, e) that lie in a verified
+ * match (k tokens or more, whatever minTokens is) with at least `at` different candidates. Each candidate counts
+ * once per token however many of its matches cover it.
+ */
+function commonSums(cands, n, at) {
+  const sum = new Int32Array(n + 1);
+  let matched = 0;
+  for (const c of cands) if (c.spans.length || c.rest) matched++;
+  if (matched < at) return sum; // fewer candidates than the threshold: no token can reach it
+  const shared = new Int32Array(n), stamp = new Int32Array(n);
+  let nth = 0;
+  for (const c of cands) {
+    if (!c.spans.length && !c.rest) continue;
+    nth++;
+    for (const list of c.rest ? [c.spans, c.rest] : [c.spans]) for (const s of list) for (let z = s[0]; z < s[1]; z++) if (stamp[z] !== nth) { stamp[z] = nth; shared[z]++; }
+  }
+  for (let z = 0; z < n; z++) sum[z + 1] = sum[z] + (shared[z] >= at ? 1 : 0);
+  return sum;
 }
 
 const span = (s, la, lb, sum, side) => {
@@ -307,13 +368,18 @@ const span = (s, la, lb, sum, side) => {
  * shorter than k can be found.
  */
 export class CloneIndex {
-  /** opts: { k, w, maxWork }: see DEFAULTS; maxWork bounds the comparisons one query may spend. */
+  /**
+   * opts: { k, w, maxWork, commonAt }: see DEFAULTS; maxWork bounds the comparisons one query may spend;
+   * commonAt (default 10, Infinity to switch it off) is how many indexed sequences must share a passage for it
+   * to count as common.
+   */
   constructor(opts = {}) {
     this.k = posInt(opts.k ?? DEFAULTS.k, 'k');
     this.w = posInt(opts.w ?? DEFAULTS.w, 'w');
     this.t = this.w + this.k - 1; // guarantee threshold
     this.maxWork = opts.maxWork ?? MAX_WORK;
-    this.docs = [];               // { id, meta, n, codes, lines }
+    this.commonAt = posIntOrInf(opts.commonAt ?? COMMON_AT, 'commonAt');
+    this.docs = [];               // { id, meta, n, codes, lines, texts }
     this.postings = new Map();    // k-gram hash → [doc, position, doc, position, …]
     this.coder = new Coder();
     this.tokens = 0;              // normalised tokens added
@@ -329,10 +395,13 @@ export class CloneIndex {
    * `tokens` are lexer tokens; `meta` is returned untouched with every match (file, name, lines: the caller's).
    * A sequence shorter than k tokens, or one that is a pure repetition, stores nothing and can never match
    * (returns 0). Ids are not checked for uniqueness: adding the same id twice makes two candidates.
+   * Every added sequence is one candidate and counts once in `distinct` and towards `common`. Sequences are
+   * taken to be separate pieces of code: if a function is added together with a function nested inside it, one
+   * place in the source counts twice.
    */
   add(id, tokens, meta = {}) {
-    const { n, codes, lines } = this.coder.encode(tokens), d = this.docs.length, k = this.k;
-    this.docs.push({ id, meta, n, codes, lines });
+    const { n, codes, lines, texts } = this.coder.encode(tokens, true), d = this.docs.length, k = this.k;
+    this.docs.push({ id, meta, n, codes, lines, texts });
     this.tokens += n;
     if (n > this.longest) this.longest = n;
     if (n < k) return 0;
@@ -346,16 +415,36 @@ export class CloneIndex {
   }
 
   /**
-   * query(tokens, { exclude = new Set(), minTokens = t, limit = Infinity })
-   *   → [{ id, meta, tokens, coverage, repetitive, spans: [{ a: { start, end }, b: { start, end }, tokens, repetitive }] }]
+   * query(tokens, { exclude = new Set(), minTokens = t, limit = Infinity, commonAt = this.commonAt })
+   *   → [{ id, meta, tokens, coverage, repetitive, common, sameText,
+   *        spans: [{ a: { start, end }, b: { start, end }, tokens, repetitive, common, sameText }] }]
    *     sorted by tokens descending (ties: order of add), with these properties on the array:
    *       distinct     candidates matched, before `limit` is applied
    *       queryTokens  normalised length of the query
    *       covered      query tokens that lie in a match with at least one candidate
+   *       common       how many of the covered tokens are common (below)
    *       truncated    true when the work budget ran out: what is listed is verified, but more may exist
    *
-   * exclude    ids to ignore (the function's own previous version, its enclosing function, …)
+   * exclude    ids to ignore (the function's own previous version, its enclosing function, …): a Set, any
+   *            iterable of ids, or one id as a string. Excluded sequences match nothing and count nowhere.
    * minTokens  shortest match counted; values below k behave as k. Default: the guarantee threshold t.
+   * commonAt   a query token is COMMON when at least this many candidates each share with the query a run of k
+   *            tokens or more that contains it (every such run is compared token by token, like a span).
+   *            `common` (per span, per candidate, on the array) is how many of the tokens counted there are
+   *            common: code written the same way in that many places is house style, an idiom or a template,
+   *            and tokens − common is what is left of a match once it is set aside. The count of candidates is
+   *            exact for shared runs of t tokens or more and a lower bound below t (a shorter run is seen only
+   *            when a fingerprint falls in it) and when `truncated`: `common` can understate, never overstate.
+   *            `distinct` is NOT a substitute: a long function with ten unrelated clones in ten places has
+   *            distinct = 10 and common = 0.
+   * sameText   (per span, and per candidate over its listed spans) the share, 0 to 1, of the matched text that
+   *            is literally the same: characters of the query tokens whose own text equals the aligned
+   *            candidate token, over the characters of all query tokens of the span. 1 is a verbatim copy (a
+   *            type-1 clone); lower means names or literals differ under the normalisation. It exists because a
+   *            token is not a fixed amount of code: two tests that differ only in a 30-line string literal match
+   *            in every token, and one token of that match is most of the function (measured on a real pair:
+   *            49 of 49 tokens covered, sameText 0.21). It measures text, not meaning: a renamed variable lowers
+   *            it and a changed `<` to `<=` cannot occur inside a span at all.
    * Per candidate: `tokens` is the number of query tokens covered by verified matches of at least minTokens
    * with that candidate (overlaps counted once), `coverage` is tokens / queryTokens, and each span is one
    * maximal match: `a` its line range in the query, `b` in the candidate, `tokens` its length. Lines are the
@@ -369,15 +458,21 @@ export class CloneIndex {
    *
    * Establishes: every listed span is identical in its normalised tokens on both sides (compared, not hashed),
    * and, when `truncated` is false, every shared run of at least max(minTokens, t) tokens with a non-excluded
-   * candidate that is not a pure repetition is counted in that candidate's `tokens`.
-   * Does not establish: copying, semantic equality, or anything about shorter runs that are not listed.
+   * candidate that is not a pure repetition is counted in that candidate's `tokens`; every token counted in
+   * `common` lies in verified shared runs with at least commonAt candidates.
+   * Does not establish: copying, semantic equality, anything about shorter runs that are not listed, or that a
+   * token NOT counted as common is rare (below t the count of candidates is a lower bound).
    */
-  query(tokens, { exclude = new Set(), minTokens = this.t, limit = Infinity } = {}) {
-    const q = this.coder.encode(tokens), n = q.n, k = this.k, qc = q.codes;
+  query(tokens, { exclude = new Set(), minTokens = this.t, limit = Infinity, commonAt = this.commonAt } = {}) {
+    // NaN would make every length comparison false and return "no clones" for any input: refuse it instead.
+    if (typeof minTokens !== 'number' || Number.isNaN(minTokens)) throw new RangeError(`minTokens must be a number, got ${minTokens}`);
+    posIntOrInf(commonAt, 'commonAt');
+    const q = this.coder.encode(tokens, true), n = q.n, k = this.k, qc = q.codes;
     const out = [];
-    out.distinct = 0; out.queryTokens = n; out.covered = 0; out.truncated = false;
+    out.distinct = 0; out.queryTokens = n; out.covered = 0; out.common = 0; out.truncated = false;
     if (n < k) return out;
-    const min = Math.max(minTokens, k), skip = exclude instanceof Set ? exclude : new Set(exclude);
+    // A bare string is one id, not an iterable of its characters (which would silently exclude nothing).
+    const min = Math.max(minTokens, k), skip = exclude instanceof Set ? exclude : new Set(typeof exclude === 'string' ? [exclude] : exclude);
     const hs = roll(qc, n, k, this.coder.hash), docs = this.docs, cands = [], cost = { work: 0 };
     const diag = new Map(), room = n + this.longest + 1; // one map for all candidates: key = candidate · room + diagonal
     if (this.slot.length < docs.length) this.slot = new Int32Array(docs.length + (docs.length >> 2));
@@ -392,7 +487,7 @@ export class CloneIndex {
           const d = list[j], doc = docs[d];
           let c;
           if (slot[d]) c = cands[slot[d] - 1];
-          else { cands.push(c = { d, base: cands.length * room + doc.n, off: skip.size > 0 && skip.has(doc.id), spans: [], best: null, result: null }); slot[d] = cands.length; }
+          else { cands.push(c = { d, base: cands.length * room + doc.n, off: skip.size > 0 && skip.has(doc.id), spans: [], rest: null, best: null, result: null }); slot[d] = cands.length; }
           if (c.off) continue;
           const p = list[j + 1], dc = doc.codes, best = c.best;
           if (best !== null && i >= best[0] && i + k <= best[1]) {
@@ -405,7 +500,7 @@ export class CloneIndex {
           }
           const m = extend(qc, n, dc, doc.n, i, p, k, diag, c.base, cost);
           if (m) {
-            if (m[1] - m[0] >= min) c.spans.push(m);
+            if (m[1] - m[0] >= min) c.spans.push(m); else (c.rest ??= []).push(m); // too short to list, still an occurrence
             if (best === null || m[1] - m[0] > best[1] - best[0]) c.best = m;
           }
           if (cost.work > this.maxWork) { out.truncated = true; break scan; }
@@ -414,15 +509,21 @@ export class CloneIndex {
     } finally { for (const c of cands) slot[c.d] = 0; }
     const found = cands.filter((c) => c.spans.length);
     if (!found.length) return out;
-    const sum = repetitiveSums(qc, n, k), count = new Int32Array(n), any = new Uint8Array(n);
+    const sum = repetitiveSums(qc, n, k), com = commonSums(cands, n, commonAt), count = new Int32Array(n), any = new Uint8Array(n);
     for (const c of found) {
-      const doc = this.docs[c.d], { kept, covered, repetitive } = cover(c.spans, 0, count, sum, any);
+      const doc = this.docs[c.d], { kept, covered, repetitive, common } = cover(c.spans, 0, count, sum, any, com);
       kept.sort((x, y) => x[0] - y[0] || x[2] - y[2]);
-      c.result = { id: doc.id, meta: doc.meta, tokens: covered, coverage: covered / n, repetitive, spans: kept.map((s) => span(s, q.lines, doc.lines, sum, 0)) };
+      let same = 0, all = 0;
+      const spans = kept.map((s) => {
+        const [sm, al] = sameText(q.texts, doc.texts, s[0], s[1], s[2]);
+        same += sm; all += al;
+        return { ...span(s, q.lines, doc.lines, sum, 0), common: com[s[1]] - com[s[0]], sameText: al ? sm / al : 1 };
+      });
+      c.result = { id: doc.id, meta: doc.meta, tokens: covered, coverage: covered / n, repetitive, common, sameText: all ? same / all : 1, spans };
     }
     found.sort((x, y) => y.result.tokens - x.result.tokens || x.d - y.d);
     out.distinct = found.length;
-    for (let z = 0; z < n; z++) out.covered += any[z];
+    for (let z = 0; z < n; z++) if (any[z]) { out.covered++; out.common += com[z + 1] - com[z]; }
     for (let j = 0; j < found.length && j < limit; j++) out.push(found[j].result);
     return out;
   }

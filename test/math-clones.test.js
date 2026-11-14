@@ -158,7 +158,7 @@ test('guarantee: a shared run of exactly t tokens is always found, with its exac
     assert.deepEqual(r[0].meta, { seed });
     assert.equal(r[0].tokens, T);
     assert.equal(r[0].coverage, T / Q.length);
-    assert.deepEqual(r[0].spans, [{ a: lines(qat, T), b: lines(dat, T), tokens: T, repetitive: 0 }]);
+    assert.deepEqual(r[0].spans, [{ a: lines(qat, T), b: lines(dat, T), tokens: T, repetitive: 0, common: 0, sameText: 1 }]);
     assert.equal(r.covered, T);
     assert.equal(r.queryTokens, Q.length);
     assert.equal(r.truncated, false);
@@ -174,7 +174,7 @@ test('guarantee is tight: a run of t − 1 tokens may be missed, and whatever is
     const r = ix.query(ops(Q), { minTokens: K });
     if (!r.length) { missed++; continue; }
     found++;
-    assert.deepEqual(r[0].spans, [{ a: lines(qat, T - 1), b: lines(dat, T - 1), tokens: T - 1, repetitive: 0 }]);
+    assert.deepEqual(r[0].spans, [{ a: lines(qat, T - 1), b: lines(dat, T - 1), tokens: T - 1, repetitive: 0, common: 0, sameText: 1 }]);
   }
   assert.ok(missed > 0, 't − 1 is below the guarantee: some run must go undetected');
   assert.ok(found > missed, 'most are still found, as a best effort');
@@ -195,7 +195,7 @@ test('guarantee holds for other parameters (k = 5, w = 4, t = 8) and matches ext
     ix.add('d', ops(D));
     const hit = ix.query(ops(Q)).find((m) => m.spans.some((s) => s.tokens === len));
     assert.ok(hit, `seed ${seed}`);
-    assert.deepEqual(hit.spans.find((s) => s.tokens === len), { a: lines(qat, len), b: lines(dat, len), tokens: len, repetitive: 0 });
+    assert.deepEqual(hit.spans.find((s) => s.tokens === len), { a: lines(qat, len), b: lines(dat, len), tokens: len, repetitive: 0, common: 0, sameText: 1 });
   }
 });
 
@@ -209,7 +209,7 @@ test('guarantee under ties: a unit of 12 tokens repeated (not a pure repetition)
   assert.equal(r.length, 1);
   assert.equal(r[0].tokens, 240);          // every token of the 20 repetitions lies in some alignment of the 5
   assert.equal(r[0].repetitive, 0);
-  assert.deepEqual(r[0].spans, [0, 60, 120, 180].map((at) => ({ a: lines(1 + at, 60), b: lines(2, 60), tokens: 60, repetitive: 0 })));
+  assert.deepEqual(r[0].spans, [0, 60, 120, 180].map((at) => ({ a: lines(1 + at, 60), b: lines(2, 60), tokens: 60, repetitive: 0, common: 0, sameText: 1 })));
 });
 
 // ---- renamed copies, real code -------------------------------------------------------------------------
@@ -241,13 +241,17 @@ test('renamed copy (type-2 clone) matches completely; a structural change does n
   assert.deepEqual(r[0].meta, { file: 'cart.js' });
   assert.equal(r[0].tokens, a.length);
   assert.equal(r[0].coverage, 1);
-  assert.deepEqual(r[0].spans, [{ a: { start: 2, end: 10 }, b: { start: 2, end: 6 }, tokens: a.length, repetitive: 0 }]);
+  // sameText, counted by hand on RENAMED: 61 of its 133 token characters sit in tokens spelled the same in
+  // ORIGINAL (every keyword and operator, and the one shared name `push`); the 12 renamed names and literals do not.
+  assert.deepEqual(r[0].spans, [{ a: { start: 2, end: 10 }, b: { start: 2, end: 6 }, tokens: a.length, repetitive: 0, common: 0, sameText: 61 / 133 }]);
+  assert.equal(r[0].sameText, 61 / 133);
+  assert.equal(ix.query(a)[0].sameText, 1); // the original against itself: a verbatim (type-1) copy
   // `*` became `/` at token 28 of 59: runs of 27 and 31 tokens remain, both shorter than t, so nothing is claimed.
   const changed = tokenize(RENAMED.replace('box.mass * box.count', 'box.mass / box.count'), 'js');
   assert.equal(ix.query(changed).length, 0);
   // `>` became `>=` at token 19: the 40 tokens after it are still a shared run of exactly t, and are reported.
   const tail = ix.query(tokenize(RENAMED.replace('box.count > 5', 'box.count >= 5'), 'js'));
-  assert.deepEqual(tail.map((m) => [m.tokens, m.spans]), [[40, [{ a: { start: 4, end: 10 }, b: { start: 4, end: 6 }, tokens: 40, repetitive: 0 }]]]);
+  assert.deepEqual(tail.map((m) => [m.tokens, m.spans]), [[40, [{ a: { start: 4, end: 10 }, b: { start: 4, end: 6 }, tokens: 40, repetitive: 0, common: 0, sameText: 38 / 88 }]]]);
 });
 
 test('line ranges: the lines where the first and last token of the match start, in the query and in the candidate', () => {
@@ -267,7 +271,7 @@ test('line ranges: the lines where the first and last token of the match start, 
   ix.add('c', tokenize(candidate, 'js'));
   const r = ix.query(tokenize(query, 'js'));
   assert.equal(r.length, 1);
-  assert.deepEqual(r[0].spans, [{ a: { start: 6, end: 13 }, b: { start: 3, end: 10 }, tokens: 71, repetitive: 0 }]);
+  assert.deepEqual(r[0].spans, [{ a: { start: 6, end: 13 }, b: { start: 3, end: 10 }, tokens: 71, repetitive: 0, common: 0, sameText: 1 }]);
   assert.equal(r[0].tokens, 71);
 });
 
@@ -319,8 +323,8 @@ test('query: sorted by tokens, coverage counts overlaps once, exclude, limit and
   // spans come in query order.
   const at = res[0].spans[0].b.start - 1;
   assert.ok(at === 130 || at === 220);
-  assert.deepEqual(res[0].spans, [{ a: lines(1, 60), b: lines(at, 60), tokens: 60, repetitive: 0 }, { a: lines(63, 100), b: lines(0, 100), tokens: 100, repetitive: 0 }]);
-  assert.deepEqual(res[2].spans, [{ a: lines(1, 60), b: lines(30, 60), tokens: 60, repetitive: 0 }]);
+  assert.deepEqual(res[0].spans, [{ a: lines(1, 60), b: lines(at, 60), tokens: 60, repetitive: 0, common: 0, sameText: 1 }, { a: lines(63, 100), b: lines(0, 100), tokens: 100, repetitive: 0, common: 0, sameText: 1 }]);
+  assert.deepEqual(res[2].spans, [{ a: lines(1, 60), b: lines(30, 60), tokens: 60, repetitive: 0, common: 0, sameText: 1 }]);
 
   assert.deepEqual(ix.query(ops(Q), { exclude: new Set(['hasYXtwice']) }).map((m) => m.id), ['hasY', 'hasX']);
   assert.deepEqual(ix.query(ops(Q), { exclude: ['hasYXtwice', 'hasY'] }).map((m) => m.id), ['hasX']);
@@ -354,7 +358,7 @@ test('empty and tiny inputs', () => {
   const ix = new CloneIndex();
   const none = ix.query(ops(stream(rng(1), 100)));
   assert.deepEqual([...none], []);
-  assert.deepEqual([none.distinct, none.queryTokens, none.covered, none.truncated], [0, 100, 0, false]);
+  assert.deepEqual([none.distinct, none.queryTokens, none.covered, none.common, none.truncated], [0, 100, 0, 0, false]);
   assert.equal(ix.add('empty', []), 0);
   assert.equal(ix.add('short', ops(stream(rng(2), K - 1))), 0);       // below k: no k-gram, never matches
   assert.equal(ix.add('exactlyK', ops(stream(rng(3), K))), 1);        // one k-gram: one fingerprint
@@ -368,6 +372,9 @@ test('empty and tiny inputs', () => {
   assert.deepEqual(whole.map((m) => [m.id, m.tokens, m.coverage]), [['exactlyK', K, 1]]);
   assert.throws(() => new CloneIndex({ k: 0 }), RangeError);
   assert.throws(() => new CloneIndex({ w: -1 }), RangeError);
+  assert.throws(() => new CloneIndex({ commonAt: 0 }), RangeError);
+  assert.equal(new CloneIndex().commonAt, 10);
+  assert.equal(new CloneIndex({ commonAt: Infinity }).commonAt, Infinity);
 });
 
 // ---- repetition and the work budget --------------------------------------------------------------------
@@ -391,7 +398,7 @@ test('repetition attached to real code is matched and counted as repetitive', ()
   assert.equal(res.length, 1);
   assert.equal(res[0].tokens, 92);
   assert.equal(res[0].repetitive, 80); // the 40 `N ,` pairs; the 12 tokens in front carry the information
-  assert.deepEqual(res[0].spans, [{ a: lines(33, 92), b: lines(25, 92), tokens: 92, repetitive: 80 }]);
+  assert.deepEqual(res[0].spans, [{ a: lines(33, 92), b: lines(25, 92), tokens: 92, repetitive: 80, common: 0, sameText: 1 }]);
 });
 
 test('work budget: a query that runs out says truncated and reports only verified matches', () => {
@@ -609,4 +616,211 @@ test('duplicationWithin agrees with brute force: the duplicated tokens, and ever
     }
   }
   assert.ok(nonEmpty > 100 && overlapping > 10, `the comparison must not be vacuous: ${nonEmpty} with duplication, ${overlapping} back-to-back runs`);
+});
+
+// ---- adversarial review --------------------------------------------------------------------------------
+// A second generator, independent of the one above (a linear congruential generator, Numerical Recipes
+// constants), so that the properties below are not tuned to the streams the module was developed against.
+const lcg = (seed) => { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; };
+/** Random stretches mixed with short and long units repeated: ties, periodic k-grams and chance matches abound. */
+function rough(r, alpha, n) {
+  const out = [];
+  while (out.length < n) {
+    if (r() < 0.4) for (let j = 1 + Math.floor(r() * 40); j > 0; j--) out.push(alpha[Math.floor(r() * alpha.length)]);
+    else { const unit = Array.from({ length: 1 + Math.floor(r() * 25) }, () => alpha[Math.floor(r() * alpha.length)]); for (let j = 1 + Math.floor(r() * 6); j > 0; j--) out.push(...unit); }
+  }
+  return out.slice(0, n);
+}
+/** One period of at most maxP tokens holds from the first token of the run to the last. */
+function onePeriod(S, from, len, maxP) {
+  for (let p = 1; p <= maxP; p++) { let ok = true; for (let z = from + p; z < from + len && ok; z++) ok = S[z] === S[z - p]; if (ok) return true; }
+  return false;
+}
+
+test('review: the guarantee over a second generator, eight (k, w) pairs and four alphabets; the only runs excused are one short period', () => {
+  const alphas = [['a', 'b'], ['a', 'b', 'c'], ['+', '-', '*', '(', ')', ';'], ALPHA];
+  let must = 0, excused = 0;
+  for (const P of [{ k: 20, w: 21 }, { k: 6, w: 5 }, { k: 2, w: 1 }, { k: 1, w: 1 }, { k: 3, w: 7 }, { k: 7, w: 2 }, { k: 20, w: 1 }, { k: 5, w: 30 }]) {
+    const t = P.k + P.w - 1;
+    for (let ai = 0; ai < alphas.length; ai++) for (let seed = 1; seed <= 12; seed++) {
+      const r = lcg(seed * 2654435761 + ai * 97 + P.k * 31 + P.w), alpha = alphas[ai];
+      const docs = Array.from({ length: 1 + Math.floor(r() * 3) }, () => rough(r, alpha, 60 + Math.floor(r() * 150))), Q = rough(r, alpha, 60 + Math.floor(r() * 150));
+      const len = t + Math.floor(r() * 30), qa = Math.floor(r() * Math.max(1, Q.length - len)), d0 = Math.floor(r() * docs.length);
+      docs[d0].splice(Math.floor(r() * docs[d0].length), 0, ...Q.slice(qa, qa + len)); // a planted run of at least t
+      const ix = new CloneIndex(P);
+      docs.forEach((D, d) => ix.add(d, ops(D)));
+      const res = ix.query(ops(Q));
+      assert.equal(res.truncated, false);
+      docs.forEach((D, d) => {
+        const need = new Set();
+        for (const [a, , L] of maximalRuns(Q, D)) {
+          if (L < t) continue;
+          // Fine and Wilf (1965): if every k-gram of a run repeats a unit of at most k/2 tokens, the whole run
+          // repeats one unit. So "no usable k-gram" and "one short period from end to end" are the same runs.
+          assert.equal(pureRepetition(Q, a, L, P.k), onePeriod(Q, a, L, P.k >> 1), 'the excused runs are exactly the purely periodic ones');
+          if (onePeriod(Q, a, L, P.k >> 1)) { excused++; continue; }
+          must++;
+          for (let z = a; z < a + L; z++) need.add(z);
+        }
+        const got = new Set();
+        for (const s of res.find((m) => m.id === d)?.spans ?? []) {
+          const a = s.a.start - 1, b = s.b.start - 1;
+          assert.deepEqual(Q.slice(a, a + s.tokens), D.slice(b, b + s.tokens), 'a listed span is equal token by token');
+          for (let z = a; z < a + s.tokens; z++) got.add(z);
+        }
+        for (const z of need) assert.ok(got.has(z), `k=${P.k} w=${P.w} alphabet ${ai} seed ${seed}: token ${z} of a shared run of at least t is not reported`);
+      });
+    }
+  }
+  assert.ok(must > 2000 && excused > 100, `the property must not be vacuous: ${must} runs required, ${excused} excused`);
+});
+
+test('review: common marks house style token by token, counts excluded sequences nowhere, and Infinity switches it off', () => {
+  const r = rng(301), idiom = stream(r, 50), unique = stream(r, 70), ix = new CloneIndex();
+  const pre = other(idiom[0]), post = other(idiom[49]); // delimiters: the shared run is the idiom and nothing more
+  for (let d = 0; d < 12; d++) ix.add(`f${d}`, ops([...stream(r, 25 + d), pre, ...idiom, post, ...stream(r, 25)]));
+  ix.add('copied', ops([pre, ...idiom, post, ...stream(r, 30), other(unique[0]), ...unique, other(unique[69])]));
+  const Q = ops([other(pre), ...idiom, other(post), '~', ...unique, '~']); // idiom on lines 2–51, unique block on 54–123
+  const res = ix.query(Q);
+  assert.equal(res.distinct, 13);
+  assert.equal(res[0].id, 'copied');
+  // The idiom is shared with 13 sequences (at least 10: common); the unique block with one (not common).
+  assert.deepEqual([res[0].tokens, res[0].common], [120, 50]);
+  assert.deepEqual(res[0].spans.map((s) => [s.a.start, s.tokens, s.common]), [[2, 50, 50], [54, 70, 0]]);
+  for (const m of res.slice(1)) assert.deepEqual([m.tokens, m.common], [50, 50]);
+  assert.deepEqual([res.covered, res.common], [120, 50]);
+  // The threshold is "at least commonAt sequences": 13 share the idiom.
+  assert.equal(ix.query(Q, { commonAt: 13 })[0].common, 50);
+  assert.equal(ix.query(Q, { commonAt: 14 })[0].common, 0);
+  assert.equal(ix.query(Q, { commonAt: Infinity }).common, 0);
+  // Excluded sequences are not occurrences: 13 − 3 = 10 is still common, 13 − 4 = 9 is not.
+  assert.equal(ix.query(Q, { exclude: ['f0', 'f1', 'f2'] }).common, 50);
+  assert.equal(ix.query(Q, { exclude: ['f0', 'f1', 'f2', 'f3'] }).common, 0);
+  assert.throws(() => ix.query(Q, { commonAt: 0 }), RangeError);
+  assert.throws(() => ix.query(Q, { commonAt: 2.5 }), RangeError);
+});
+
+test('review: an occurrence too short to be listed still counts towards common', () => {
+  // w = 1 makes every k-gram a fingerprint (t = k = 20), so the 35-token idiom is certain to be seen; minTokens 40
+  // keeps it out of the listed matches. The 60-token block is listed once, and its first 35 tokens are house style.
+  const r = rng(304), B = stream(r, 60), ix = new CloneIndex({ k: 20, w: 1 });
+  for (let d = 0; d < 12; d++) ix.add(`f${d}`, ops([...stream(r, 20), other(B[0]), ...B.slice(0, 35), other(B[35]), ...stream(r, 20)]));
+  ix.add('copied', ops(['~', ...B, '~']));
+  const res = ix.query(ops(['?', ...B, '?']), { minTokens: 40 });
+  assert.deepEqual(res.map((m) => [m.id, m.tokens, m.common]), [['copied', 60, 35]]);
+  assert.equal(res.distinct, 1); // one candidate holds a match long enough to list: distinct alone would say "a copy"
+  assert.deepEqual([res.covered, res.common], [60, 35]);
+  // 12 short occurrences and the copy make 13; excluding three leaves 10 (still common), four leaves 9 (not).
+  assert.equal(ix.query(ops(['?', ...B, '?']), { minTokens: 40, exclude: ['f0', 'f1', 'f2'] }).common, 35);
+  assert.equal(ix.query(ops(['?', ...B, '?']), { minTokens: 40, exclude: ['f0', 'f1', 'f2', 'f3'] }).common, 0);
+});
+
+test('review: distinct is not an idiom signal (counterexample), common is', () => {
+  // A long function made of ten unrelated blocks, each copied from a different place: ten candidates, and not one
+  // token is house style. Calling this an idiom because distinct > 8 would wave ten real clones through.
+  const r = rng(302), blocks = Array.from({ length: 10 }, () => stream(r, 60)), ix = new CloneIndex();
+  blocks.forEach((b, d) => ix.add(`src${d}`, ops([...stream(r, 20), '~', ...b, '~', ...stream(r, 20)])));
+  const res = ix.query(ops(blocks.flatMap((b, i) => ['?', ALPHA[i], ...b])));
+  assert.equal(res.distinct, 10);
+  assert.deepEqual([res.covered, res.common], [600, 0]);
+  assert.ok(res.every((m) => m.tokens === 60 && m.common === 0));
+});
+
+test('review: common is a lower bound, exact from t upwards (against brute force)', () => {
+  // Per query token, brute force gives two counts of sequences: those sharing a maximal run of at least k through
+  // it (the definition, an upper bound for what fingerprints can see) and those sharing one of at least t that is
+  // not a pure repetition (always seen). The module's count must lie between them: never more than the first.
+  const AT = 3;
+  let bothBounds = 0, strict = 0;
+  for (let seed = 1; seed <= 150; seed++) {
+    const r = rng(seed * 6007), pool = Array.from({ length: 3 }, () => stream(r, 45).map((v) => ['+', '-', '*', '(', ')', ';'][ALPHA.indexOf(v) % 6]));
+    const docs = Array.from({ length: 7 }, () => messy(r, pool)), Q = messy(r, pool), ix = new CloneIndex({ ...REF, commonAt: AT });
+    docs.forEach((D, d) => ix.add(d, ops(D)));
+    const res = ix.query(ops(Q));
+    const upper = new Int32Array(Q.length), lower = new Int32Array(Q.length), covered = new Uint8Array(Q.length);
+    docs.forEach((D) => {
+      const any = new Uint8Array(Q.length), sure = new Uint8Array(Q.length);
+      for (const [a, , len] of maximalRuns(Q, D)) {
+        if (len >= REF.k) any.fill(1, a, a + len);
+        if (len >= REF_T && !pureRepetition(Q, a, len, REF.k)) { sure.fill(1, a, a + len); covered.fill(1, a, a + len); }
+      }
+      for (let z = 0; z < Q.length; z++) { upper[z] += any[z]; lower[z] += sure[z]; }
+    });
+    let lo = 0, hi = 0;
+    for (let z = 0; z < Q.length; z++) if (covered[z]) { if (lower[z] >= AT) lo++; if (upper[z] >= AT) hi++; }
+    assert.ok(res.common >= lo && res.common <= hi, `seed ${seed}: common ${res.common} outside [${lo}, ${hi}]`);
+    if (hi > 0) bothBounds++;
+    if (hi > lo) strict++;
+    for (const m of res) {
+      assert.ok(m.common >= 0 && m.common <= m.tokens);
+      for (const s of m.spans) { // per span, token by token against the upper bound
+        let cap = 0;
+        for (let z = s.a.start - 1; z < s.a.start - 1 + s.tokens; z++) if (upper[z] >= AT) cap++;
+        assert.ok(s.common <= cap, `seed ${seed}: a span claims ${s.common} common tokens, brute force allows ${cap}`);
+      }
+    }
+    assert.equal(ix.query(ops(Q), { commonAt: Infinity }).common, 0);
+  }
+  assert.ok(bothBounds > 50 && strict > 10, `the comparison must not be vacuous: ${bothBounds} cases with common tokens, ${strict} where the bounds differ`);
+});
+
+test('review: sameText tells a verbatim copy from a match that is mostly one erased literal', () => {
+  // Two tests with the same scaffolding and different inputs: every normalised token matches (coverage 1), yet
+  // the code a person reads is mostly the string, and the strings differ.
+  const scaffold = (source, code) => `
+    const input = ${source};
+    const result = await new Harness({ sources: [input], expected: [diagnostic(${code}).at(0)] }).run(this.output);
+    assert.equal(result.errors.length, 1);
+    assert.equal(result.errors[0].code, ${code});`;
+  const longA = JSON.stringify('class A { constructor(x) { this.x = x; } get value() { return this.x; } }'.repeat(4));
+  const longB = JSON.stringify('record B(int Id, string Name) { public override string ToString() => Name; }'.repeat(4));
+  const a = tokenize(scaffold(longA, "'E005'"), 'js'), b = tokenize(scaffold(longB, "'E007'"), 'js'), ix = new CloneIndex();
+  ix.add('a', a);
+  const res = ix.query(b);
+  assert.equal(res[0].coverage, 1);
+  // Hand count: exactly three tokens differ (the long string and the code, twice); everything else is spelled the same.
+  const differing = b.filter((t, i) => t.v !== a[i].v);
+  assert.deepEqual(differing.map((t) => t.k), ['str', 'str', 'str']);
+  const all = b.reduce((n, t) => n + t.v.length, 0), diff = differing.reduce((n, t) => n + t.v.length, 0);
+  assert.equal(diff, longB.length + 12);
+  assert.equal(res[0].sameText, (all - diff) / all);
+  assert.equal(res[0].spans[0].sameText, (all - diff) / all);
+  assert.ok(res[0].sameText < 0.5, `most of the matched text differs: ${res[0].sameText}`);
+  assert.equal(ix.query(a)[0].sameText, 1);
+});
+
+test('review: arguments that used to fail silently', () => {
+  const r = rng(303), X = stream(r, 80), ix = new CloneIndex();
+  ix.add('self', ops(['~', ...X, '~']));
+  ix.add('other', ops(['?', ...X, '?']));
+  const Q = ops(['!', ...X, '!']);
+  // NaN made every length comparison false: "no clones", whatever the input.
+  assert.throws(() => ix.query(Q, { minTokens: NaN }), RangeError);
+  assert.throws(() => ix.query(Q, { minTokens: '40x' }), RangeError);
+  assert.equal(ix.query(Q, { minTokens: undefined }).length, 2); // undefined is "use the default"
+  // A bare string was read as an iterable of characters and excluded nothing.
+  assert.deepEqual(ix.query(Q, { exclude: 'self' }).map((m) => m.id), ['other']);
+  assert.deepEqual(ix.query(Q, { exclude: ['self'] }).map((m) => m.id), ['other']);
+});
+
+test('review: a truncated query is a lower bound in every count, and what it lists is still verified', () => {
+  const r = lcg(77), block = stream(r, 90), docs = Array.from({ length: 40 }, () => [...stream(r, 15), '?', ...block, '?', ...stream(r, 15)]), Q = ['~', ...block, '~', ...block, '~'];
+  const full = new CloneIndex(), byId = new Map();
+  docs.forEach((D, d) => full.add(d, ops(D)));
+  const all = full.query(ops(Q));
+  assert.equal(all.truncated, false);
+  assert.deepEqual([all.distinct, all.covered, all.common], [40, 180, 180]);
+  for (const m of all) byId.set(m.id, m);
+  for (const maxWork of [0, 50, 500, 3000]) {
+    const tight = new CloneIndex({ maxWork });
+    docs.forEach((D, d) => tight.add(d, ops(D)));
+    const some = tight.query(ops(Q));
+    assert.equal(some.truncated, true, `maxWork ${maxWork}`);
+    assert.ok(some.distinct <= all.distinct && some.covered <= all.covered && some.common <= all.common);
+    for (const m of some) {
+      assert.ok(m.tokens <= byId.get(m.id).tokens && m.common <= byId.get(m.id).common);
+      for (const s of m.spans) assert.deepEqual(Q.slice(s.a.start - 1, s.a.start - 1 + s.tokens), docs[m.id].slice(s.b.start - 1, s.b.start - 1 + s.tokens));
+    }
+    assert.deepEqual([...tight.query(ops(Q))], [...some]); // a count, not a clock: the same answer every time
+  }
 });

@@ -7,6 +7,8 @@ import { tokenize, matchBrackets, langOf, isJsLike } from './lex.js';
 const TYPE_KW = new Set(['class', 'struct', 'interface', 'record', 'enum', 'trait', 'impl', 'protocol', 'extension', 'union', 'object']);
 const FN_KW = new Set(['function', 'func', 'fn', 'fun', 'def']);
 const CONTROL = new Set(['if', 'else', 'for', 'foreach', 'while', 'do', 'switch', 'try', 'catch', 'finally', 'using', 'lock', 'fixed', 'checked', 'unchecked', 'unsafe', 'when', 'with', 'match', 'select', 'loop', 'synchronized', 'guard', 'defer', 'elif', 'except', 'repeat', 'return', 'throw', 'case', 'default', 'get', 'set', 'init', 'add', 'remove', 'static']);
+// Keywords that open a bare block only when nothing follows them (`get { }`, `static { }`); with more tokens they are modifiers.
+const ALONE = new Set(['get', 'set', 'init', 'add', 'remove', 'static']);
 const TEST_CALL = new Set(['describe', 'it', 'test', 'suite', 'context', 'specify', 'fdescribe', 'fit', 'xdescribe', 'xit', 'bench']);
 const TEST_GROUP = new Set(['describe', 'suite', 'context', 'fdescribe', 'xdescribe']);
 const TEST_ATTR = /^(Fact|Theory|Test|TestMethod|TestCase|TestCaseSource|DataTestMethod|InlineData|MemberData|ClassData|CombinatorialData|Benchmark|ParameterizedTest|RepeatedTest)$/;
@@ -53,7 +55,7 @@ export function parseFile(text, path, lang = langOf(path)) {
       const eq = seg.findIndex((i) => op(i, '=')), body = eq < 0 ? seg : seg.slice(0, eq);
       const ids = body.filter((i) => T[i].k === 'id' || (T[i].k === 'kw' && (T[i].v === 'self' || T[i].v === 'this')));
       const rest = body.some((i) => op(i, '...') || kw(i, 'params') || (lang === 'py' && op(i, '*')) || (lang === 'py' && op(i, '**')));
-      const optional = eq >= 0 || body.some((i) => op(i, '?'));
+      const optional = eq >= 0 || (js && body.some((i, k) => op(i, '?') && body[k + 1] != null && op(body[k + 1], ':')));
       const colon = body.findIndex((i) => op(i, ':'));
       let name = null;
       if (ids.length) name = TYPED_BEFORE.has(lang) || lang === 'go' && false ? T[ids[ids.length - 1]].v : colon > 0 ? word(body[colon - 1]) || T[ids[0]].v : lang === 'go' ? T[ids[0]].v : TYPED_BEFORE.has(lang) ? T[ids[ids.length - 1]].v : T[ids[0]].v;
@@ -80,17 +82,17 @@ export function parseFile(text, path, lang = langOf(path)) {
     return names;
   };
 
-  function add(sym, ctx, a, b, bodyA, bodyB, open) {
+  function add(sym, ctx, a, b, bodyA, bodyB, open, single = null) {
     const attrs = attrsOf(a, b), mods = [];
     for (let i = a; i < Math.min(b, bodyA > a ? bodyA : b); i++) { const w = word(i); if (w && MODIFIER.has(w)) mods.push(w); if (op(i, '(')) break; i = skip(i); }
     const chain = ctx.chain || [];
-    const p = open != null && open >= 0 ? params(open) : { params: 0, minParams: 0, maxParams: 0, paramNames: [] };
+    const p = open != null && open >= 0 ? params(open) : single ? { params: 1, minParams: 1, maxParams: 1, paramNames: [single] } : { params: 0, minParams: 0, maxParams: 0, paramNames: [] };
     const exported = mods.includes('export') || mods.includes('public') || mods.includes('pub') || (lang === 'go' && /^[A-Z]/.test(sym.name)) || (lang === 'py' && !sym.name.startsWith('_'));
     const s = {
       name: sym.name, qname: [...chain, sym.name].join('.'), kind: sym.kind, container: chain.length ? chain.join('.') : null, file: path,
       start: T[a].l, end: T[Math.max(a, b - 1)].l, a, b, bodyA, bodyB, ...p, modifiers: mods, attrs, exported,
       isTest: !!sym.isTest || attrs.some((x) => TEST_ATTR.test(x)) || (lang === 'py' && /^test_/.test(sym.name)) || (testFile && sym.kind !== 'type' && (lang === 'go' ? /^Test/.test(sym.name) : false)),
-      abstract: bodyA === bodyB,
+      abstract: bodyA === bodyB, ns: ctx.ns || file.namespace || null,
     };
     file.symbols.push(s);
     return s;
@@ -137,10 +139,11 @@ export function parseFile(text, path, lang = langOf(path)) {
       const name = assigned();
       const arrowParams = h.length >= 2 && op(h[h.length - 2], ')') ? match[h[h.length - 2]] : h.length >= 2 && op(h[h.length - 2], '(') ? h[h.length - 2] : -1;
       const open2 = h.slice().reverse().find((i) => op(i, '(') && i < last && (eqAt < 0 || i > h[eqAt]));
-      if (name) return { kind: 'fn', name, open: open2 ?? arrowParams, single: open2 == null ? 1 : 0 };
+      const bare = open2 == null && arrowParams < 0 && h.length >= 2 && T[h[h.length - 2]].k === 'id' ? T[h[h.length - 2]].v : null; // name = x => { … }
+      if (name) return { kind: 'fn', name, open: open2 ?? arrowParams, single: bare };
       return { kind: 'block' };
     }
-    if (T[first].k === 'kw' && CONTROL.has(T[first].v) && !(js && (T[first].v === 'get' || T[first].v === 'set' || T[first].v === 'static') && h.length > 1)) return { kind: 'block' };
+    if (T[first].k === 'kw' && CONTROL.has(T[first].v) && !(ALONE.has(T[first].v) && h.length > 1)) return { kind: 'block' };
     if (firstParen >= 0 && (eqAt < 0 || eqAt > firstParen)) {
       if (js && ctx.kind !== 'type' && ctx.kind !== 'obj') return { kind: 'block' }; // `name(args) {` is only a declaration inside a class or an object
       if (lang === 'py' || lang === 'go' || lang === 'rs' || lang === 'kt' || lang === 'swift' || lang === 'php') return { kind: 'block' }; // these always use a keyword
@@ -183,7 +186,8 @@ export function parseFile(text, path, lang = langOf(path)) {
       if (eqAt >= 0 && eqAt < arrow) { // name = (args) => expr   |   name = arg => expr
         const at = nameBefore(hh[eqAt], a); if (at < 0 || op(at - 1, '.') && !js) return;
         const open = before.slice(eqAt + 1).find((i) => op(i, '('));
-        add({ name: T[at].v, kind: ctx.kind === 'type' ? 'method' : 'function' }, ctx, a, end + 1, hh[arrow] + 1, end, open ?? -1);
+        const lastB = before[before.length - 1], bare = open == null && T[lastB].k === 'id' && lastB !== at ? T[lastB].v : null; // name = x => expr
+        add({ name: T[at].v, kind: ctx.kind === 'type' ? 'method' : 'function' }, ctx, a, end + 1, hh[arrow] + 1, end, open ?? -1, bare);
         return;
       }
       if (ctx.kind !== 'type' || js) return;
@@ -214,7 +218,7 @@ export function parseFile(text, path, lang = langOf(path)) {
     const label = T[open + 1].v.replace(/^[`'"]|[`'"]$/g, '').slice(0, 80);
     const callee = T.slice(a, open).map((t) => t.v).join('');
     const isTest = TEST_CALL.has(root);
-    if (TEST_GROUP.has(root)) { scan(body + 1, match[body], { kind: 'type', name: label, chain: [...(ctx.chain || []), label], group: true }); return true; }
+    if (TEST_GROUP.has(root)) { scan(body + 1, match[body], { kind: 'type', name: label, chain: [...(ctx.chain || []), label], group: true, ns: ctx.ns }); return true; }
     add({ name: isTest ? label : `${callee} ${label}`, kind: 'function', isTest }, ctx, a, close + 1, body, match[body] + 1, popen);
     return true;
   }
@@ -233,10 +237,10 @@ export function parseFile(text, path, lang = langOf(path)) {
         if (t.v === '{') {
           const close = match[i] > i ? match[i] : Math.max(i, hi - 1); // an unclosed block runs to the end of its container
           const d = classify(stmt, i, ctx), chain = ctx.chain || [];
-          if (d.kind === 'ns') scan(i + 1, close, { kind: 'ns', name: d.name, chain });
-          else if (d.kind === 'type') { add({ name: d.name, kind: 'type' }, ctx, stmt, close + 1, i, close + 1, -1); scan(i + 1, close, { kind: 'type', name: d.name, chain: [...chain, d.name] }); }
-          else if (d.kind === 'obj') scan(i + 1, close, { kind: 'obj', name: d.name, chain: [...chain, d.name] });
-          else if (d.kind === 'fn') add({ name: d.name, kind: d.ctor ? 'ctor' : ctx.kind === 'type' || ctx.kind === 'obj' ? 'method' : 'function' }, ctx, stmt, close + 1, i, close + 1, d.open ?? -1);
+          if (d.kind === 'ns') scan(i + 1, close, { kind: 'ns', name: d.name, chain, ns: [ctx.ns, d.name].filter(Boolean).join('.') });
+          else if (d.kind === 'type') { add({ name: d.name, kind: 'type' }, ctx, stmt, close + 1, i, close + 1, -1); scan(i + 1, close, { kind: 'type', name: d.name, chain: [...chain, d.name], ns: ctx.ns }); }
+          else if (d.kind === 'obj') scan(i + 1, close, { kind: 'obj', name: d.name, chain: [...chain, d.name], ns: ctx.ns });
+          else if (d.kind === 'fn') add({ name: d.name, kind: d.ctor ? 'ctor' : ctx.kind === 'type' || ctx.kind === 'obj' ? 'method' : 'function' }, ctx, stmt, close + 1, i, close + 1, d.open ?? -1, d.single || null);
           else if (d.kind === 'prop') add({ name: d.name, kind: 'property' }, ctx, stmt, close + 1, i, close + 1, -1);
           i = close + 1;
           // `const f = () => {…};`, `x: function () {…},` and `{ get; } = value;` end here.
@@ -336,8 +340,14 @@ function readImports(file) {
       continue;
     }
     if (lang === 'cs' && t.k === 'kw' && t.v === 'using' && !op(i + 1, '(') && !kw(i + 1, 'var') && (i === 0 || op(i - 1, ';') || op(i - 1, '{') || op(i - 1, '}') || T[i - 1].k === 'pp' || kw(i - 1, 'global'))) {
-      let j = i + 1, parts = [], alias = null; if (kw(j, 'static')) j++;
-      for (; j < N && !op(j, ';'); j++) { if (op(j, '=')) { alias = parts.join('.'); parts = []; } else if (T[j].k === 'id' || T[j].k === 'kw') parts.push(T[j].v); else if (!op(j, '.') && !op(j, '::')) { parts = []; break; } }
+      let j = i + 1, parts = [], alias = null, generic = false; if (kw(j, 'static')) j++;
+      for (; j < N && !op(j, ';'); j++) {
+        if (op(j, '=')) { alias = parts.join('.'); parts = []; }
+        else if (generic) continue; // the type arguments of an aliased generic type: the alias points at the type before them
+        else if (T[j].k === 'id' || T[j].k === 'kw') parts.push(T[j].v);
+        else if (alias != null && op(j, '<')) generic = true;
+        else if (!op(j, '.') && !op(j, '::')) { parts = []; break; }
+      }
       if (parts.length && op(j, ';')) file.imports.push({ source: parts.join('.'), line: t.l, names: [], default: null, ns: alias });
       i = j; continue;
     }

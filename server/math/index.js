@@ -35,7 +35,7 @@ function historyOf(repo, base) {
 import { verdict, summarize, POLICY, WEIGHTS } from './risk.js';
 import { lexicon, decide, merge } from './sensitivity.js';
 
-export const VERSION = 2; // part of the cache key: raise it whenever a measurement or the model changes
+export const VERSION = 3; // part of the cache key: raise it whenever a measurement or the model changes
 const MAX_UNITS = 44, MAX_CONTEXT = 22;
 // A call that can fail a test: assert/expect/should/verify/ensure/check families, and the Roslyn verifier runs (VerifyCS.Test.RunDefaultAsync).
 // Things a function can do that no static graph can follow, per language. A changed function that does one of
@@ -52,7 +52,7 @@ export const METHODS = [
   { id: 'identical', level: 'proof', name: 'Token equality', basis: 'Comments and layout are not part of the program: equal token streams compile to the same program.' },
   { id: 'alpha', level: 'proof', name: 'Alpha-equivalence', basis: 'Renaming a bound variable consistently, without capture, preserves meaning (lambda calculus; Barendregt 1984).' },
   { id: 'checks', level: 'fact', name: 'Deterministic checks', basis: 'Imports resolve, call arities match, nothing removed is still called, no test was deleted or disabled.' },
-  { id: 'graph', level: 'measure', name: 'Dependency graph', basis: 'Who uses whom; rank by use relations (Inoue et al. 2005) and reverse reachability (Arnold & Bohner 1996). Network measures predict defect-prone code (Zimmermann & Nagappan 2008).' },
+  { id: 'graph', level: 'measure', name: 'Dependency graph', basis: 'Who uses whom, by name; rank by use relations (Inoue et al. 2003) and what can reach a function (after Chianti, Ren et al. 2004). Network measures on dependency graphs predict defect-prone code (Zimmermann & Nagappan 2008). An estimate: published call graphs miss 10 to 15% of targets (Feldthaus et al. 2013).' },
   { id: 'complexity', level: 'measure', name: 'Cyclomatic complexity', basis: 'Number of linearly independent paths through a function (McCabe 1976).' },
   { id: 'entropy', level: 'measure', name: 'Naturalness', basis: 'Cross-entropy under an n-gram model of this repository; buggy lines are on average more surprising (Hindle et al. 2012; Ray et al. 2016).' },
   { id: 'clones', level: 'measure', name: 'Duplication', basis: 'Winnowing fingerprints guarantee every shared run above a length is found (Schleimer, Wilkerson & Aiken 2003).' },
@@ -378,7 +378,7 @@ export async function analyze(project, pr, { force = false, decisions = true } =
     lines: u.lines, evidence: u.evidence, findings: u.findings, parts: (u.parts || []).slice(0, 6).map((p) => ({ id: p.id, text: p.text, nats: round(p.nats) })),
     metrics: u.metrics?.after ? { cyclomatic: u.metrics.after.cyclomatic, cognitive: u.metrics.after.cognitive, nesting: u.metrics.after.nesting, loc: u.metrics.after.loc, before: u.metrics.before ? u.metrics.before.cyclomatic : null } : null,
     sensitive: u.sensitive?.level !== 'normal' ? u.sensitive : null, proof: u.proof?.proved ? { level: u.proof.level, renames: u.proof.renames || null } : null,
-    centrality: u.centrality ? { fanIn: u.centrality.fanIn, dependents: u.centrality.dependents, testedBy: u.centrality.testedBy } : null,
+    centrality: u.centrality ? { fanIn: u.centrality.fanIn, dependents: u.centrality.dependents, testedBy: u.centrality.testedBy, unlinked: u.centrality.unlinked || 0 } : null,
   });
   const groupNodes = [...folded].map(([gid, ids]) => {
     const ctx = gid.startsWith('tests:ctx:'), file = gid.slice(ctx ? 10 : 6), us = ids.map((id) => unitBySymbol.get(id)).filter(Boolean);

@@ -212,6 +212,30 @@ Validación real `ju26-issue-2283-mwg90r70`: **4 min 31 s, 40.859 tokens, 171 te
 
 Para mejorar el MVP, la siguiente prioridad es la calidad y novedad de los ataques y la resolución del contrato. Aumentar el número de agentes por sí solo no ha demostrado mejorar la evidencia. No están cubiertos NativeAOT, .NET 10, los otros siete proyectos de test, otros lenguajes ni un sandbox de ejecución del sistema operativo. `entire-graph` no está conectado.
 
+## Pasada matemática y grafo de dependencias
+
+Al abrir una rama, antes de cualquier agente, Katse lee los dos lados del cambio desde objetos git y establece para cada función tocada lo que se puede saber **sin IA y sin ejecutar nada** (≈ 1 s en el repositorio del reto). El resultado es el grafo de dependencias de la rama: el **tamaño** de una bolita es cuánto código depende de ella y el **color** es lo que la matemática puede afirmar.
+
+| Color | Qué afirma | Base |
+|---|---|---|
+| Demostrado (anillo) | La edición no puede cambiar el comportamiento | Mismos tokens (solo comentarios y formato) o renombrado de locales sin captura; `server/math/proof.js` |
+| Despejado | Nada marcado. No es una prueba | Cambio pequeño, medidas bajo umbral, un test escrito con el cambio la alcanza |
+| Incierto | El comportamiento cambió y la matemática no puede avalarlo | Estado por defecto de lo que cambia de verdad |
+| Arriesgado | Falló una comprobación determinista, o cambio grande, complejo y sin tests | `checks.js` (imports, aridad, referencias colgantes, tests borrados, secretos) y `risk.js` |
+
+Lo que queda abierto va a los agentes **de función en función** (`server/math/nodereview.js`, unos 15 s): tres agentes la reconstruyen a ciegas desde el requisito, la comparación con la versión del PR es exacta (tokens, renombrado, similitud) y un juez solo puede dar una diferencia por válida si cita literalmente la frase del requisito que la decide; la cita se comprueba con una búsqueda de texto. Gemini Decisions puede subir el impacto de una bolita y dejar una revisión abierta; nunca baja el impacto ni cierra nada.
+
+```bash
+npm run math:selftest          # ataca el certificado: muta funciones reales y cuenta qué se certifica (debe ser 0)
+npm run math:selftest -- workspace/messagepack-csharp origin/ju26-issue-2283
+```
+
+Medido el 14/11/2026: 0 de 14.538 ediciones que cambian el comportamiento certificadas sobre este repositorio y 0 de 6.314 sobre el de C# (cota superior al 95 %: 0,021 % y 0,047 %); en el PR de 237 ficheros (#2297) quedan 55 de 1.307 líneas por mirar; en la demo `demo-consenso`, `pr-con-fallo`, «Review all» revisa las 4 funciones abiertas en 25 s y marca en rojo `cartTotal` y `couponDiscount` con la entrada concreta, la regla citada y el arreglo.
+
+Límites: «demostrado» solo cubre ediciones sin efecto; el grafo se construye por nombres, sin inferencia de tipos (no ve reflexión ni tests que pasan por un framework); la exposición ordena y no es una probabilidad (pesos de la literatura, no ajustados a este repositorio); la revisión por función no compila ni ejecuta, eso sigue siendo la revisión completa.
+
+Rutas: `GET /api/projects/:id/math?pr=…` (la pasada), `POST /api/projects/:id/math/review` (agentes para una bolita), `POST /api/projects/:id/math/mark` (marcar una bolita como leída). Interfaz en `mvp/math.js` y `mvp/review.js`.
+
 ## Archivos principales
 
 - `server/pipeline/complete.js`: presupuesto, generaciones y juicio final.
