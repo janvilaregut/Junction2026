@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {populationPlan,allocateGroup,groupMission,updateGroups,unverifiedCritical} from '../server/planner.js';
-import {PrivacyGateway,privacyMode,PUBLIC_TIETO,localURL} from '../server/privacy.js';
+import {PrivacyGateway,privacyMode,PUBLIC_TIETO,localURL,localEndpoint} from '../server/privacy.js';
 import {decisionMissions} from '../server/decisions.js';
 import {privateGenerate} from '../server/private-generation.js';
 import {execution} from '../server/execution.js';
@@ -121,4 +121,39 @@ test('strict session never invokes workspace tools and restores validated local 
     const result=await execution.run({privacy:gate},()=>session({dir,artifacts:dir,role:'build-C1',model:'google/gemini-4-hydrogen',prompt:'Repair PrivateLedger',noTools:true,execute:async()=>{throw Error('Must not invoke OpenCode');},validate:x=>x.name==='PrivateLedger'}));
     assert.equal(result.result.name,'PrivateLedger');assert.equal(result.transport,'direct-sanitized-text');assert.equal(result.sessionId,undefined);assert.equal(cloudCalls,1);
   } finally {globalThis.fetch=originalFetch;fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('the local model URL picks the protocol: Ollama by default, OpenAI-compatible (oMLX) when it ends in /v1',()=>{
+  assert.deepEqual(localEndpoint('http://127.0.0.1:11434'),{origin:'http://127.0.0.1:11434',api:'ollama'});
+  assert.deepEqual(localEndpoint('http://127.0.0.1:8000/v1'),{origin:'http://127.0.0.1:8000',api:'openai'});
+  assert.deepEqual(localEndpoint('http://localhost:8000/v1/'),{origin:'http://localhost:8000',api:'openai'});
+  for(const url of ['https://api.example.com/v1','http://10.0.0.5:8000/v1','http://127.0.0.1:8000/v2','http://127.0.0.1:8000/v1/chat/completions'])assert.throws(()=>localEndpoint(url));
+});
+test('oMLX: the scan goes to the loopback chat endpoint with the local key, after one warm-up, and masks what Gemma finds',async()=>{
+  const old=process.env.KATSE_GEMMA_KEY;process.env.KATSE_GEMMA_KEY='synthetic-local-key';
+  try {
+    const sent=[];
+    const gate=new PrivacyGateway({url:'http://127.0.0.1:8000/v1',fetcher:async(url,req)=>{
+      const body=JSON.parse(req.body);sent.push(body);
+      assert.equal(url,'http://127.0.0.1:8000/v1/chat/completions');assert.equal(req.headers.Authorization,'Bearer synthetic-local-key');assert.equal(req.redirect,'error');
+      assert.ok(!req.body.includes('alice@example.com'));assert.ok(!req.body.includes('secret-value'));
+      return Response.json({choices:[{finish_reason:'stop',message:{role:'assistant',content:body.max_tokens===1?'OK':JSON.stringify({complete:true,uncertain:false,spans:body.messages[0].content.includes('AcmeLedger')?['AcmeLedger']:[]})}}]});
+    }});
+    const prompt='class AcmeLedger {} // alice@example.com password="secret-value" key synthetic-local-key';
+    const result=await gate.prepare(prompt);
+    for(const raw of ['AcmeLedger','alice@example.com','secret-value','synthetic-local-key'])assert.ok(!result.text.includes(raw));
+    assert.equal(result.restore(result.text),prompt);
+    assert.equal(sent.length,2);assert.equal(sent[0].max_tokens,1);assert.equal(sent[1].response_format.type,'json_schema');assert.equal(sent[1].temperature,0);assert.match(sent[1].model,/^gemma/);
+    await gate.prepare(prompt+' // more');assert.equal(sent.filter(b=>b.max_tokens===1).length,1);
+    const stats=gate.snapshot();assert.match(stats.server,/oMLX/);assert.ok(!JSON.stringify(stats).includes('AcmeLedger'));assert.ok(!JSON.stringify(stats).includes('synthetic-local-key'));
+  } finally {if(old===undefined)delete process.env.KATSE_GEMMA_KEY;else process.env.KATSE_GEMMA_KEY=old;}
+});
+test('oMLX: a cut-off, malformed or refused answer blocks the send and says why without quoting it',async()=>{
+  const reply=(content,finish_reason='stop')=>Response.json({choices:[{finish_reason,message:{content}}]});
+  const good=JSON.stringify({complete:true,uncertain:false,spans:[]});
+  const cases=[[()=>reply(good,'length'),'invalid-answer'],[()=>reply('```json private-detail'),'invalid-answer'],[()=>reply(JSON.stringify({complete:true,uncertain:false,spans:['invented']})),'invalid-answer'],[()=>new Response('',{status:401}),'http 401'],[()=>{throw new TypeError('fetch failed');},'unreachable']];
+  for(const [answer,why] of cases) {
+    const gate=new PrivacyGateway({url:'http://127.0.0.1:8000/v1',fetcher:async(url,req)=>JSON.parse(req.body).max_tokens===1&&why!=='http 401'&&why!=='unreachable'?reply('OK'):answer()});
+    await assert.rejects(gate.prepare('private code'),/Privacy blocked/);
+    assert.equal(gate.snapshot().blocked,1);assert.equal(gate.snapshot().blockedBy,why);assert.ok(!JSON.stringify(gate.snapshot()).includes('private-detail'));
+  }
 });

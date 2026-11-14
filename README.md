@@ -165,6 +165,14 @@ KATSE_PRIVATE_TERMS=NombreInterno,ClientePrivado,dominio.interno
 
 Reinicia `npm start` tras cambiar la configuración. `strict` permite probar también el #2283 a través de Gemma. Con `auto`, únicamente el commit público #2283 y su base fijada quedan exentos de Gemma; un requisito propio o una transcripción de Entire exige modo estricto. La exención se indica en el informe.
 
+**Gemma en un Mac con oMLX:** la pasarela también habla con servidores compatibles con OpenAI. Si la URL termina en `/v1`, usa `/v1/chat/completions` en vez del protocolo de Ollama; el resto (solo loopback, bloqueo si el escaneo falta o queda incompleto) es igual. Con oMLX en marcha (`omlx start` o oMLX.app) basta una línea en `.env` o `.env.local`:
+
+```dotenv
+KATSE_GEMMA_URL=http://127.0.0.1:8000/v1
+```
+
+El modelo por defecto en ese caso es `gemma-4-26B-A4B-it-oQ4e-mtp` (cámbialo con `KATSE_GEMMA_MODEL`; tiene que ser un Gemma local). La clave de oMLX se lee de `KATSE_GEMMA_KEY`, de `OMLX_API_KEY` o de `~/.omlx/settings.json`; solo se envía a loopback y nunca se copia al repositorio. La primera petición carga el modelo (15-25 s): esa espera no consume el presupuesto de escaneo (45 s), pero sí el tiempo de la revisión; el límite por fragmento es de 30 s en vez de 12. Comprueba con `npm run check:privacy`: debe mostrar `status: passed` y `server: OpenAI-compatible (oMLX)`. Si una revisión se bloquea, el informe indica el motivo (`unreachable`, `http 401`, `timeout`, `invalid-answer`, `budget`).
+
 El gateway combina reglas para secretos y datos personales, un diccionario explícito y detección de nombres internos con Gemma. Sustituye coincidencias por alias estables; restaura las ediciones **localmente** antes de validarlas. Solo admite un endpoint de loopback, bloquea respuestas incompletas o inciertas, usa caché y limita los escaneos a 45 s por revisión y 12 s por fragmento, siempre dentro del plazo de la revisión. Si el ordenador no mantiene ese ritmo, conserva evidencia pendiente en vez de enviar texto sin escanear. La detección sigue siendo probabilística: no garantiza anonimización completa.
 
 **Límite de integración:** la protección cubre las llamadas del pipeline v2 (`mode: completo`). En modo estricto se usa transporte directo de texto saneado, sin OpenCode ni herramientas que puedan añadir contexto del repositorio. Eso implica que **no hay captura nueva de Entire para esos candidatos**; quedan sus artefactos y commits locales. El ejemplo público sigue usando OpenCode y checkpoints reales de Entire. Los módulos antiguos de voz/live, consensus y chat auxiliar no están cubiertos por este gateway: quedan bloqueados al configurar `KATSE_PRIVACY_MODE=strict`. El chat de un informe v2 privado también se bloquea aunque el servidor esté en `auto`. Para trabajar con información privada configura el servidor entero en `strict`. `entire-graph` sigue pendiente.
