@@ -35,7 +35,7 @@ function historyOf(repo, base) {
 import { verdict, summarize, POLICY, WEIGHTS } from './risk.js';
 import { lexicon, decide, merge } from './sensitivity.js';
 
-export const VERSION = 3; // part of the cache key: raise it whenever a measurement or the model changes
+export const VERSION = 8; // part of the cache key: raise it whenever a measurement or the model changes
 const MAX_UNITS = 44, MAX_CONTEXT = 22;
 // A call that can fail a test: assert/expect/should/verify/ensure/check families, and the Roslyn verifier runs (VerifyCS.Test.RunDefaultAsync).
 // Things a function can do that no static graph can follow, per language. A changed function that does one of
