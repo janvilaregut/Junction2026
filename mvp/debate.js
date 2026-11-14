@@ -366,7 +366,6 @@
     D.data = debateFor(S.cur); D.chs = chapters(D.data); D.open = true; D.agent = null; D.ch = -1;
     $('dtitle').textContent = `Agents · ${name(S.cur)}`;
     sec.querySelector('.dbar em').textContent = D.data.real ? `Live run · ${D.data.runId}` : 'Preview · sample data';
-    $('drawer').hidden = true;
     focusOn(['pr'], { k: 5.5, K: 0.03, noTip: true, still: true });
     full.classList.add('indebate');
     build();

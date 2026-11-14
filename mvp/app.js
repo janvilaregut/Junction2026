@@ -1,6 +1,6 @@
 /* Katse UI. Plain JavaScript, no build step. Everything shown comes from the API; text from
    repositories is always escaped before it reaches the page.
-   Three views: the branch tree (home), the full-screen graph of one branch, the review drawer. */
+   Three views: the branch tree (home), the full-screen graph of one branch, and its review (review.js). */
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const base = (p) => String(p).split('/').pop();
@@ -38,7 +38,7 @@ const S = { projects: [], agents: [], pid: null, prs: { incoming: [], outgoing: 
 /* The real review pipeline (server/pipeline/complete.js) runs with a profile: a time and token budget. */
 const PROFILE = { quick: ['Quick', '90 s · first checks, no alternatives'], standard: ['Standard', '5 min · two alternatives from the base, debate and attacks'], deep: ['Deep', '15 min · extra exploration, mutations'] };
 S.profile = PROFILE[store.get('katse.profile')] ? store.get('katse.profile') : 'standard';
-S.vmode = 'graph'; // a branch always opens on its graph; asking to fix something opens Fix it (fixit.js)
+S.vmode = 'graph'; // a branch always opens on its graph; Review & sign grows the review tree out of it (review.js)
 const VERDICT = { 'ready-for-human': ['ok', 'Ready for your approval'], 'request-changes': ['bad', 'Request changes'], 'insufficient-evidence': ['warn', 'Not enough evidence'] };
 const CAND = { built: 'patch built', pending: 'building', failed: 'failed', timeout: 'out of time', duplicate: 'duplicate', empty: 'no changes' };
 const FIND = { 'confirmed-original': ['bad', 'Confirmed failure in the PR'], 'original-failure-unconfirmed': ['warn', 'PR failure, not confirmed'], 'candidate-only': ['no', 'Fails only in an alternative'], refuted: ['ok', 'Refuted: the PR passes'], 'invalid-test': ['no', 'Invalid test'], pending: ['no', 'Pending'], unstable: ['warn', 'Unstable result'] };
@@ -87,7 +87,7 @@ async function init() {
 }
 async function loadProject(id) {
   closeGraph();
-  Object.assign(S, { pid: id, prs: { incoming: [], outgoing: [] }, base: '', expanded: false, hl: [], cur: null, treeW: 0, focus: null, unfold: false, commits: {} });
+  Object.assign(S, { pid: id, prs: { incoming: [], outgoing: [] }, base: '', expanded: false, hl: [], cur: null, treeW: 0, focus: null, zoom: null, unfold: false, commits: {} });
   focusTok++; // a commits request still in flight belongs to the previous project
   store.set('katse.project', id);
   $('projName').textContent = S.projects.find((p) => p.id === id)?.name || id;
@@ -152,14 +152,16 @@ $('gear').onclick = settingsModal;
 /* ── Home: left = history, centre = you, right = merges still to come ── */
 function renderTree() {
   const svg = $('tree'); svg.innerHTML = '';
-  svg.classList.remove('hl'); $('card').classList.remove('on');
+  svg.classList.remove('hl', 'zoomed'); $('card').classList.remove('on');
   const W = Math.max(svg.parentElement.clientWidth, 760);
   const recent = S.prs.incoming.filter((p) => p.last || p.running || (!p.behind && Date.now() - new Date(p.date) < 30 * 864e5));
   const old = S.prs.incoming.filter((p) => !recent.includes(p));
   const F = S.focus; // a branch unfolded to show its commits
   if (F && ![...S.prs.incoming, ...S.prs.outgoing].some((p) => p.id === F.id)) S.focus = null;
-  // Unfolded, only the recent branches (plus the chosen one) are drawn: the others fold away anyway.
-  const inc = S.focus ? [...recent, ...old.filter((p) => p.id === S.focus.id)] : S.expanded ? [...recent, ...old] : recent;
+  if (S.zoom && ![...S.prs.incoming, ...S.prs.outgoing].some((p) => p.id === S.zoom.id)) S.zoom = null;
+  // Unfolded or zoomed in, only the recent branches (plus the chosen one) are drawn: the others go away anyway.
+  const one = S.focus || S.zoom;
+  const inc = one ? [...recent, ...old.filter((p) => p.id === one.id)] : S.expanded ? [...recent, ...old] : recent;
   const out = S.prs.outgoing;
   if (!inc.length && !out.length && !old.length) {
     svg.style.height = '0px';
@@ -192,7 +194,7 @@ function renderTree() {
       const mx = tipX + M;
       const faint = !recent.includes(p) && dir < 0;
       const g = mk('g', { class: 'lane' + (st.tone === 'warn' || st.tone === 'bad' ? ' pulse' : ''), 'data-pr': p.id, 'data-tx': tipX, 'data-ty': y, style: `transform-origin:0px ${mainY}px`, tabindex: 0, role: 'button', 'aria-label': `${name(p)}: ${p.title} (${st.label})` }, lanes);
-      geo[p.id] = { p, st, col, dir, xf };
+      geo[p.id] = { p, st, col, dir, xf, y, tipX, R, g };
       const fork = `M${xf} ${mainY} C ${xf + R * .55} ${mainY}, ${xf + R * .45} ${y}, ${xf + R} ${y} L ${tipX} ${y}`;
       const merge = `M${tipX} ${y} C ${tipX + M * .55} ${y}, ${mx - M * .45} ${mainY}, ${mx} ${mainY}`;
       mk('path', { d: fork, fill: 'none', stroke: col, 'stroke-width': faint ? 1.4 : 2.2, 'stroke-linecap': 'round', 'stroke-opacity': faint ? .5 : .95 }, g);
@@ -214,7 +216,7 @@ function renderTree() {
       const leave = () => { g.classList.remove('on'); $('card').classList.remove('on'); applyHighlight(); };
       const open = () => openGraph(p);
       g.onmouseenter = enter; g.onmouseleave = leave; g.onfocus = enter; g.onblur = leave; g.onclick = open;
-      g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } else if (e.key === 'c') showCommits(p.id); };
+      g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } else if (e.key === 'c') showCommits(p.id); else if (e.key === 'z') zoomBranch(p.id); };
     });
   };
   draw(inc, -1); draw(out, 1);
@@ -228,13 +230,14 @@ function renderTree() {
   if (box.clientWidth < W && S.treeW !== W) box.scrollLeft = xNow - 112;
   S.treeW = W;
   applyHighlight();
-  $('more').hidden = !old.length || !!S.focus;
+  $('more').hidden = !old.length || !!S.focus || !!S.zoom;
   $('more').textContent = S.expanded ? 'Hide older branches' : `+${old.length} older branches`;
 
   // Folding: every other branch folds flat into the base line while the chosen one unfolds its commits.
   const all = [...lanes.children];
   const still = (fn) => { svg.classList.add('still'); fn(); void svg.getBoundingClientRect(); svg.classList.remove('still'); };
-  S.focusTip = null;
+  S.focusTip = null; S.zoomTip = null;
+  if (S.zoom && geo[S.zoom.id]) { drawZoom(svg, geo[S.zoom.id], mainY, W, H); return; }
   if (S.focus && geo[S.focus.id]) {
     const first = !S.focus.drawn;
     if (first) { void svg.getBoundingClientRect(); requestAnimationFrame(() => all.forEach((g) => g.classList.add('fold'))); }
@@ -313,6 +316,112 @@ function commitCard(c, x, y, dir, head) {
   card.style.top = (dir < 0 ? py - card.offsetHeight - 52 : py + 56) + 'px';
   card.classList.add('on');
 }
+/* ── One branch, zoomed in: the tree is scaled around the point where the branch starts (a real camera
+   zoom, so its line and dots grow to close-up size), then the close-up is drawn crisp on top: the fork,
+   one thick glowing line, every commit as a big ring, small ticks between them. Wheel or drag slides along. ── */
+const ZK = 2.2;
+function drawZoom(svg, f, mainY, W, H) {
+  const Z = S.zoom, first = !Z.drawn; Z.drawn = true;
+  const { p, st, col, dir, y, xf, R, g: lane } = f;
+  const cut = st.end === 'cut', up = dir < 0; // labels go on the side away from the base line
+  const cam = mk('g', { class: 'cam' });
+  while (svg.firstChild) cam.appendChild(svg.firstChild);
+  svg.appendChild(cam);
+  lane.classList.add('zl');
+  const ax = xf + R; // where the branch turns flat
+  const sx = Math.round(Math.max(120, Math.min(R * ZK * 0.55 + 40, W * 0.28))), sy = Math.round(H / 2);
+  const tx = sx - ax * ZK, ty = sy - y * ZK;
+  const T = (x, yy) => `${(x * ZK + tx).toFixed(1)} ${(yy * ZK + ty).toFixed(1)}`;
+  const yBase = mainY * ZK + ty;
+
+  const list = Z.commits, n = list.length, lead = 92;
+  const sp = n > 1 ? Math.max(170, Math.min(250, (W - sx - lead - 140) / (n - 1))) : 0;
+  const X = (i) => sx + lead + sp * i;
+  const headX = X(n - 1), M = 150, endX = headX + (cut ? 30 : M + 30);
+  Z.maxPan = Math.max(0, Math.round(endX + 40 - W));
+  Z.pan = Math.max(-Z.maxPan, Math.min(0, Z.pan || 0));
+
+  const defs = mk('defs', {}, svg);
+  const glow = mk('filter', { id: 'zglow', filterUnits: 'userSpaceOnUse', x: -200, y: sy - 60, width: endX + 600, height: 120 }, defs);
+  mk('feGaussianBlur', { stdDeviation: 6 }, glow);
+  const zg = mk('g', { class: 'zoom' + (first ? ' anim' : '') }, svg);
+  const pz = mk('g', {}, zg);
+  const flat = `M${sx} ${sy} L${headX} ${sy}`;
+  mk('path', { d: flat, class: 'zglow', fill: 'none', stroke: col, 'stroke-width': 11, 'stroke-opacity': 0.3, filter: 'url(#zglow)' }, pz);
+  mk('path', { d: `M${T(xf, mainY)} C ${T(xf + R * 0.55, mainY)}, ${T(xf + R * 0.45, y)}, ${T(ax, y)}`, class: 'zfork', fill: 'none', stroke: col, 'stroke-width': 2.2 * ZK, 'stroke-linecap': 'round' }, pz);
+  const line = mk('path', { d: flat, class: 'zline', fill: 'none', stroke: col, 'stroke-width': 2.2 * ZK, 'stroke-linecap': 'round' }, pz);
+  if (!cut) {
+    const merged = st.end === 'merged';
+    mk('path', { d: `M${headX} ${sy} C ${headX + M * 0.55} ${sy}, ${headX + M * 0.45} ${yBase}, ${headX + M} ${yBase}`, class: 'zmerge', fill: 'none', stroke: col, 'stroke-width': 1.6 * ZK, 'stroke-opacity': merged ? 0.9 : 0.45, 'stroke-dasharray': merged ? '' : '7 11', 'stroke-linecap': 'round' }, pz);
+    mk('circle', { cx: headX + M, cy: yBase, r: 5 * ZK, class: 'zmerge', fill: merged ? col : '#0c0c0e', stroke: col, 'stroke-width': 1.8 * ZK, 'stroke-opacity': merged ? 1 : 0.6 }, pz);
+  }
+  for (let x = sx + 16; x < headX - 6; x += 30) if (list.every((_, i) => Math.abs(X(i) - x) > 14)) mk('circle', { cx: x, cy: sy, r: 1.3, class: 'ztick' }, pz);
+
+  const chars = Math.max(12, Math.floor((n > 1 ? sp - 24 : 420) / 6.9));
+  const clip = (s) => (s.length > chars ? s.slice(0, chars - 1) + '…' : s);
+  list.forEach((c, i) => {
+    const x = X(i), head = i === n - 1;
+    const d = first ? 980 + Math.min(i * 90, 1100) : 0;
+    const cg = mk('g', { class: 'cmt' + (head ? ' head' : ''), style: `--d:${d}ms`, tabindex: 0, role: 'button', 'aria-label': `${c.subject} (${c.sha.slice(0, 7)})` }, pz);
+    const pop = mk('g', { class: 'pop' }, cg);
+    if (head && cut) { const s = 7; mk('path', { d: `M${x - s} ${sy - s}L${x + s} ${sy + s}M${x + s} ${sy - s}L${x - s} ${sy + s}`, stroke: col, 'stroke-width': 3.2, 'stroke-linecap': 'round' }, pop); }
+    else if (head) { mk('circle', { cx: x, cy: sy, r: 17, fill: 'none', stroke: col, 'stroke-opacity': 0.3, 'stroke-width': 1.4 }, pop); mk('circle', { cx: x, cy: sy, r: 8.5, fill: col }, pop); }
+    else mk('circle', { cx: x, cy: sy, r: 7.5, fill: '#0c0c0e', stroke: col, 'stroke-width': 3.2 }, pop);
+    mk('text', { x, y: up ? sy - 28 : sy + 36, 'text-anchor': 'middle', class: 'clab' }, cg).textContent = clip(c.subject);
+    mk('text', { x, y: up ? sy - 45 : sy + 53, 'text-anchor': 'middle', class: 'csha' }, cg).textContent = c.sha.slice(0, 7) + (c.author ? ' · ' + c.author.split(' ')[0] : '');
+    mk('circle', { cx: x, cy: sy, r: 20, fill: 'transparent' }, cg);
+    const show = () => commitCard(c, x + Z.pan, sy, dir, head);
+    cg.onmouseenter = show; cg.onfocus = show;
+    cg.onmouseleave = cg.onblur = () => $('card').classList.remove('on');
+    if (head) { cg.onclick = () => openGraph(p); cg.onkeydown = (e) => { if (e.key === 'Enter') openGraph(p); }; }
+  });
+  if (Z.total > n) mk('text', { x: sx + 14, y: up ? sy + 30 : sy - 22, class: 'csha ztxt' }, pz).textContent = `+${Z.total - n} earlier`;
+
+  const apply = () => {
+    cam.style.transform = `translate(${(tx + Z.pan).toFixed(1)}px,${ty.toFixed(1)}px) scale(${ZK})`;
+    pz.setAttribute('transform', `translate(${Z.pan} 0)`);
+    S.zoomTip = [headX + Z.pan, sy];
+  };
+  Z.slide = (dx) => {
+    const v = Math.max(-Z.maxPan, Math.min(0, Z.pan - dx));
+    if (v === Z.pan) return false;
+    svg.classList.add('panning'); Z.pan = v; apply(); $('card').classList.remove('on');
+    clearTimeout(Z.pt); Z.pt = setTimeout(() => svg.classList.remove('panning'), 140);
+    return true;
+  };
+  if (first) {
+    cam.style.transform = 'none';
+    const len = headX - sx + 1, seg = Math.min(len, (f.tipX - ax) * ZK); // the part the scaled branch already covers
+    Object.assign(line.style, { strokeDasharray: len, strokeDashoffset: len - seg });
+    void svg.getBoundingClientRect();
+    requestAnimationFrame(() => {
+      svg.classList.add('zoomed'); apply();
+      requestAnimationFrame(() => { line.style.transition = 'stroke-dashoffset .8s cubic-bezier(.6,0,.2,1) .85s, opacity 0s linear .85s'; line.style.strokeDashoffset = 0; zg.classList.remove('anim'); });
+    });
+  } else { svg.classList.add('still', 'zoomed'); apply(); void svg.getBoundingClientRect(); svg.classList.remove('still'); }
+
+  $('sum').innerHTML = `<b>${esc(name(p))}</b> up close · ${Z.total > n ? `the last ${n} of ${Z.total} commits` : `${n} ${n === 1 ? 'commit' : 'commits'} since it left ${esc(base(S.base))}`}. <button class="link" id="allBr">All branches</button>`;
+  $('allBr').onclick = hideCommits;
+}
+/* Sliding along a zoomed branch: wheel (either direction) or drag. A drag never counts as a click. */
+(() => {
+  const svg = $('tree'); let drag = null, dragged = false;
+  const scale = () => (svg.viewBox.baseVal?.width || 1) / (svg.getBoundingClientRect().width || 1);
+  svg.addEventListener('wheel', (e) => {
+    if (!S.zoom?.slide || !S.zoom.maxPan) return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (S.zoom.slide(d * scale())) e.preventDefault();
+  }, { passive: false });
+  svg.addEventListener('pointerdown', (e) => { dragged = false; if (S.zoom?.maxPan && e.button === 0) drag = { x: e.clientX, moved: false }; });
+  addEventListener('pointermove', (e) => {
+    if (!drag || !S.zoom?.slide) return;
+    const d = drag.x - e.clientX;
+    if (!drag.moved && Math.abs(d) < 5) return;
+    drag.moved = true; S.zoom.slide(d * scale()); drag.x = e.clientX;
+  });
+  addEventListener('pointerup', () => { dragged = !!drag?.moved; drag = null; });
+  svg.addEventListener('click', (e) => { if (dragged) { e.stopPropagation(); dragged = false; } }, true);
+})();
 /* Unfold one branch to show its commits (oldest → newest). Resolves to what is shown, or null. */
 let focusTok = 0;
 async function showCommits(id) {
@@ -320,23 +429,54 @@ async function showCommits(id) {
   if (!p) return null;
   const tok = ++focusTok, pid = S.pid;
   if (!$('full').hidden) { closeGraph(); await new Promise((r) => setTimeout(r, 760)); }
-  S.commits = S.commits || {};
-  let data = S.commits[id];
-  if (!data) {
-    try { data = await api(`/projects/${pid}/commits?pr=${encodeURIComponent(id)}`); }
-    catch { data = null; }
-    if (!data?.commits?.length) data = { total: 1, commits: [{ sha: p.sha || '', subject: p.title, author: '', date: p.date }] };
-    S.commits[id] = data;
-  }
+  const data = await commitsOf(p, pid);
   if (tok !== focusTok || pid !== S.pid) return null;
   if (S.focus?.id === id) return { p, ...data };
-  if (S.focus) { S.focus = null; renderTree(); await new Promise((r) => setTimeout(r, 60)); }
+  if (S.focus || S.zoom) { S.focus = null; S.zoom = null; renderTree(); await new Promise((r) => setTimeout(r, 60)); }
   S.hl = []; $('card').classList.remove('on');
   S.focus = { id, commits: data.commits, total: data.total, drawn: false };
   renderTree();
   return { p, ...data };
 }
+/* A branch's own commits (oldest first), fetched once per project. */
+async function commitsOf(p, pid) {
+  S.commits = S.commits || {};
+  let data = S.commits[p.id];
+  if (!data) {
+    try { data = await api(`/projects/${pid}/commits?pr=${encodeURIComponent(p.id)}`); }
+    catch { data = null; }
+    if (!data?.commits?.length) data = { total: 1, commits: [{ sha: p.sha || '', subject: p.title, author: '', date: p.date }] };
+    if (pid === S.pid) S.commits[p.id] = data;
+  }
+  return data;
+}
+/* "Zoom into this branch": the camera flies to where it starts and its first commits sit big on one line. */
+async function zoomBranch(id) {
+  const p = [...S.prs.incoming, ...S.prs.outgoing].find((x) => x.id === id);
+  if (!p) return null;
+  const tok = ++focusTok, pid = S.pid;
+  if (!$('full').hidden) { closeGraph(); await new Promise((r) => setTimeout(r, 760)); }
+  const data = await commitsOf(p, pid);
+  if (tok !== focusTok || pid !== S.pid) return null;
+  if (S.zoom?.id === id) return { p, ...data };
+  if (S.focus || S.zoom) { S.focus = null; S.zoom = null; renderTree(); await new Promise((r) => setTimeout(r, 60)); }
+  S.hl = []; $('card').classList.remove('on');
+  S.zoom = { id, commits: data.commits, total: data.total, drawn: false, pan: 0 };
+  renderTree();
+  return { p, ...data };
+}
+/* Zooming out plays the zoom backwards: the close-up fades into the scaled tree, which shrinks back. */
+function unzoomBranch() {
+  if (!S.zoom) return;
+  const tok = ++focusTok, svg = $('tree'), cam = svg.querySelector('.cam');
+  $('card').classList.remove('on');
+  svg.querySelector('.zoom')?.classList.add('out');
+  svg.classList.remove('zoomed');
+  setTimeout(() => { if (tok === focusTok && cam) cam.style.transform = 'none'; }, 140);
+  setTimeout(() => { if (tok !== focusTok) return; S.zoom = null; renderTree(); }, 1020);
+}
 function hideCommits() {
+  if (S.zoom) return unzoomBranch();
   if (!S.focus) return;
   const tok = ++focusTok;
   $('tree').querySelector('.rail')?.classList.add('out');
@@ -349,7 +489,8 @@ function tipOf(id) {
   if (!vb || !vb.width || document.body.classList.contains('dive')) return null;
   let tx, ty;
   if (S.focus?.id === id && S.focusTip) [tx, ty] = S.focusTip;
-  else { const g = svg.querySelector(`.lane[data-pr="${CSS.escape(id)}"]`); if (!g || S.focus) return null; tx = +g.dataset.tx; ty = +g.dataset.ty; }
+  else if (S.zoom?.id === id && S.zoomTip) [tx, ty] = S.zoomTip;
+  else { const g = svg.querySelector(`.lane[data-pr="${CSS.escape(id)}"]`); if (!g || S.focus || S.zoom) return null; tx = +g.dataset.tx; ty = +g.dataset.ty; }
   const r = svg.getBoundingClientRect();
   const x = r.left + (tx * r.width) / vb.width, y = r.top + (ty * r.height) / vb.height;
   return x > 0 && x < innerWidth && y > 0 && y < innerHeight ? [x, y] : null;
@@ -367,7 +508,7 @@ function showCard(p, st, x, y, dir) {
 /* Light up some branches in the tree (by PR id) and dim the rest; no ids clears it.
    Used by the voice mascot to point at PRs. Older branches are unfolded if needed. */
 function highlightLanes(ids) {
-  if (S.focus && ids?.length) { S.focus = null; S.unfold = true; renderTree(); }
+  if ((S.focus || S.zoom) && ids?.length) { S.focus = null; S.zoom = null; S.unfold = true; renderTree(); }
   S.hl = [...new Set(ids || [])];
   const want = new Set(S.hl);
   if (want.size && !S.expanded && S.prs.incoming.some((p) => want.has(p.id) && !document.querySelector(`#tree .lane[data-pr="${CSS.escape(p.id)}"]`))) { S.expanded = true; renderTree(); }
@@ -501,11 +642,10 @@ function spring(o, key, target, K, dt, z = 1) {
 const radius = (n) => (n.kind === 'core' ? CORE_R : n.kind === 'zone' ? 6 : n.kind === 'file' ? 9 + Math.min(n.deg || 0, 6) * 0.8 : 10);
 const toScreen = (x, y) => [x * G.cam.k + G.cam.x, y * G.cam.k + G.cam.y];
 const toWorld = (x, y) => [(x - G.cam.x) / G.cam.k, (y - G.cam.y) / G.cam.k];
-/* The middle of the free area: left of the drawer when it is open, between the header and the bar. */
+/* The middle of the free area, between the header and the bar. */
 function focusPoint() {
-  const drawer = $('drawer').hidden ? 0 : $('drawer').offsetWidth + 12;
   const bar = $('fbar').getBoundingClientRect().top || innerHeight - 100;
-  return [(innerWidth - drawer) / 2, (90 + bar) / 2];
+  return [innerWidth / 2, (90 + bar) / 2];
 }
 
 function resetGraph() {
@@ -759,10 +899,10 @@ async function openGraph(p, x, y) {
   const seq = ++openSeq;
   clearTimeout(closeTimer); clearTimeout(renderTimer); stopStream();
   if (x == null) [x, y] = tipOf(p.id) || [innerWidth / 2, innerHeight * 0.55];
-  $('drawer').hidden = true; $('card').classList.remove('on'); $('tip').classList.remove('on');
+  $('card').classList.remove('on'); $('tip').classList.remove('on');
   Object.assign(S, { cur: p, run: null, plan: null, model: null, starting: false, hl: [], origin: [x, y], openedAt: performance.now() });
   const full = $('full');
-  if (typeof closeFixit === 'function') closeFixit(true);
+  if (typeof closeTree === 'function') closeTree(true);
   Object.assign(S, { fixTarget: null });
   full.classList.remove('open', 'indebate', 'infix');
   $('fid').textContent = name(p); $('fbr').textContent = p.branch;
@@ -792,8 +932,8 @@ function closeGraph() {
   openSeq++; // late answers for this branch are now ignored
   clearTimeout(renderTimer); stopStream();
   if (typeof closeDebate === 'function') closeDebate(true);
-  if (typeof closeFixit === 'function') closeFixit(true);
-  $('drawer').hidden = true; $('tip').classList.remove('on');
+  if (typeof closeTree === 'function') closeTree(true);
+  $('tip').classList.remove('on');
   full.classList.remove('open');
   collapseGraph(S.origin || [innerWidth / 2, innerHeight / 2], S.cur ? state(S.cur).tone : 'core');
   document.body.classList.remove('dive');
@@ -802,10 +942,10 @@ function closeGraph() {
   closeTimer = setTimeout(() => { if (!full.classList.contains('open')) { full.hidden = true; stopLoop(); resetGraph(); } }, 760);
   reloadPRs().catch(() => {});
 }
-$('back').onclick = () => (typeof fixOpen === 'function' && fixOpen() ? closeFixit() : closeGraph());
+$('back').onclick = () => (typeof treeOpen === 'function' && treeOpen() ? closeTree() : closeGraph());
 /* There is one view of a branch now, the graph. Kept for older callers. */
 function setView(mode) { return mode === 'graph'; }
-/* A click on a node (not a drag) flies the camera to it; a code region also becomes the target of Fix it. */
+/* A click on a node (not a drag) flies the camera to it; a code region also becomes the spot Review & sign opens on. */
 function nodeTap(n) {
   focusOn([n.id]);
   S.fixTarget = n.kind === 'zone' ? n : null;
@@ -814,14 +954,14 @@ function nodeTap(n) {
 
 /* The one bar at the bottom of the graph: a number, a state, one action.
    An error from loading the branch is fatal (only Back); an error from an action can be dismissed. */
-const fixBtn = () => `<button class="cta ghost fixb" id="bFix" title="Watch the agents argue it out">Fix it${S.fixTarget ? ` <small>:${S.fixTarget.start}</small>` : ''}</button>`;
+const spotTag = () => (S.fixTarget ? ` <small class="spot">:${S.fixTarget.start}</small>` : '');
 function renderBar(error, fatal) {
   const p = S.cur, b = S.run?.brief;
   const seg = `<div class="seg">${Object.entries(PROFILE).map(([id, [n, d]]) => `<button data-p="${id}" class="${S.profile === id ? 'on' : ''}" title="${esc(d)}">${n}</button>`).join('')}</div>`;
   let h;
   if (error) h = `<span class="txt" style="color:var(--bad);white-space:normal;max-width:520px">${esc(error)}</span>${fatal ? '<button class="cta ghost" id="bBack">Back</button>' : '<button class="cta ghost" id="bOk">OK</button>'}`;
   else if (S.starting) h = '<span class="spin"></span><span class="txt" style="color:var(--fg)">Starting…</span><button class="cta" disabled>Verifying…</button>';
-  else if (S.es) h = `<span class="spin"></span><span class="txt live" style="color:var(--fg)">${esc(S.stage)}</span><span class="txt">${secs(Date.now() - S.t0)}</span><button class="cta" disabled>Verifying…</button>`;
+  else if (S.es) h = `<span class="spin"></span><span class="txt live" style="color:var(--fg)">${esc(S.stage)}</span><span class="txt">${secs(Date.now() - S.t0)}</span><button class="cta" id="bReview">Watch the review</button>`;
   else if (b) {
     const stale = p.sha && !b.pr.head.startsWith(p.sha);
     const so = S.run.signoff;
@@ -829,14 +969,12 @@ function renderBar(error, fatal) {
     const [tone, label] = stale ? ['no', 'Out of date'] : so ? (so.decision === 'aprobar' ? ['ok', 'Signed'] : ['bad', 'Sent back']) : v ? VERDICT[v.status] || ['warn', v.label] : [laneTone(b.lane.id, b.lane.tone), laneName(b.lane.id, b.lane.name)];
     const num = v ? (sc && sc.value != null ? `<span class="num">${sc.value}<small> / 10</small></span><span class="txt">review score</span>` : '<span class="num">–</span><span class="txt">no score yet</span>') : `<span class="num">${b.residue.lines}<small> / ${b.totals.lines}</small></span><span class="txt">lines are yours</span>`;
     h = `${num}<span class="chip ${tone}" style="background:${PAL[tone]}">${esc(label)}</span>`
-      + (stale ? `${seg}<button class="cta" id="bVerify">Verify again</button>` : `${fixBtn()}<button class="cta" id="bReview">${S.run.signoff ? 'View sign-off' : 'Review & sign'}</button>`);
-  } else if (S.plan) h = `<span class="num">${S.plan.totals.files}<small> files</small></span><span class="txt">+${S.plan.totals.added} −${S.plan.totals.removed} · not verified yet</span>${seg}${fixBtn()}<button class="cta" id="bVerify">Verify</button>`;
+      + (stale ? `${seg}<button class="cta" id="bReview">Review again</button>` : `<button class="cta" id="bReview">${S.run.signoff ? 'View sign-off' : `Review &amp; sign${spotTag()}`}</button>`);
+  } else if (S.plan) h = `<span class="num">${S.plan.totals.files}<small> files</small></span><span class="txt">+${S.plan.totals.added} −${S.plan.totals.removed} · not reviewed yet</span>${seg}<button class="cta" id="bReview">Review &amp; sign${spotTag()}</button>`;
   else h = '<span class="txt">Loading…</span>';
   $('fbar').innerHTML = h;
   $('fbar').querySelectorAll('[data-p]').forEach((x) => (x.onclick = () => { S.profile = x.dataset.p; store.set('katse.profile', S.profile); renderBar(); }));
-  if ($('bVerify')) $('bVerify').onclick = () => verify();
-  if ($('bReview')) $('bReview').onclick = openReview;
-  if ($('bFix')) $('bFix').onclick = () => openFixit({ node: S.fixTarget });
+  if ($('bReview')) $('bReview').onclick = () => openReview();
   if ($('bBack')) $('bBack').onclick = closeGraph;
   if ($('bOk')) $('bOk').onclick = () => renderBar();
 }
@@ -875,7 +1013,7 @@ function liveText(e) {
 function attach(runId, seq = openSeq) {
   stopStream();
   const prId = S.cur.id;
-  Object.assign(S, { stage: 'Starting in an isolated copy', t0: Date.now() });
+  Object.assign(S, { stage: 'Starting in an isolated copy', t0: Date.now(), liveEv: [] });
   const es = new EventSource(`/api/projects/${S.pid}/runs/${runId}/events`);
   S.es = es; renderBar();
   S.timer = setInterval(() => { if (S.es === es && alive(seq)) renderBar(); }, 1000);
@@ -883,6 +1021,7 @@ function attach(runId, seq = openSeq) {
     if (S.es !== es) return;
     const e = JSON.parse(m.data);
     const live = liveText(e);
+    S.liveEv.push(e); if (typeof treeEvent === 'function') treeEvent(e);
     if (e.type === 'stage' && e.status === 'start') { S.stage = STAGE[e.id] || e.name; renderBar(); }
     else if (live) { S.stage = live; renderBar(); }
     else if (e.type === 'end') {
@@ -893,8 +1032,9 @@ function attach(runId, seq = openSeq) {
         const run = await api(`/projects/${S.pid}/runs/${runId}`);
         if (!alive(seq)) return;
         S.run = run;
-        if (!run.brief) return renderBar(`Verification failed: ${english(run.error) || 'unknown error'}`);
+        if (!run.brief) { renderBar(`Verification failed: ${english(run.error) || 'unknown error'}`); if (typeof treeLiveDone === 'function') treeLiveDone(); return; }
         renderBar(); renderGraph(model(run.brief));
+        if (typeof treeLiveDone === 'function') treeLiveDone();
       } catch (err) { if (alive(seq)) renderBar(err.message); }
     }
   };
@@ -906,133 +1046,9 @@ function attach(runId, seq = openSeq) {
   };
 }
 
-/* ── Review drawer: decide, read, sign ────────────────────────────────── */
-function codeHTML(item) {
-  if (!item.code?.length) return '';
-  return `<pre class="code">${item.code.map((c) => `<span class="h">@@ line ${c.at}</span>\n${c.removed.map((l) => `<span class="r">- ${esc(l)}</span>`).join('\n')}${c.removed.length && c.added.length ? '\n' : ''}${c.added.map((l) => `<span class="a">+ ${esc(l)}</span>`).join('\n')}`).join('\n')}</pre>`;
-}
-const copyBlock = (title, text, id) => `<div class="copy"><label>${esc(title)}</label><button type="button" data-copy="${id}">Copy</button><pre id="${id}">${esc(text)}</pre></div>`;
-function openReview() {
-  if ($('full').hidden || !S.run?.brief) return; // the drawer belongs to the open branch, never to the tree
-  const run = S.run, b = run.brief, so = run.signoff;
-  $('dk').textContent = `${name(S.cur)} · ${S.cur.branch}`;
-  const v2 = b.version >= 2 && b.verdict;
-  $('dt').textContent = so ? (so.decision === 'aprobar' ? 'Signed' : 'Sent back') : v2 ? VERDICT[b.verdict.status]?.[1] || b.verdict.label : laneName(b.lane.id, b.lane.name);
-  const lead = so ? (so.decision === 'aprobar' ? 'Signed. The answers, what was read and the merge commands are below.' : 'Sent back to the author. The answers are below.') : v2 ? 'AI agents rebuilt the change from the base, debated, attacked the PR and a judge scored it. The evidence is below; your signature is the approval.' : LANE[b.lane.id]?.[1] || b.lane.summary;
-  const H = [`<p class="lead">${esc(lead)}</p>`];
-  if (b.version >= 2 && b.verdict) H.push(v2HTML(b), intentHTML(b));
-  if (b.recommendation && !(b.version >= 2)) H.push(`<p class="lead" style="margin-top:6px">Recommendation: <b style="color:var(--fg);font-weight:500">${esc(RECO[b.recommendation.id] || b.recommendation.name)}</b></p>`);
-  if (b.questions.length) H.push(`<div class="sec"><h3>Decide <span>${b.questions.length}</span></h3>${b.questions.map((q) => `<div class="q"><p>${esc(q.text)}</p>${q.options.map((o) => `<label class="opt"><input type="radio" name="q-${esc(q.id)}" value="${esc(o)}" ${so?.answers?.[q.id] === o ? 'checked' : ''} ${so ? 'disabled' : ''}>${esc(OPTION[o] || o)}</label>`).join('')}</div>`).join('')}</div>`);
-  if (b.residue.items.length) H.push(`<div class="sec"><h3>Read <span>${b.residue.lines} lines</span></h3>${b.residue.items.map((i) => `<details class="res"><summary>${esc(base(i.file))}:${i.start}${i.end !== i.start ? '–' + i.end : ''}<span>${i.lines} ${i.lines === 1 ? 'line' : 'lines'}</span></summary>${codeHTML(i)}</details>`).join('')}</div>`);
-  H.push(`<div class="sec"><h3>Checked</h3><div class="list">${b.claims.map((c) => `<div class="li"><i style="background:${PAL[CLAIM[c.status][0]]}"></i><span><b>${CLAIM[c.status][1]}</b> · ${esc(c.text)}</span></div>`).join('')}</div></div>`);
-  H.push(`<div class="sec"><details class="more2"><summary>Not checked · ${b.notChecked.length} ›</summary><div class="list">${b.notChecked.map((n) => `<div class="li"><i></i><span><b>${esc(n.what)}</b> · ${esc(n.why)}</span></div>`).join('')}</div></details></div>`);
-  H.push(so ? signedHTML(run) : signHTML(b));
-  H.push(`<div class="foot"><span><button class="link" id="mdlink">Full report</button></span><span>${b.options?.mode === 'completo' ? `Full run, ${b.options.agents?.length || 0} agents` : 'Quick run'} · ${secs(b.timing.totalMs)}${b.cost?.usd ? ` · $${b.cost.usd.toFixed(2)}` : ''}</span></div>
-    <div class="foot" style="margin-top:10px"><span>Verify again:&nbsp; ${Object.entries(PROFILE).map(([id, [n, d]]) => `<button class="link" data-again="${id}" title="${esc(d)}">${n}</button>`).join(' · ')}${b.version >= 2 && b.contract ? ' · <button class="link" id="goDeep" title="Keeps the contract and verified patches; runs the tests again">Continue with Deep</button>' : ''}</span></div>`);
-  $('dbody').innerHTML = H.join('');
-  $('dbody').querySelectorAll('[data-art]').forEach(x => { x.onclick = async () => {
-    try { const response = await fetch(`/api/projects/${S.pid}/runs/${run.id}/artifact?name=${encodeURIComponent(x.dataset.art)}`); if (!response.ok) throw new Error('Artifact unavailable'); showText(x.dataset.art, await response.text()); }
-    catch (e) { showText('Artifact', e.message); }
-  }; });
-  $('dbody').scrollTop = 0;
-  $('drawer').hidden = false;
-  $('mdlink').onclick = async () => showText('Full report', await (await fetch(`/api/projects/${S.pid}/runs/${run.id}/report`)).text());
-  $('dbody').querySelectorAll('[data-again]').forEach((x) => (x.onclick = () => { S.profile = x.dataset.again; store.set('katse.profile', S.profile); $('drawer').hidden = true; verify(); }));
-  if ($('goDeep')) $('goDeep').onclick = async () => {
-    const seq = openSeq; $('drawer').hidden = true; S.starting = true; renderBar();
-    try { const r = await api(`/projects/${S.pid}/runs/${run.id}/continue`, { body: { profile: 'deep' } }); S.starting = false; if (alive(seq)) attach(r.runId, seq); }
-    catch (e) { S.starting = false; if (alive(seq)) renderBar(e.message); }
-  };
-  if (so) bindSigned(run); else bindSign(run);
-}
-function v2HTML(b) {
-  const v = b.verdict, sc = v.score, [tone, label] = VERDICT[v.status] || ['warn', v.label];
-  const cands = b.candidates || [], debate = Array.isArray(b.debate) ? b.debate : b.debate?.entries || [];
-  const parts = (sc?.components || []).map((c) => `<div class="li"><i style="background:${PAL[c.earned >= c.max ? 'ok' : c.earned > 0 ? 'warn' : 'no']}"></i><span><b>${esc(c.label)} · ${esc(c.earned)}/${esc(c.max)}</b> · ${esc(c.reason)}</span></div>`).join('');
-  const caps = (sc?.caps || []).map((c) => `<div class="li"><i style="background:var(--warn)"></i><span><b>Capped at ${esc(c.max)}/10</b> · ${esc(c.reason)}</span></div>`).join('');
-  const finds = (v.findings || []).map((f) => { const [t, what] = FIND[f.classification] || ['no', f.classification]; return `<details class="res"><summary>${esc(f.attack || '')} · ${esc(what)}<span><i class="dot" style="background:${PAL[t]}"></i></span></summary><div class="li2"><p>${esc(f.hypothesis || '')}</p>${f.scenario ? `<p><b>Scenario</b> ${esc(f.scenario)}</p>` : ''}${(f.outcomes || []).map((o) => `<p><b>${esc(o.version)}</b> ${esc({ passed: 'passes', failed: 'fails', pending: 'pending' }[o.outcome] || o.outcome)}</p>`).join('')}${f.reason ? `<p>${esc(f.reason)}</p>` : ''}</div></details>`; }).join('');
-  const talk = debate.filter((d) => d.status !== 'incomplete').map((d) => `<div class="q"><p><b>${esc(d.candidate)} · ${esc(modelName(d.model))}</b> <span style="color:var(--fg3)">${d.round === 'results' ? 'after the tests' : 'on the proposals'}</span></p>${d.strength ? `<p class="lead"><b>Strength</b> ${esc(d.strength)}</p>` : ''}${d.risk ? `<p class="lead"><b>Risk</b> ${esc(d.risk)}</p>` : ''}${d.scenario ? `<p class="lead"><b>Test idea</b> ${esc(d.scenario)}</p>` : ''}${d.revision ? `<p class="lead"><b>Would change</b> ${esc(d.revision)}</p>` : ''}</div>`).join('');
-  return `${b.providers?.available?.diverse === false ? '<div class="sec"><p class="lead">NVIDIA / Verda was unavailable in this run. Google substitutions are recorded on the candidates; this run does not validate Nemotron.</p></div>' : ''}<div class="sec"><h3>Judge <span>${esc(modelName(b.providers?.review || 'carbon'))}</span></h3><div class="done"><b style="font-size:30px">${sc?.value != null ? `${esc(sc.value)}<small style="font-size:16px;color:var(--fg3)"> / 10</small>` : 'No score'}</b> <span class="chip ${tone}" style="background:${PAL[tone]};margin-left:8px">${esc(label)}</span>
-      <p>A heuristic rubric about the PR as written, not a probability of no bugs.${v.pending?.length ? ` ${v.pending.length} open ${v.pending.length === 1 ? 'blocker' : 'blockers'}.` : ''}</p></div>
-      ${parts || caps ? `<div class="list" style="margin-top:10px">${parts}${caps}</div>` : ''}
-      ${v.semantic?.explanation ? `<details class="more2" style="margin-top:10px"><summary>What the judge says ›</summary><p class="lead">${esc(v.semantic.explanation)}</p></details>` : ''}</div>
-    ${finds ? `<div class="sec"><h3>Attacks on the PR <span>${(v.findings || []).length}</span></h3>${finds}</div>` : ''}
-    ${talk || debate.some(d => d.status === 'incomplete') ? `<div class="sec"><h3>Debate between the alternatives <span>${debate.length}</span></h3>${talk}${debate.filter(d => d.status === 'incomplete').map(d => `<p class="lead">${esc(d.candidate)} · ${esc(d.round)} · incomplete: ${esc(d.reason || 'No response')}</p>`).join('')}</div>` : ''}
-    ${cands.length ? `<div class="sec"><h3>Alternatives from the base <span>${cands.length}</span></h3><div class="list">${cands.map((c) => `<div class="li"><i style="background:${PAL[c.status === 'built' ? 'agent' : 'no']}"></i><span><b>${esc(c.id)} · ${esc(modelName(c.model))}</b> · ${esc(CAND[c.status] || c.status)}${c.final ? ' · final' : ''}</span></div>`).join('')}</div></div>` : ''}
-    ${b.budget ? `<div class="sec"><h3>Budget</h3><p class="lead">${esc(PROFILE[b.options?.profile]?.[0] || b.options?.profile || '')} · ${secs(b.budget.elapsedMs || b.timing?.totalMs || 0)} of ${secs(b.budget.limitMs || 0)} · ${(b.budget.accounting?.observed ?? b.budget.tokens ?? 0).toLocaleString('en-GB')} tokens reported</p></div>` : ''}`;
-}
-function intentHTML(b) {
-  const comparison = b.intentComparison;
-  if (!comparison) return '';
-  const labels = { aligned: 'Compatible according to the analysis', gap: 'Possible deviation', uncertain: 'Interpretation pending' };
-  return `<div class="sec"><h3>Requested / implemented</h3><p class="lead">The judge's interpretation with checked citations. Agreement does not prove correctness or add score points: execution evidence is required.</p><p class="lead">Original Entire messages: ${comparison.originalPromptStatus === 'recorded-messages' ? 'recorded messages available' : 'unavailable; using the requirement'}. Candidate checkpoints have separate provenance.</p>
-    ${comparison.rows.map(row => { const support = b.verdict?.support?.filter(s => s.expectation === row.expectation) || []; return `<details class="res"><summary>${esc(row.expectation)} · ${esc(labels[row.assessment] || row.assessment)}</summary><div class="li2"><p><b>Requested</b> ${esc(row.requested)}</p><p><b>Interpreted</b> ${esc(row.implemented)}</p>${row.source ? `<p><b>Source ${esc(row.source.id)}</b> ${esc(row.source.quote)}</p>` : ''}${row.patchQuote ? `<pre class="code">${esc(row.patchQuote)}</pre>` : ''}<p>${esc(row.limitation)}</p>${row.question ? `<p>${esc(row.question)}</p>` : ''}<p><b>Execution support</b> ${support.length ? esc(support.flatMap(s => s.tests || s.evidence).join(', ')) : 'See attack outcomes and pending checks; this interpretation does not establish support.'}</p></div></details>`; }).join('')}
-    <p><button class="link" data-art="intent-comparison.json">Contrast and provenance</button> · <button class="link" data-art="original-change.patch">Original change</button></p></div>`;
-}
-function signHTML(b) {
-  const hard = (b.version >= 2 && b.verdict && b.verdict.status !== 'ready-for-human') || b.rules.fired.some((r) => HARD.includes(r.id));
-  return `<div class="sec"><h3>Sign</h3><p class="lead">The automatic review is advice. Your signature is the approval.${b.audit ? ' This area is on probation: a second person will audit it.' : ''}</p>
-    <div class="field"><label for="signer">Your name</label><input type="text" id="signer" value="${esc(store.get('katse.signer') || '')}" placeholder="Full name"></div>
-    ${b.residue.items.length ? `<label class="ck"><input type="checkbox" id="ckRes"><span>I read the residue: ${b.residue.lines} lines</span></label>` : ''}
-    <label class="ck"><input type="checkbox" id="ckNot"><span>I reviewed the ${b.notChecked.length} things that were not checked</span></label>
-    <div class="field"><label for="risk">Residual risk I accept</label><textarea id="risk" rows="3" placeholder="In your words: what could still go wrong, and why you accept it."></textarea></div>
-    <div class="btns"><button class="cta ghost" id="sendBack">Send back</button><button class="cta" id="sign" ${hard ? 'disabled title="Checks are missing or the PR fails: read the report"' : ''}>Accept &amp; sign</button></div>
-    <div class="err" id="serr"></div></div>`;
-}
-/* `run` is the run this drawer was built from. If the open branch changed underneath, nothing is sent. */
-function bindSign(run) {
-  const submit = async (decision) => {
-    if (S.run !== run || $('full').hidden) { $('serr').textContent = 'This review no longer matches the open branch. Close it and open it again.'; return; }
-    const b = run.brief; const answers = {};
-    for (const q of b.questions) { const c = $('dbody').querySelector(`input[name="q-${CSS.escape(q.id)}"]:checked`); if (c) answers[q.id] = c.value; }
-    const signer = $('signer').value.trim(); store.set('katse.signer', signer);
-    const residueOk = !!$('ckRes')?.checked, notOk = !!$('ckNot')?.checked, risk = $('risk').value.trim();
-    // Same rules the server enforces, said in English before the round trip.
-    const open = b.questions.filter((q) => !answers[q.id]).length;
-    const hard = (b.version >= 2 && b.verdict && b.verdict.status !== 'ready-for-human') || b.rules.fired.find((r) => HARD.includes(r.id));
-    const problem = !signer ? 'Write your name: a person signs, not the tool.'
-      : decision !== 'aprobar' ? ''
-      : hard ? 'This change cannot be accepted yet: checks are missing or it fails. Send it back or verify again.'
-      : open ? `Answer the ${open === 1 ? 'open question' : `${open} open questions`} first.`
-      : b.residue.items.length && !residueOk ? 'Confirm that you read the residue.'
-      : !notOk ? 'Confirm that you reviewed what was not checked.'
-      : risk.length < 20 ? 'Describe the residual risk you accept, in your own words (one sentence at least).' : '';
-    if (problem) { $('serr').textContent = problem; return; }
-    $('serr').textContent = '';
-    const btns = [$('sign'), $('sendBack')]; const was = btns.map((x) => x.disabled);
-    btns.forEach((x) => (x.disabled = true)); // one decision per click
-    try {
-      const r = await api(`/projects/${S.pid}/runs/${run.id}/signoff`, { body: { signer, decision, answers, residualRisk: risk, checks: { residue: residueOk, notChecked: notOk } } });
-      run.signoff = r.signoff; run.signed = r;
-      if (S.run === run && !$('full').hidden) { openReview(); renderBar(); }
-      reloadPRs().catch(() => {});
-    } catch (e) { $('serr').textContent = e.message; btns.forEach((x, i) => (x.disabled = was[i])); }
-  };
-  $('sign').onclick = () => submit('aprobar');
-  $('sendBack').onclick = () => submit('devolver');
-}
-function signedHTML(run) {
-  const so = run.signoff, s = run.signed || {}, out = run.brief.pr.direction === 'outgoing';
-  return `<div class="sec"><h3>Sign-off</h3>
-    <div class="done"><b>${so.decision === 'aprobar' ? 'Accepted' : 'Sent back'} by ${esc(so.signer)}</b><p>${new Date(so.ts).toLocaleString('en-GB')} · report sha256:${esc(so.briefHash.slice(0, 12))}…${so.auditRequired ? ' · waiting for a second person to audit' : ''}</p><p>Accepted risk: ${esc(so.residualRisk)}</p></div>
-    ${so.decision === 'aprobar' && s.commands?.length ? copyBlock(out ? 'To send it (you run this)' : 'To merge (you run this)', s.commands.join('\n'), 'c1') : ''}
-    ${s.trailers ? copyBlock('Commit trailers', s.trailers, 'c2') : ''}
-    ${s.markdown ? copyBlock(out ? 'PR description, with the report' : 'PR comment', s.markdown, 'c3') : ''}
-    <p class="lead" style="margin-top:14px">Katse never merges. You do.</p>
-    <button class="link" id="attach" style="margin-top:10px">Attach the report to the commit (git notes)</button><div class="err" id="aerr" style="color:var(--fg2)"></div></div>`;
-}
-function bindSigned(run) {
-  $('dbody').querySelectorAll('[data-copy]').forEach((b) => (b.onclick = async () => {
-    try { await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = 'Copied'; }
-    catch { b.textContent = 'Select and copy'; } // clipboard can be blocked (http, permissions)
-    setTimeout(() => (b.textContent = 'Copy'), 1400);
-  }));
-  $('attach').onclick = async () => {
-    try { const r = await api(`/projects/${S.pid}/runs/${run.id}/attach`, { body: {} }); $('aerr').innerHTML = `Attached to ${esc(r.commit.slice(0, 9))} in <code>${esc(r.ref)}</code>. To share it: <code>${esc(r.push)}</code>`; }
-    catch (e) { $('aerr').textContent = e.message; }
-  };
-}
-$('dx').onclick = () => ($('drawer').hidden = true);
+/* ── Review & sign: the review is the agents' tree (review.js), growing out of the spot you clicked; the
+   verdict card at its end is where you sign. No review yet: it starts one and the tree grows live. */
+function openReview(target) { return typeof openTree === 'function' ? openTree(target || { node: S.fixTarget }) : null; }
 
 /* ── Modal ────────────────────────────────────────────────────────────── */
 function modal(html) { $('mbody').innerHTML = html; $('modal').hidden = false; }
@@ -1042,14 +1058,13 @@ $('mx').onclick = closeModal;
 $('modal').onclick = (e) => { if (e.target === $('modal')) closeModal(); };
 addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  const typing = e.target.closest?.('#drawer input, #drawer textarea');
+  const typing = e.target.closest?.('input, textarea');
   if (!$('modal').hidden) closeModal();
-  else if (typing) e.target.blur(); // first Esc leaves the field; the sign-off text is not lost
-  else if (typeof fixEscape === 'function' && fixEscape()) { /* Fix it, back to the graph */ }
+  else if (typing) e.target.blur(); // first Esc leaves the field; what you typed is not lost
+  else if (typeof treeEscape === 'function' && treeEscape()) { /* the review, back to the graph */ }
   else if (typeof debateEscape === 'function' && debateEscape()) { /* the agent, then the debate */ }
-  else if (!$('drawer').hidden) $('drawer').hidden = true;
   else if (!$('full').hidden) { if ((G.focus || Math.abs(G.cam.tk - 1) > 0.01 || G.cam.tx || G.cam.ty)) zoomGraph('fit'); else closeGraph(); } // step back out, then leave
-  else if (S.focus) hideCommits();
+  else if (S.focus || S.zoom) hideCommits();
 });
 
 init().catch((e) => { $('sum').textContent = e.message; });

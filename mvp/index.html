@@ -38,7 +38,7 @@
   <svg id="g" aria-label="Change graph"></svg>
   <button class="back" id="back" aria-label="Back"><i>←</i><span><b id="fid"></b><small id="fbr"></small></span></button>
   <div class="flegend"><span><i style="background:var(--file)"></i>File</span><span><i style="background:var(--ok)"></i>Reproduced</span><span><i style="background:var(--warn)"></i>You decide</span><span><i style="background:var(--bad)"></i>You read it</span></div>
-  <section class="fix" id="fix" hidden aria-label="Fix it: the agents' tree">
+  <section class="fix" id="fix" hidden aria-label="The review: the agents' tree">
     <svg id="fsvg" aria-hidden="true"><defs><filter id="fgoo" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur id="fgooblur" in="SourceGraphic" stdDeviation="3" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter></defs><g id="fcam"><g id="fworld"></g></g><g id="fscr"><g id="fblobs" filter="url(#fgoo)"></g></g></svg>
     <div class="fsays" id="fsays"></div>
     <div class="fstat" id="fstat"></div>
@@ -56,17 +56,13 @@
   </section>
 </section>
 
-<aside class="drawer" id="drawer" hidden>
-  <div class="dhead"><div><div class="k" id="dk"></div><h2 id="dt"></h2></div><button class="x" id="dx" aria-label="Close">×</button></div>
-  <div class="dbody" id="dbody"></div>
-</aside>
 
 <div class="modal" id="modal" hidden><div class="sheet"><button class="x" id="mx" aria-label="Close">×</button><div id="mbody"></div></div></div>
 <div class="tip" id="tip"></div>
 
 <script src="app.js"></script>
 <script src="debate.js"></script>
-<script src="fixit.js"></script>
+<script src="review.js"></script>
 <script type="module" src="mascot/mascot.js"></script>
 </body>
 </html>
