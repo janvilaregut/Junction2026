@@ -225,7 +225,7 @@ function attach(runId) {
       await loadProject(pid(), true);
       if (S.cur?.id !== prId) return;
       S.run = await api(`/projects/${pid()}/runs/${runId}`);
-      if (S.run.brief) { renderBrief(); const b = S.run.brief; say(b.verdict ? `Revisión terminada en ${secs(b.timing.totalMs)}. <b>${h(b.verdict.label)}</b>${b.verdict.score ? ` · confianza ${b.verdict.score.value == null ? 'no evaluable' : h(b.verdict.score.value) + '/10'}` : ''}. ${b.verdict.pending?.length || 0} comprobaciones o dudas pendientes. Abre cada apartado para ver sus pruebas. La aprobación es tuya.` : `Listo en ${secs(b.timing.totalMs)}. Carril <b>${h(b.lane.name)}</b>: quedan ${b.residue.lines} de ${b.totals.lines} líneas por revisar.`); briefChips(); }
+      if (S.run.brief) { renderBrief(); const b = S.run.brief; say(b.verdict ? `Revisión terminada en ${secs(b.timing.totalMs)}. <b>${h(b.verdict.label)}</b>${b.verdict.score ? ` · confianza ${b.verdict.score.value == null ? 'no evaluable' : h(b.verdict.score.value) + '/10'}` : ''}. ${b.verdict.pending?.length || 0} bloqueos del veredicto en el alcance comprobado. Revisa también las limitaciones y lo no comprobado. Abre cada apartado para ver sus pruebas. La aprobación es tuya.` : `Listo en ${secs(b.timing.totalMs)}. Carril <b>${h(b.lane.name)}</b>: quedan ${b.residue.lines} de ${b.totals.lines} líneas por revisar.`); briefChips(); }
       else $('panel').innerHTML = `<p class="err">La verificación falló: ${h(S.run.error || 'error desconocido')}</p><button class="act" id="retry">Volver</button>`, ($('retry').onclick = () => loadPlan());
     }
   };
@@ -253,7 +253,7 @@ function stageLine(e) {
 /* ── Brief ────────────────────────────────────────────────────────────── */
 function greetBrief() {
   const b = S.run.brief;
-  say(`<b>${h(S.cur.branch)}</b> — ${h(S.cur.title)}\nRevisión del ${new Date(b.createdAt).toLocaleString()}. ${b.verdict ? `<b>${h(b.verdict.label)}</b>${b.verdict.score ? ` · confianza ${b.verdict.score.value == null ? 'no evaluable' : h(b.verdict.score.value) + '/10'}` : ''}. ${b.verdict.pending?.length || 0} comprobaciones o dudas pendientes.` : `Carril <b>${h(b.lane.name)}</b>: lees ${b.residue.lines} de ${b.totals.lines} líneas.`}${S.run.signoff ? `\nFirmado por ${h(S.run.signoff.signer)}.` : ''}`);
+  say(`<b>${h(S.cur.branch)}</b> — ${h(S.cur.title)}\nRevisión del ${new Date(b.createdAt).toLocaleString()}. ${b.verdict ? `<b>${h(b.verdict.label)}</b>${b.verdict.score ? ` · confianza ${b.verdict.score.value == null ? 'no evaluable' : h(b.verdict.score.value) + '/10'}` : ''}. ${b.verdict.pending?.length || 0} bloqueos del veredicto en el alcance comprobado. Revisa también las limitaciones y lo no comprobado.` : `Carril <b>${h(b.lane.name)}</b>: lees ${b.residue.lines} de ${b.totals.lines} líneas.`}${S.run.signoff ? `\nFirmado por ${h(S.run.signoff.signer)}.` : ''}`);
   briefChips();
 }
 const briefChips = () => chips(['¿Por qué esta nota?', '¿Qué problemas encontraste?', '¿Qué queda pendiente?', '¿Cuánto ha costado?', '¿Qué aportó el debate?']);
@@ -277,7 +277,7 @@ function scoreHTML(b) {
     ${(score.components || []).map(c => `<details class="score-part"><summary><span>${h(c.label)}</span><b>${h(c.earned)} / ${h(c.max)}</b></summary><p class="sub">${h(c.reason)}</p><div class="links">${evidenceLinks(c.evidence, b)}</div>${c.expectations?.length ? `<div class="sub">Expectativas: ${c.expectations.map(h).join(', ')}</div>` : ''}</details>`).join('')}
     ${(score.caps || []).map(c => `<p class="sub t-warn">Límite ${h(c.max)}/10: ${h(c.reason)}</p>`).join('')}
     ${score.explanation ? `<p class="sub">${h(score.explanation)}</p>` : ''}
-    <details ${b.verdict.pending?.length ? 'open' : ''}><summary>Qué queda pendiente · ${b.verdict.pending?.length || 0}</summary>${(b.verdict.pending || []).map(x => `<div class="item"><span class="dot no"></span><span class="sub">${h(pendingMessage(x))}</span></div>`).join('') || '<p class="sub">No hay comprobaciones obligatorias pendientes para este alcance. Revisa los riesgos residuales antes de firmar.</p>'}<div class="links">${ev({artifact:'pipeline.json',label:'Ver expediente y errores completos'})}</div></details>
+    <details ${b.verdict.pending?.length ? 'open' : ''}><summary>Bloqueos del veredicto · ${b.verdict.pending?.length || 0}</summary>${(b.verdict.pending || []).map(x => `<div class="item"><span class="dot no"></span><span class="sub">${h(pendingMessage(x))}</span></div>`).join('') || '<p class="sub">No hay bloqueos del veredicto en el alcance comprobado. Las limitaciones de ejecución, los aspectos no comprobados y los riesgos residuales siguen siendo relevantes antes de firmar.</p>'}<div class="links">${ev({artifact:'pipeline.json',label:'Ver expediente y errores completos'})}</div></details>
     ${(b.verdict.residualRisks || []).length ? `<details><summary>Límites del alcance</summary>${b.verdict.residualRisks.map(x => `<p class="sub">${h(x)}</p>`).join('')}</details>` : ''}</section>`;
 }
 function findingsHTML(b) {
