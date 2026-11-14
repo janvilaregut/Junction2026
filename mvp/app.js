@@ -7,11 +7,26 @@ const base = (p) => String(p).split('/').pop();
 const secs = (ms) => (ms >= 60000 ? `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s` : `${Math.round(ms / 1000)} s`);
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
 
+/* The backend still answers in Spanish; the errors a person can actually hit are said in English here. */
+const ERR = [
+  [/^Ya hay una verificación en marcha/, () => 'Another verification is already running in this project. Wait for it to finish.'],
+  [/^No existe la carpeta (.*)/, (m) => `That folder does not exist: ${m[1]}`],
+  [/^(.*) no es un repositorio git$/, (m) => `${m[1]} is not a git repository`],
+  [/^URL no válida/, () => 'Invalid URL (use https://…)'],
+  [/^git clone falló: ([\s\S]*)/, (m) => `git clone failed: ${m[1]}`],
+  [/^No encuentro el PR (.*)/, (m) => `Can't find the PR ${m[1]}`],
+  [/^No encuentro esa verificación/, () => 'Can’t find that verification'],
+  [/^Proyecto desconocido: (.*)/, (m) => `Unknown project: ${m[1]}`],
+  [/^No existe la rama (.*)/, (m) => `The branch ${m[1]} does not exist`],
+  [/^Esta verificación no tiene informe/, () => 'This verification has no report'],
+];
+const english = (msg) => { const s = String(msg ?? ''); for (const [re, f] of ERR) { const m = s.match(re); if (m) return f(m); } return s; };
+
 async function api(path, opts) {
   const init = opts ? { method: opts.method || 'POST', headers: { 'Content-Type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined } : undefined;
   const r = await fetch('/api' + path, init);
   const data = (r.headers.get('content-type') || '').includes('json') ? await r.json() : await r.text();
-  if (!r.ok) throw new Error(data.error || data || 'Request failed');
+  if (!r.ok) throw new Error(english(data.error || data || 'Request failed'));
   return data;
 }
 
@@ -125,7 +140,7 @@ function renderTree() {
       const st = state(p); const col = PAL[st.tone];
       const y = mainY + dir * (i + 1) * GAP; const dy = Math.abs(y - mainY);
       const xf = p.behind ? Math.max(40, xNow - (30 + 34 * Math.log2(1 + p.behind))) : xNow;
-      const R = 34 + dy * 0.8;
+      const R = Math.min(34 + dy * 0.8, 150); // far lanes turn up more steeply instead of sweeping across the history
       const tipX = Math.max(xNow + 150 + i * step, xf + R + 40);
       const M = Math.min(44 + dy * 0.45, W - 16 - tipX);
       const mx = tipX + M;
@@ -134,7 +149,7 @@ function renderTree() {
       const fork = `M${xf} ${mainY} C ${xf + R * .55} ${mainY}, ${xf + R * .45} ${y}, ${xf + R} ${y} L ${tipX} ${y}`;
       const merge = `M${tipX} ${y} C ${tipX + M * .55} ${y}, ${mx - M * .45} ${mainY}, ${mx} ${mainY}`;
       mk('path', { d: fork, fill: 'none', stroke: col, 'stroke-width': faint ? 1.4 : 2.2, 'stroke-linecap': 'round', 'stroke-opacity': faint ? .5 : .95 }, g);
-      if (st.end !== 'cut') {
+      if (st.end !== 'cut' && !faint) { // stale branches are not merge candidates: no pending-merge curve
         mk('path', { d: merge, fill: 'none', stroke: col, 'stroke-width': 1.6, 'stroke-opacity': st.end === 'merged' ? .9 : .45, 'stroke-dasharray': st.end === 'merged' ? '' : '3 5', 'stroke-linecap': 'round' }, g);
         mk('circle', { cx: mx, cy: mainY, r: 5, fill: st.end === 'merged' ? col : '#0c0c0e', stroke: col, 'stroke-width': 1.8, 'stroke-opacity': st.end === 'merged' ? 1 : .6 }, g);
       }
@@ -147,7 +162,7 @@ function renderTree() {
         mk('circle', { cx: tipX, cy: y, r: faint ? 7 : 11, fill: 'none', stroke: col, 'stroke-opacity': .25, class: 'tipring' }, g);
       }
       mk('text', { x: tipX, y: dir < 0 ? y - (faint ? 11 : 17) : y + 25, 'text-anchor': 'middle', class: 'lbl' + (faint ? ' old' : '') }, g).textContent = dir > 0 ? name(p) + ' · yours' : name(p);
-      mk('path', { d: fork + ' ' + merge, fill: 'none', stroke: 'transparent', 'stroke-width': Math.max(GAP - 8, 18) }, g);
+      mk('path', { d: faint ? fork : fork + ' ' + merge, fill: 'none', stroke: 'transparent', 'stroke-width': Math.max(GAP - 8, 18) }, g);
       g.onmouseenter = () => { svg.classList.add('hl'); g.classList.add('on'); showCard(p, st, tipX, y, dir); };
       g.onmouseleave = () => { svg.classList.remove('hl'); g.classList.remove('on'); $('card').classList.remove('on'); };
       g.onclick = () => { const r = svg.getBoundingClientRect(); openGraph(p, r.left + (tipX * r.width) / W, r.top + (y * r.height) / H); };
@@ -158,6 +173,9 @@ function renderTree() {
   mk('circle', { cx: xNow, cy: mainY, r: 7.5, fill: '#f5f5f7' }, svg);
   mk('text', { x: xNow - 24, y: mainY - 14, 'text-anchor': 'end', class: 'here' }, svg).textContent = 'you are here';
 
+  // On narrow screens the tree scrolls sideways: start at "you are here", where the branches are.
+  const box = svg.parentElement;
+  if (box.clientWidth < W) box.scrollLeft = xNow - 112;
   $('more').hidden = !old.length;
   $('more').textContent = S.expanded ? 'Hide older branches' : `+${old.length} older branches`;
   const pend = recent.filter((p) => state(p).end === 'open').length;
@@ -182,8 +200,13 @@ function highlightLanes(ids) {
   svg.classList.toggle('hl', want.size > 0);
   svg.querySelectorAll('.lane').forEach((g) => g.classList.toggle('on', want.has(g.dataset.pr)));
 }
-$('more').onclick = () => { S.expanded = !S.expanded; renderTree(); };
-addEventListener('resize', () => S.pid && renderTree());
+$('more').onclick = () => { S.expanded = !S.expanded; renderTree(); if (S.expanded) $('more').scrollIntoView({ block: 'end', behavior: 'smooth' }); };
+let resizeTimer = 0;
+addEventListener('resize', () => {
+  if (S.pid) renderTree();
+  clearTimeout(resizeTimer); // the graph is fitted to the screen, so fit it again once resizing stops
+  resizeTimer = setTimeout(() => { if (!$('full').hidden && S.model) renderGraph(S.model); }, 250);
+});
 
 /* ── Graph model, from the real report (or the plan if not verified yet) ── */
 const overlaps = (a, b) => a.file === b.file && a.start <= b.end && b.start <= a.end;
@@ -262,16 +285,22 @@ function layout({ N, L }, W, H) {
   }
   const xs = P.map((n) => n.x), ys = P.map((n) => n.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const L0 = 110, R0 = W - 110, T0 = 120, B0 = H - 150;
-  const s = Math.min((R0 - L0) / Math.max(maxX - minX, 1), (B0 - T0) / Math.max(maxY - minY, 1), 1.5);
-  const ox = (L0 + R0) / 2 - ((minX + maxX) / 2) * s, oy = (T0 + B0) / 2 - ((minY + maxY) / 2) * s;
-  P.forEach((n) => { n.x = n.x * s + ox; n.y = n.y * s + oy; n.bx = n.x; n.by = n.y; });
+  // Fit to the free area (minus the header, the bottom bar and room for labels). The graph may stretch
+  // up to 1.5x along the longer side of the screen so it uses the space instead of staying a small circle.
+  const narrow = W < 600;
+  const barTop = $('fbar').getBoundingClientRect().top || H - 100;
+  const L0 = narrow ? 40 : 110, R0 = W - L0, T0 = narrow ? 100 : 120, B0 = Math.min(H - 150, barTop - 44);
+  const fx = (R0 - L0) / Math.max(maxX - minX, 1), fy = (B0 - T0) / Math.max(maxY - minY, 1);
+  const s = Math.min(fx, fy, 1.5), sx = Math.min(fx, s * 1.5, 1.6), sy = Math.min(fy, s * 1.5, 1.6);
+  const ox = (L0 + R0) / 2 - ((minX + maxX) / 2) * sx, oy = (T0 + B0) / 2 - ((minY + maxY) / 2) * sy;
+  P.forEach((n) => { n.x = n.x * sx + ox; n.y = n.y * sy + oy; n.bx = n.x; n.by = n.y; });
   return { P, links };
 }
 
 /* ── Full-screen graph ────────────────────────────────────────────────── */
 let raf = 0;
 function renderGraph(m) {
+  S.model = m;
   const svg = $('g'); svg.innerHTML = '';
   $('full').classList.remove('ready');
   const W = svg.clientWidth, H = svg.clientHeight;
@@ -354,8 +383,9 @@ function renderBar(error) {
   else if (S.es) h = `<span class="spin"></span><span class="txt" style="color:var(--fg)">${esc(S.stage)}</span><span class="txt">${secs(Date.now() - S.t0)}</span><button class="cta" disabled>Verifying…</button>`;
   else if (b) {
     const stale = p.sha && !b.pr.head.startsWith(p.sha);
-    const tone = stale ? 'no' : laneTone(b.lane.id, b.lane.tone);
-    h = `<span class="num">${b.residue.lines}<small> / ${b.totals.lines}</small></span><span class="txt">lines are yours</span><span class="chip ${tone}" style="background:${PAL[tone]}">${stale ? 'Out of date' : esc(laneName(b.lane.id, b.lane.name))}</span>`
+    const so = S.run.signoff;
+    const [tone, label] = stale ? ['no', 'Out of date'] : so ? (so.decision === 'aprobar' ? ['ok', 'Signed'] : ['bad', 'Sent back']) : [laneTone(b.lane.id, b.lane.tone), laneName(b.lane.id, b.lane.name)];
+    h = `<span class="num">${b.residue.lines}<small> / ${b.totals.lines}</small></span><span class="txt">lines are yours</span><span class="chip ${tone}" style="background:${PAL[tone]}">${esc(label)}</span>`
       + (stale ? `${seg}<button class="cta" id="bVerify">Verify again</button>` : `<button class="cta" id="bReview">${S.run.signoff ? 'View sign-off' : 'Review & sign'}</button>`);
   } else if (S.plan) h = `<span class="num">${S.plan.totals.files}<small> files</small></span><span class="txt">+${S.plan.totals.added} −${S.plan.totals.removed} · not verified yet</span>${seg}<button class="cta" id="bVerify">Verify</button>`;
   else h = '<span class="txt">Loading…</span>';
@@ -387,7 +417,7 @@ function attach(runId) {
       await reloadPRs();
       if (S.cur?.id !== prId || $('full').hidden) return;
       S.run = await api(`/projects/${S.pid}/runs/${runId}`);
-      if (!S.run.brief) return renderBar(`Verification failed: ${S.run.error || 'unknown error'}`);
+      if (!S.run.brief) return renderBar(`Verification failed: ${english(S.run.error) || 'unknown error'}`);
       renderBar(); renderGraph(model(S.run.brief));
     }
   };
@@ -404,18 +434,21 @@ function openReview() {
   const run = S.run, b = run.brief, so = run.signoff;
   $('dk').textContent = `${name(S.cur)} · ${S.cur.branch}`;
   $('dt').textContent = so ? (so.decision === 'aprobar' ? 'Signed' : 'Sent back') : laneName(b.lane.id, b.lane.name);
-  const H = [`<p class="lead">${esc(LANE[b.lane.id]?.[1] || b.lane.summary)}</p>`];
+  const lead = so ? (so.decision === 'aprobar' ? 'Signed. The answers, what was read and the merge commands are below.' : 'Sent back to the author. The answers are below.') : LANE[b.lane.id]?.[1] || b.lane.summary;
+  const H = [`<p class="lead">${esc(lead)}</p>`];
   if (b.recommendation) H.push(`<p class="lead" style="margin-top:6px">Recommendation: <b style="color:var(--fg);font-weight:500">${esc(RECO[b.recommendation.id] || b.recommendation.name)}</b></p>`);
   if (b.questions.length) H.push(`<div class="sec"><h3>Decide <span>${b.questions.length}</span></h3>${b.questions.map((q) => `<div class="q"><p>${esc(q.text)}</p>${q.options.map((o) => `<label class="opt"><input type="radio" name="q-${esc(q.id)}" value="${esc(o)}" ${so?.answers?.[q.id] === o ? 'checked' : ''} ${so ? 'disabled' : ''}>${esc(OPTION[o] || o)}</label>`).join('')}</div>`).join('')}</div>`);
   if (b.residue.items.length) H.push(`<div class="sec"><h3>Read <span>${b.residue.lines} lines</span></h3>${b.residue.items.map((i) => `<details class="res"><summary>${esc(base(i.file))}:${i.start}${i.end !== i.start ? '–' + i.end : ''}<span>${i.lines} ${i.lines === 1 ? 'line' : 'lines'}</span></summary>${codeHTML(i)}</details>`).join('')}</div>`);
   H.push(`<div class="sec"><h3>Checked</h3><div class="list">${b.claims.map((c) => `<div class="li"><i style="background:${PAL[CLAIM[c.status][0]]}"></i><span><b>${CLAIM[c.status][1]}</b> · ${esc(c.text)}</span></div>`).join('')}</div></div>`);
   H.push(`<div class="sec"><details class="more2"><summary>Not checked · ${b.notChecked.length} ›</summary><div class="list">${b.notChecked.map((n) => `<div class="li"><i></i><span><b>${esc(n.what)}</b> · ${esc(n.why)}</span></div>`).join('')}</div></details></div>`);
   H.push(so ? signedHTML(run) : signHTML(b));
-  H.push(`<div class="foot"><button class="link" id="mdlink">Full report</button><span>${secs(b.timing.totalMs)}${b.cost?.usd ? ` · $${b.cost.usd.toFixed(2)} in agents` : ''}</span></div>`);
+  H.push(`<div class="foot"><span><button class="link" id="mdlink">Full report</button></span><span>${b.options?.mode === 'completo' ? `Full run, ${b.options.agents?.length || 0} agents` : 'Quick run'} · ${secs(b.timing.totalMs)}${b.cost?.usd ? ` · $${b.cost.usd.toFixed(2)}` : ''}</span></div>
+    <div class="foot" style="margin-top:10px"><span>Verify again:&nbsp; <button class="link" data-again="quick">Quick</button>${S.agents.length ? ` · <button class="link" data-again="full" title="${Math.min(3, S.agents.length)} agents redo the change blind. Takes minutes.">Full, with agents</button>` : ''}</span></div>`);
   $('dbody').innerHTML = H.join('');
   $('dbody').scrollTop = 0;
   $('drawer').hidden = false;
   $('mdlink').onclick = async () => showText('Full report', await (await fetch(`/api/projects/${S.pid}/runs/${run.id}/report`)).text());
+  $('dbody').querySelectorAll('[data-again]').forEach((x) => (x.onclick = () => { S.mode = x.dataset.again; $('drawer').hidden = true; verify(); }));
   if (so) bindSigned(); else bindSign();
 }
 function signHTML(b) {
@@ -433,8 +466,21 @@ function bindSign() {
     const b = S.run.brief; const answers = {};
     for (const q of b.questions) { const c = $('dbody').querySelector(`input[name="q-${CSS.escape(q.id)}"]:checked`); if (c) answers[q.id] = c.value; }
     const signer = $('signer').value.trim(); store.set('katse.signer', signer);
+    const residueOk = !!$('ckRes')?.checked, notOk = !!$('ckNot')?.checked, risk = $('risk').value.trim();
+    // Same rules the server enforces, said in English before the round trip.
+    const open = b.questions.filter((q) => !answers[q.id]).length;
+    const hard = b.rules.fired.find((r) => HARD.includes(r.id));
+    const problem = !signer ? 'Write your name: a person signs, not the tool.'
+      : decision !== 'aprobar' ? ''
+      : hard ? 'This change cannot be accepted: it does not build or it breaks tests. Send it back.'
+      : open ? `Answer the ${open === 1 ? 'open question' : `${open} open questions`} first.`
+      : b.residue.items.length && !residueOk ? 'Confirm that you read the residue.'
+      : !notOk ? 'Confirm that you reviewed what was not checked.'
+      : risk.length < 20 ? 'Describe the residual risk you accept, in your own words (one sentence at least).' : '';
+    if (problem) { $('serr').textContent = problem; return; }
+    $('serr').textContent = '';
     try {
-      const r = await api(`/projects/${S.pid}/runs/${S.run.id}/signoff`, { body: { signer, decision, answers, residualRisk: $('risk').value, checks: { residue: !!$('ckRes')?.checked, notChecked: !!$('ckNot')?.checked } } });
+      const r = await api(`/projects/${S.pid}/runs/${S.run.id}/signoff`, { body: { signer, decision, answers, residualRisk: risk, checks: { residue: residueOk, notChecked: notOk } } });
       S.run.signoff = r.signoff; S.run.signed = r;
       openReview(); renderBar(); reloadPRs().catch(() => {});
     } catch (e) { $('serr').textContent = e.message; }
