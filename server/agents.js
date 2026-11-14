@@ -28,11 +28,20 @@ export function configuration({ maxOutputTokens = 4096 } = {}) {
   };
 }
 
-export async function setupCapture(dir) {
+export async function setupCapture(dir, { manual = false } = {}) {
+  if(manual) assertScratch(ROOT,dir);
   fs.mkdirSync(path.join(dir, '.opencode'), { recursive: true });
   writeJSON(path.join(dir, '.opencode', 'opencode.json'), configuration());
   const r = await run(entirePath(), ['enable', '--agent', 'opencode', '--yes', '--local', '--skip-push-sessions', '--telemetry=false', '--absolute-git-hook-path', '--agent-help-skill=false'], { cwd: dir, timeout: 30_000 });
   if (r.code !== 0) throw new Error(`Entire setup: ${r.stderr || r.stdout}`);
+  if(manual) {
+    // Explicit session attach imports the transcript; automatic hooks are not needed.
+    // Keep the generated plugin for audit outside OpenCode's plugin search path.
+    for(const folder of ['plugin','plugins']) {
+      const plugin = path.join(dir,'.opencode',folder,'entire.ts');
+      if(fs.existsSync(plugin)) fs.renameSync(plugin,path.join(dir,'.entire',`opencode-${folder}.ts`));
+    }
+  }
   // Local infrastructure never enters candidate patches.
   fs.appendFileSync(path.join(dir, '.git', 'info', 'exclude'), '\n.opencode/\n.entire/\n.replica-trx/\n');
   return { version: (await run(entirePath(), ['version'], { timeout: 5000 })).stdout.trim(), plugin: '.opencode/plugin/entire.ts' };
@@ -100,7 +109,9 @@ export async function session({ dir, role, model, prompt, artifacts, validate = 
       const hasUsage = usage.length > 0 && usage.every(t => ['total', 'input', 'output'].some(k => Number.isFinite(t[k])));
       const usageIncomplete = !hasUsage || r.code !== 0 || r.timedOut === true || events.some(e => e.type === 'error');
       if (reservation !== undefined) tokenBudget.settle(reservation, hasUsage ? usage.reduce((n, t) => n + usageTokens(t), 0) : null, { incomplete: usageIncomplete });
-      history.push({ code: r.code, ms: r.ms, sessionId, usage, usageIncomplete, inputEstimate, outputLimit });
+      const firstStep = events.find(e=>e.type==='step_start' && Number.isFinite(e.timestamp))?.timestamp;
+      const lastStep = events.filter(e=>e.type==='step_finish' && Number.isFinite(e.timestamp)).at(-1)?.timestamp;
+      history.push({ code: r.code, ms: r.ms, sessionId, usage, usageIncomplete, inputEstimate, outputLimit, timing: { beforeFirstStepMs: firstStep ? Math.max(0,firstStep-(Date.now()-r.ms)) : null, observedStepsMs: firstStep && lastStep ? lastStep-firstStep : null } });
       fs.writeFileSync(path.join(artifacts, `${id}-${history.length}.jsonl`), redact(r.stdout + '\n' + r.stderr));
       if (r.code !== 0 || events.some(e => e.type === 'error')) {
         lastError = r.timedOut ? 'session-timeout' : redact(r.stderr || JSON.stringify(events.filter(e => e.type === 'error')) || `exit ${r.code}`);

@@ -33,7 +33,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   const { project, pr, options, runDir, emit } = args;
   const profile = resolveProfile(options);
   const started = Date.now(), budgetMs = profile.budgetMs;
-  const deadline = started + budgetMs, generationEnd = started + budgetMs * 2 / 3, finalEnd = deadline - Math.min(45000, budgetMs / 5);
+  const deadline = started + budgetMs, generationEnd = started + budgetMs * 2 / 3, finalEnd = deadline - Math.min(30000, budgetMs / 5);
   const artifacts = path.join(runDir, 'artifacts'); fs.mkdirSync(artifacts, { recursive: true });
   const tempRoot = path.join(os.tmpdir(), 'katse', path.basename(runDir)); fs.mkdirSync(tempRoot, { recursive: true });
   const state = { version: 2, contract: null, candidates: [], attacks: [], evidence: [], sessions: [], groups: [], finalMissions: [], pending: [], debate: [], requiredFinalMissions: profile.finalMissions, budget: { profile: profile.id, tokenLimit: profile.tokenBudget, limitMs: budgetMs, generationEnd, finalEnd, deadline, concurrency: { models: 2, runners: 1 }, maxCandidates: profile.initialCandidates + profile.maxDescendants, maxGenerations: profile.maxDescendants ? 2 : 1, formula: 'two independent candidates; additional work only for unresolved risks within profile', priorityFormula: 'R*(1+U+D)/(C*(1+N))', heuristics: true } };
@@ -59,7 +59,8 @@ async function executeComplete(args, { intake, verifyBaseline }) {
     const c = { id, dir, version: 1, generation: parent ? 2 : 1, parents: parent ? [parent.id] : [], model, requestedModel, modelFallback: model !== requestedModel, group: group?.id, strategy: strategies[index % strategies.length], status: 'pending', reason: parent ? 'Correct observed failures or explore an unresolved decision in a surviving strategy' : 'Independent reconstruction from the historical base', isolation: { base: it.mergeBase, history: 'fresh single commit, no remotes', proposedPatchVisible: false, changedLocationsVisible: true, excerptSelection: 'prior source at changed locations and expressions cited in the requirement', osSandbox: false } };
     state.candidates.push(c); emit({ type: 'candidate', id, status: c.status }); save(); const begin = Date.now();
     try {
-      await blindCopy(it.repo, dir, it.mergeBase); if(state.providers?.tools?.entire !== false) await setupCapture(dir);
+      await blindCopy(it.repo, dir, it.mergeBase);
+      fs.appendFileSync(path.join(dir,'.git','info','exclude'),'\n.opencode/\n.entire/\n.replica-trx/\n');
       if (parent) await git(dir, ['apply', '--whitespace=nowarn', path.join(artifacts, parent.patch)]);
       const blocks = parent ? sourceBlocks(state.sourceChanges.map(f=>({...f,text:fs.readFileSync(path.join(dir,f.path),'utf8')})), state.requirementContext) : state.baseBlocks;
       const context = JSON.stringify(blocks);
@@ -85,6 +86,8 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       c.tree = await out(dir, ['write-tree']); c.lines = parseDiff(patch).reduce((n, f) => n + f.add + f.del, 0);
       const duplicate = state.candidates.find(other => other.id !== id && other.tree === c.tree && other.status === 'built');
       if (duplicate) { c.status = 'duplicate'; c.duplicateOf = duplicate.id; return; }
+      // Link the recorded proposal after generation. No capture hooks delay the model request.
+      if(state.providers?.tools?.entire !== false) await setupCapture(dir, {manual:true});
       await git(dir, [...ID, 'commit', '-m', `Katse candidate ${id}`]);
       c.capture = state.providers?.tools?.entire === false ? {status:'unavailable',reason:'Entire preflight failed'} : await attachSession(dir, result.sessionId);
       c.commit = await out(dir, ['rev-parse', 'HEAD']);
@@ -131,7 +134,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
     const outcomes = afterExecution ? state.evidence.map(e=>({version:e.version,status:e.status,ran:e.ran,failures:e.tests?.filter(t=>t.outcome==='Failed').map(t=>({name:t.name,error:t.error?.slice(0,1200)}))})) : [];
     await Promise.allSettled(built.map(async c=>{
       try {
-        const reply = await call({dir:c.dir,role:`debate-${afterExecution?'results':'proposals'}-${c.id}`,model:c.model,timeout:25000,noTools:true,maxOutputTokens:1000,
+        const reply = await call({dir:reviewerDir,role:`debate-${afterExecution?'results':'proposals'}-${c.id}`,model:c.model,timeout:25000,noTools:true,maxOutputTokens:1000,
           prompt:`You authored candidate ${c.id}. Cooperatively review the other candidate. The original implementation is hidden. Revise your view when warranted; agreement is not evidence. NO tools. Respond compact JSON {"strength":"...","risk":"...","expectation":"E1","scenario":"concrete test idea","revision":"what you would change or why keep"}. Do not invent outcomes. Contract: ${JSON.stringify(state.contract.expectations)}\nCandidates:${JSON.stringify(proposals)}\nActual execution:${JSON.stringify(outcomes).slice(0,7000)}`,validate:x=>typeof x.scenario==='string' && typeof x.revision==='string'});
         state.debate.push({candidate:c.id,model:c.model,round:afterExecution?'results':'proposals',...reply});
         emit({type:'debate',candidate:c.id,round:afterExecution?'results':'proposals',...reply});save();
@@ -237,13 +240,19 @@ async function executeComplete(args, { intake, verifyBaseline }) {
           const a = await attack(mission, i + 1, true); state.finalMissions.push({ mission, attack: a.id, complete: a.status === 'admitted', roles: { attacker: a.attacker, defender: a.defender }, labels: a.labels });
         }));
         const originalResult = await test(original, true);
-        for (const c of state.candidates.filter(c=>c.status==='built').slice(0,profile.id==='deep'?1:2)) { if(Date.now()+20000<finalEnd) await test(c,true); }
+        for (const c of state.candidates.filter(c=>c.status==='built').slice(0,profile.id==='deep'?1:2)) {
+          if(Date.now()+20000<finalEnd) await test(c,true);
+          else state.pending.push({where:`validation-${c.id}`,text:'Candidate validation was not started: execution budget insufficient'});
+        }
         const failures = state.attacks.filter(a => a.status === 'admitted' && attackOutcome(a, originalResult) === 'failed');
         if (failures.length) {
           await test(original, false, true);
           const baseDir = path.join(tempRoot, 'repro-base'); await blindCopy(it.repo, baseDir, it.mergeBase);
           await test({ id: 'historical-base', dir: baseDir, tree: await out(it.repo, ['rev-parse', `${it.mergeBase}^{tree}`]) });
         }
+        const unchecked = state.candidates.filter(c=>c.status==='built').slice(0,profile.id==='deep'?1:2).filter(c=>!state.evidence.some(e=>e.version===c.id&&e.scope==='relevant-suite'&&e.executionComplete));
+        state.budget.candidateValidation = {complete:unchecked.length===0,pending:unchecked.map(c=>c.id)};
+        for(const c of unchecked) if(!state.pending.some(p=>p.where===`validation-${c.id}`)) state.pending.push({where:`validation-${c.id}`,text:'Candidate validation did not complete; the full comparison remains pending'});
         await deliberate(true);
         complete = true;
       });

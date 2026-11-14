@@ -61,6 +61,18 @@ Las copias locales de Windows y las restricciones de herramientas no son un sand
 
 `entire-graph` es opcional y no es una dependencia de este MVP: el análisis local funciona con Roslyn. No se consulta ningún grafo de la propuesta desde los constructores.
 
+## Corrección del tiempo de C2 y diagnóstico de Verda (14/11/2026)
+
+La captura de las propuestas se vincula después de la sesión mediante `entire session attach`. En las copias desechables se conserva el plugin generado fuera de las rutas de carga automática: la importación explícita evita cargarlo también durante la exportación de OpenCode. Los debates usan una copia de revisión sin hooks y solo el contexto suministrado. [Adjuntar sesiones existentes en Entire](https://docs.entire.com/cli-reference/session).
+
+La fase de tests reserva ahora 30 segundos para el informe, manteniendo Standard en cinco minutos. Una validación de candidato incompleta queda explícitamente pendiente. Se registran los tiempos anteriores al primer evento de ejecución de OpenCode y la duración de sus pasos observados.
+
+Validación real `ju26-issue-2283-mwg90r70`: **4 min 31 s, 40.859 tokens, 171 tests por versión**. El original pasa; C1 y C2 completan la suite y fallan un test cada uno. Ambos conservan checkpoints de Entire. La preparación de cada candidato fue de unos 38 segundos frente a unos 77 en la ejecución anterior. Resultado: **5/10, evidencia insuficiente** porque E2 no quedó asociado a una prueba admitida. Una respuesta de la ronda posterior del debate se truncó; la ejecución de tests de C2 sí terminó. La puntuación no se fuerza para que el demo aparezca aprobado.
+
+**Verda continúa sin responder con las credenciales recibidas.** URL y modelo coinciden con las instrucciones del evento. GET /models y POST /chat/completions autenticados agotan el plazo, también mediante comprobaciones fuera de OpenCode; una comprobación larga agotó 90 segundos. Las peticiones sin clave y con una clave deliberadamente inválida devuelven HTTP 404 rápidamente. Esto no permite confirmar el estado del despliegue ni de la autenticación sin una respuesta del proveedor. No se ha cambiado de endpoint ni se afirma que Nemotron esté arreglado. La web muestra la sustitución por Google.
+
+`npm run check:verda` reproduce el diagnóstico sin enviar código y guarda un JSON sin credenciales en `data/diagnostics`. `-- --timeout=90000` amplía cada comprobación hasta 90 segundos. El comando devuelve un código de error mientras catálogo e inferencia no estén disponibles.
+
 ## Validación del flujo optimizado (14/11/2026)
 
 - `npm test`: **76/76** pruebas superadas. Los controles .NET preparados detectan la regresión y descartan la acusación falsa.
