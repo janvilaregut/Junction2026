@@ -1,0 +1,59 @@
+/* Agent sessions (Entire): the mark on a commit, the lines in the hover card, and the session panel. */
+.aibadge{cursor:pointer;outline:none}
+.aibadge .aibg{fill:#16161a;stroke:rgba(255,255,255,.18);stroke-width:1.2;transition:stroke .15s,fill .15s}
+.aibadge:hover .aibg,.aibadge:focus-visible .aibg{stroke:rgba(255,255,255,.6);fill:#222226}
+.hcmt{cursor:default;outline:none}.hcmt:has(.aibadge){cursor:pointer}
+.cmt .aibadge{opacity:0;animation:aiin .4s ease forwards;animation-delay:calc(var(--d,0ms) + 200ms)}
+@keyframes aiin{to{opacity:1}}
+
+.card .airow{display:flex;align-items:center;gap:7px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line);font-size:12px;color:var(--fg2)}
+.card .airow b{color:var(--fg);font-weight:500}
+.card .airow .amark{flex:none}
+.card .aiprompt{margin-top:7px;font-size:12.5px;line-height:1.4;color:var(--fg);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card .aifirst{margin-top:5px;font-size:11.5px;line-height:1.35;color:var(--fg2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .aihint{margin-top:7px;font-size:11px;color:var(--fg3)}
+
+.sess{position:fixed;z-index:40;top:12px;right:12px;bottom:12px;width:min(520px,calc(100vw - 24px));display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line2);border-radius:24px;box-shadow:0 30px 80px rgba(0,0,0,.55);transform:translateX(calc(100% + 24px));transition:transform .26s cubic-bezier(.3,.7,.2,1)}
+.sess.on{transform:none}
+.shead{display:flex;align-items:center;gap:12px;padding:18px 18px 14px 20px;border-bottom:1px solid var(--line)}
+.stit{flex:1;min-width:0}
+.stit b{display:block;font:600 17px var(--head)}
+.stit small{display:block;margin-top:2px;font-size:12px;color:var(--fg2)}
+.sx{width:32px;height:32px;border-radius:50%;font-size:20px;line-height:1;color:var(--fg2)}
+.sx:hover{background:var(--card2);color:var(--fg)}
+.sbody{flex:1;overflow:auto;padding:16px 20px 20px;scroll-behavior:smooth}
+.sempty{color:var(--fg2);font-size:13px;padding:6px 0}
+.scommit{display:flex;flex-direction:column;gap:3px;padding:12px 14px;background:var(--card2);border-radius:16px}
+.scommit .mono{font:500 11px var(--mono);color:var(--fg2)}
+.scommit b{font:600 14px/1.3 var(--head)}
+.scommit small{font-size:12px;color:var(--fg2)}
+.scommit .link{font-size:12px;color:var(--fg);text-decoration:underline;text-underline-offset:2px}
+.sact{display:flex;align-items:center;gap:10px;margin-top:12px}
+.sact .cta{flex:none;padding:9px 16px;font-size:13px}
+.scmd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px var(--mono);color:var(--fg3)}
+.snote{margin-top:6px;font-size:11.5px;color:var(--fg3);min-height:1em;word-break:break-all}
+.conv{margin-top:18px;display:flex;flex-direction:column;gap:10px}
+.conv .m{font-size:13px;line-height:1.5}
+.conv .m.u{align-self:flex-end;max-width:88%;background:var(--card3);border-radius:16px 16px 4px 16px;padding:9px 13px}
+.conv .m.u .who{font:500 10px var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--agent);margin-bottom:3px}
+.conv .m.a{color:#d6d6db;max-width:96%}
+.conv .m code{font:12px var(--mono);background:rgba(255,255,255,.06);padding:1px 4px;border-radius:5px}
+.conv .m pre{font:11.5px/1.45 var(--mono);background:#0f0f11;border-radius:10px;padding:8px 10px;margin:6px 0;overflow:auto;white-space:pre-wrap}
+.conv .m.t summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--fg3)}
+.conv .m.t summary::-webkit-details-marker{display:none}
+.conv .m.t summary:hover{color:var(--fg2)}
+.conv .m.t .dot{width:6px;height:6px;border-radius:50%;background:var(--fg3)}
+.conv .m.t ul{list-style:none;margin:6px 0 2px 13px;border-left:1px solid var(--line2);padding-left:11px;display:flex;flex-direction:column;gap:3px}
+.conv .m.t li{font:11.5px/1.4 var(--mono);color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conv .m.t li b{color:var(--fg);font-weight:500}
+.conv .m.t li.bad b{color:var(--bad)}
+.conv .mine{display:flex;flex-direction:column;gap:10px}
+.conv .fold{border:1px dashed var(--line2);border-radius:14px;padding:8px 12px}
+.conv .fold>summary{cursor:pointer;font-size:12px;color:var(--fg2)}
+.conv .fold[open]{display:flex;flex-direction:column;gap:10px}
+.cmark{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ok);padding:4px 0}
+.cmark i{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.cmark .mono{font:500 11px var(--mono);color:var(--fg2)}
+.sfoot{margin-top:18px;font-size:11px;color:var(--fg3)}
+.sfoot .mono{font-family:var(--mono)}
+@media (max-width:600px){.sess{top:auto;left:8px;right:8px;bottom:8px;width:auto;height:82vh;transform:translateY(calc(100% + 16px))}}

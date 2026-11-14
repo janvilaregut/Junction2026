@@ -38,6 +38,8 @@ TOOLS.push(
   { name: 'graph_overview', description: 'What mathematics settled in the open pull request, without any AI: how many changed functions are proved (the edit cannot change behaviour), cleared (nothing flagged, not a proof), uncertain and risky, how many lines still need someone, and the open spots in order. Use it for "how risky is this", "what did the maths say", "can I approve".', parameters: T() },
   { name: 'prove_it', description: 'Open "Prove it" on one changed function of the graph: the card grows into the full list of engineering principles it is held to without any AI (same behaviour, contract intact, public API stable, guards kept, errors not swallowed, no dangerous APIs or secrets, no blocking on async, reached by a test, used, simple, small, small interface, written once), each pass / warn / fail with its exact value. Use it for "prove it", "why is this green", "what does it fail", "show me the principles", "amplíame la info de este punto". query: the function name or file:line; empty = the spot already selected.', parameters: T({ query: { type: 'STRING' } }) },
   { name: 'mark_read', description: 'The user says they read a spot and accept it: mark that function as read by them so it turns green. query: the function name or file:line. Only when the user says so.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
+  { name: 'show_ai_session', description: 'Open the panel with the AI agent session (recorded by Entire) behind one commit: which agent and model made it, the prompt that led to it and the conversation up to it, with a button to reopen it in its agent. ONLY when the user explicitly and directly asks for it: the prompt, the AI session, the conversation, or which AI made a commit ("¿con qué prompt se hizo este commit?", "enséñame la sesión de Claude del último commit", "which AI wrote this"). NEVER call it on your own initiative, to illustrate something else, or as part of a review. query: a commit (sha, words from its message, "last"/"first"); empty = the newest commit with a session. branch: optional branch, else the one unfolded or open, else the history of the base line.', parameters: T({ query: { type: 'STRING' }, branch: { type: 'STRING' } }) },
+  { name: 'close_ai_session', description: 'Close the AI session panel.', parameters: T() },
   { name: 'look_deeper', description: 'The user wants the change looked at harder: launches a Deep review (up to 15 min, real cost). ASK FOR A YES FIRST.', parameters: T() },
 );
 // Retired: the bubbles story. Agents are shown in one place only, the review tree (open_review); the raw
@@ -112,7 +114,8 @@ const TOOL_FN = {
       view: v, project: project?.name, base: s?.base, pullRequest: p ? prBrief(p, allPRs().findIndex((x) => x.id === p.id)) : null, verification: p ? briefOf(s.run?.brief, 'summary') : null, verifyingNow: !!s?.es,
       graphNodes: v === 'graph' && !s?.math ? graphSummary() : undefined,
       mathematics: v === 'graph' && s?.math ? { proved: s.math.summary.nodes.proved, cleared: s.math.summary.nodes.cleared, uncertain: s.math.summary.nodes.uncertain, risky: s.math.summary.nodes.risky, openNow: (call('mathQueue') || []).slice(0, 8).map((x) => ({ name: x.name, state: x.state, why: x.why })), selected: s.fixTarget?.label || null } : undefined,
-      commitsShown: f ? { branch: allPRs().find((x) => x.id === f.id)?.branch, total: f.total, commits: f.commits.map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date })) } : undefined,
+      commitsShown: f ? { branch: allPRs().find((x) => x.id === f.id)?.branch, total: f.total, commits: f.commits.map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date, madeWith: c.ai?.[0]?.agent })) } : undefined,
+      aiSessionOpen: !!call('aiSessionOpen') || undefined,
       agentsStory: v === 'debate' || v === 'agent' ? call('debateInfo') : undefined,
       review: v === 'review' ? call('treeInfo') : undefined,
     };
@@ -162,6 +165,26 @@ const TOOL_FN = {
     act(`Zoomed into ${p.branch}`);
     return { branch: p.branch, total: r.total, shown: r.commits.length, firstCommits: r.commits.slice(0, 6).map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date })), tip: 'Oldest commit on the left, where the branch leaves the base; the newest (filled dot) opens the branch. The user can slide along with the wheel or by dragging. show_all_branches zooms back out.' };
   },
+  async show_ai_session({ query = '', branch = '' } = {}) {
+    const s = app();
+    const p = branch ? findPR(branch) : allPRs().find((x) => x.id === (s?.focus?.id || s?.zoom?.id || s?.cur?.id));
+    const shown = s?.focus || s?.zoom;
+    let list = shown && (!p || shown.id === p.id) ? shown.commits : null;
+    if (!list && p) list = (await call('commitsOf', p, s.pid))?.commits;
+    if (!list && !branch && s?.history?.commits) list = [...s.history.commits].reverse(); // the base's history, oldest first
+    if (!list) return { error: 'Which branch? Name it, or unfold its commits first.', available: allPRs().map((x) => x.branch).slice(0, 20) };
+    const q = String(query).toLowerCase().trim();
+    const withAi = list.filter((c) => c.ai);
+    const c = !q || /\b(last|latest|newest)\b|últim|ultim|reciente/.test(q) ? [...list].reverse().find((x) => x.ai) || list[list.length - 1]
+      : /\bfirst\b|primer/.test(q) ? withAi[0] || list[0]
+      : list.find((x) => x.sha.startsWith(q)) || list.find((x) => x.subject.toLowerCase().includes(q)) || list.find((x) => q.split(/\s+/).filter((w) => w.length > 3).some((w) => x.subject.toLowerCase().includes(w)));
+    if (!c) return { error: `No commit matches "${query}".`, commits: list.slice(-12).map((x) => ({ subject: x.subject, madeWith: x.ai?.[0]?.agent || null })) };
+    if (!c.ai) return { noSession: true, commit: c.subject, note: 'No agent session was recorded for this commit: made by hand, or on a computer that did not record it.', commitsWithSessions: withAi.slice(-8).map((x) => x.subject) };
+    const d = await call('openAiSession', c);
+    act(`${c.ai[0].agent} session`);
+    return { commit: c.subject, agent: d?.agent, model: d?.model, turns: d?.turns, promptThatLedToIt: clip(d?.prompt, 300), firstPromptOfSession: clip(d?.firstPrompt, 200), canReopen: !!d?.resume, tip: 'The panel shows the conversation up to this commit; earlier and later parts are folded. It has a button to reopen the session in its agent.' };
+  },
+  async close_ai_session() { return { closed: !!call('closeAiSession') }; },
   async show_all_branches() { if (inGraph()) { call('closeGraph'); await sleep(780); } call('hideCommits'); act('All branches'); return { ok: true }; },
   async focus_graph({ query }) {
     if (!inGraph()) return { error: 'No pull request is open. Open one first.' };

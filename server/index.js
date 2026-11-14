@@ -20,6 +20,7 @@ import { startConsensus, getConsensus, listConsensus, subscribeConsensus, isLive
 import { verifyIntegrity } from './integrity.js';
 import { resolveProfile } from './profiles.js';
 import { session, models } from './agents.js';
+import { aiOfMany, aiOfRange, sessionOf, resumeSession, syncCheckpoints } from './sessions.js';
 import { analyze as mathAnalyze } from './math/index.js';
 import { marksOf, setMark } from './math/marks.js';
 import { graphScope, trustProgress, eligible } from './graph-review.js';
@@ -196,13 +197,17 @@ async function api(req, res, url) {
     if (!sub && method === 'DELETE') { removeProject(project.id); return send(res, 200, { ok: true }); }
     if (sub === 'status') return send(res, 200, await projectStatus(project));
     if (sub === 'prs') {
-      const prs = await listPullRequests(project, { fetch: url.searchParams.get('fetch') === '1' });
+      const fetchNow = url.searchParams.get('fetch') === '1';
+      const prs = await listPullRequests(project, { fetch: fetchNow });
+      if (fetchNow) await syncCheckpoints(project.path);
+      const baseRef = await resolveRef(project.path, project.base).catch(() => null);
       const last = latestByPr(project.id);
       const act = activeRun(project.id);
       for (const pr of [...prs.incoming, ...prs.outgoing]) {
         const l = last[pr.id];
         pr.last = l ? { ...l, stale: !pr.sha || !l.head.startsWith(pr.sha) } : null;
         pr.running = act?.prId === pr.id ? act.id : null;
+        pr.ai = baseRef ? await aiOfRange(project.path, `${baseRef}..${pr.ref}`).catch(() => null) : null; // agent sessions behind its commits (Entire)
       }
       return send(res, 200, prs);
     }
@@ -213,7 +218,24 @@ async function api(req, res, url) {
     if (sub === 'commits') { // the branch's own commits (base..branch), oldest first, at most the last 40
       const pr = await findPullRequest(project, url.searchParams.get('pr'));
       const list = await commits(project.path, await resolveRef(project.path, project.base), pr.ref);
-      return send(res, 200, { total: list.length, commits: list.slice(-40).map(({ sha, author, date, subject }) => ({ sha, author, date, subject })) });
+      const shown = list.slice(-40);
+      const ai = await aiOfMany(project.path, shown.map((c) => c.sha)).catch(() => ({}));
+      return send(res, 200, { total: list.length, commits: shown.map(({ sha, author, date, subject }) => ({ sha, author, date, subject, ai: ai[sha] || undefined })) });
+    }
+    if (sub === 'history') { // the base line on the left of the tree: its latest commits (newest first), with their agent sessions
+      const ref = await resolveRef(project.path, project.base);
+      const raw = (await git(project.path, ['log', '--first-parent', '-n', '24', '--format=%H%x1f%an%x1f%aI%x1f%s', ref])).stdout;
+      const list = raw.split('\n').filter(Boolean).map((l) => { const [sha, author, date, subject] = l.split('\x1f'); return { sha, author, date, subject }; });
+      const ai = await aiOfMany(project.path, list.map((c) => c.sha)).catch(() => ({}));
+      return send(res, 200, { base: project.base, commits: list.map((c) => ({ ...c, ai: ai[c.sha] || undefined })) });
+    }
+    if (sub === 'session') { // the agent session behind one commit (Entire checkpoint): watch it, or reopen it in its agent
+      const sha = String(url.searchParams.get('sha') || '');
+      if (!/^[0-9a-f]{7,40}$/.test(sha)) return send(res, 400, { error: 'Give a commit sha' });
+      const full = (await git(project.path, ['rev-parse', '--verify', '--quiet', `${sha}^{commit}`], { allowFail: true })).stdout.trim();
+      if (!full) return send(res, 404, { error: 'No such commit' });
+      if (seg[3] === 'resume' && method === 'POST') return send(res, 200, await resumeSession(project.path, full, url.searchParams.get('i')));
+      return send(res, 200, await sessionOf(project.path, full, url.searchParams.get('i')));
     }
     if (sub === 'math') { // the mathematical pass: proofs, checks and measurements per changed function, no model and no execution
       if (seg[3] === 'mark' && method === 'POST') {

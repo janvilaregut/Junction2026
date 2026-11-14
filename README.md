@@ -253,6 +253,27 @@ Límites: «demostrado» solo cubre ediciones sin efecto; el grafo se construye 
 
 Rutas: `GET /api/projects/:id/math?pr=…` (la pasada), `POST /api/projects/:id/math/review` (agentes para una bolita), `POST /api/projects/:id/math/mark` (marcar una bolita como leída). Interfaz en `mvp/math.js` y `mvp/review.js`.
 
+## Sesiones de IA por commit (Entire)
+
+Cada commit hecho con un agente lleva su sesión (prompts, conversación, modelo y tokens) guardada por [Entire](https://entire.io) en git, en `refs/entire/checkpoints/*`. En el árbol de ramas, un commit hecho con IA lleva el logo de su agente (Claude Code, Codex, OpenCode, Gemini…), también en la historia de la base. Al pasar el ratón ves el prompt que llevó a ese commit. Al hacer clic en el logo se abre la sesión: la conversación hasta el commit, con lo anterior y lo posterior plegado, y un botón para reabrirla en Claude Code (`claude --resume`). La voz solo la abre si se lo pides explícitamente.
+
+```bash
+npm run entire              # instala, activa y recupera el historial (lo que necesita un clon nuevo)
+npm run entire -- status    # qué hay capturado, qué falta subir y comprobación de secretos
+npm run entire -- scrub     # cambia las API keys por REDACTED en checkpoints, estado local de Entire y transcripciones
+npm run entire -- push      # sube los checkpoints a origin, solo si la comprobación de secretos pasa
+```
+
+- **Nada global:** Entire 0.13.4 se descarga con SHA256 fijado en `tools/entire/bin/` (ignorado por git), y los hooks de Claude Code van en `.claude/settings.local.json` apuntando a ese binario, en todos los worktrees del clon.
+- **Historial anterior:** `backfill` busca en las transcripciones locales de Claude Code (`~/.claude/projects/`) qué sesión ejecutó el `git commit` de cada commit, y lo enlaza con `entire session attach --commit`. En commits ya subidos no reescribe el historial. Los que aún no se han subido se quedan para otra pasada. Cada persona del equipo lo ejecuta en su máquina para recuperar sus propias sesiones.
+- **Nada se sube solo:** los checkpoints quedan en local hasta `npm run entire -- push`.
+- **Secretos:** la redacción de Entire por defecto no tapa algunos formatos; por ejemplo, una clave de NVIDIA `dc_…` llegó a subirse. Por eso `enable` le añade reglas propias (`redaction.custom_redactions` en `.entire/settings.local.json`) para claves de Gemini, OpenAI/Anthropic, GitHub, NVIDIA, Slack y Hugging Face.
+  - `scrub` reescribe cualquier checkpoint local que aún tenga una clave, borra las versiones viejas de git (incluidas las empaquetadas) y tapa las claves en el estado local de Entire y en las transcripciones de Claude Code de este repo. En las transcripciones lo hace sin cambiar su longitud, para no estorbar a una sesión que esté escribiendo.
+  - `push` se niega a subir si encuentra una clave, sea de esos formatos o un valor de `.env`. Los valores de `.env` solo se leen en memoria.
+  - El visor tapa esos formatos y las claves que tiene cargadas el servidor, y una sesión restaurada nunca se escribe con claves.
+- **Reabrir:** "Resume in Claude Code" abre tu terminal por defecto mediante un `.command` temporal, sin pedir permisos de Automatización. Si la sesión no está en este Mac, antes la restaura desde el checkpoint.
+- **API:** `GET /api/projects/:id/history` (commits de la base con su sesión), `commits` (lleva `ai` por commit), `GET /api/projects/:id/session?sha=` y `POST …/session/resume?sha=`. Código en `server/sessions.js`, `mvp/sessions.js` y `scripts/entire.js`.
+
 ## Archivos principales
 
 - `server/pipeline/complete.js`: presupuesto, generaciones y juicio final.

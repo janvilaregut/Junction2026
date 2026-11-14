@@ -16,7 +16,14 @@ export const models = () => {
 };
 /** The pinned OpenCode (its postinstall writes bin/opencode.exe on every OS); a global one may be another version. */
 const opencodeBin = () => { const pinned = path.join(ROOT, 'node_modules/opencode-ai/bin/opencode.exe'); return fs.existsSync(pinned) ? pinned : 'opencode'; };
-export const entirePath = () => process.env.KATSE_ENTIRE_PATH || path.join(process.env.LOCALAPPDATA || os.homedir(), 'Katse/tools', process.platform === 'win32' ? 'entire.exe' : 'entire');
+/** Entire: the copy `npm run entire` installs in this clone (shared by its worktrees), else the older per-user location. */
+export const entirePath = () => {
+  if (process.env.KATSE_ENTIRE_PATH) return process.env.KATSE_ENTIRE_PATH;
+  const exe = process.platform === 'win32' ? 'entire.exe' : 'entire';
+  const main = ROOT.includes(`${path.sep}.claude${path.sep}worktrees${path.sep}`) ? ROOT.slice(0, ROOT.indexOf(`${path.sep}.claude${path.sep}worktrees${path.sep}`)) : ROOT;
+  for (const dir of [ROOT, main]) { const f = path.join(dir, 'tools', 'entire', 'bin', exe); if (fs.existsSync(f)) return f; }
+  return path.join(process.env.LOCALAPPDATA || os.homedir(), 'Katse/tools', exe);
+};
 
 export function configuration({ maxOutputTokens = 4096 } = {}) {
   // OpenCode v1.19.5 ProviderTransform.maxOutputTokens uses model.limit.output.
