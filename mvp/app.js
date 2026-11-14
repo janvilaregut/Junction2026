@@ -85,15 +85,14 @@ const name = (p) => (p.requirement && /^ju26|fix|issue/i.test(base(p.branch)) ? 
 async function init() {
   const st = await api('/state');
   Object.assign(S, { projects: st.projects, agents: st.agents, workspace: st.workspace });
-  if (!S.projects.length) return projectsModal(true);
-  const saved = store.get('katse.project');
-  await loadProject(S.projects.find((p) => p.id === saved)?.id || S.projects[0].id);
+  showLanding(); // the first page is always the project picker
 }
 async function loadProject(id) {
   closeGraph();
   Object.assign(S, { pid: id, prs: { incoming: [], outgoing: [] }, prsKey: '', base: '', expanded: false, hl: [], cur: null, treeW: 0, focus: null, zoom: null, unfold: false, commits: {} });
   focusTok++; // a commits request still in flight belongs to the previous project
   store.set('katse.project', id);
+  const op = opened(); op[id] = Date.now(); store.set('katse.opened', JSON.stringify(op));
   $('projName').textContent = S.projects.find((p) => p.id === id)?.name || id;
   $('tree').innerHTML = ''; $('tree').style.height = '0px'; $('more').hidden = true; // never show the previous project's branches
   $('sum').textContent = 'Loading branches…';
@@ -127,6 +126,112 @@ function projectsModal(first) {
   };
 }
 $('proj').onclick = () => projectsModal(false);
+
+/* ── Landing (first page) and the projects sidebar ───────────────────── */
+const TINTS = ['file', 'agent', 'warn', 'ok'];
+const tint = (id) => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return TINTS[h % TINTS.length]; };
+const mono = (n) => { const w = String(n).split(/[^A-Za-z0-9]+/).filter(Boolean); return (w.length > 1 ? w[0][0] + w[1][0] : (w[0] || '?').slice(0, 2)).toUpperCase(); };
+const tile = (p) => `<span class="ptile" data-t="${tint(p.id)}" aria-hidden="true">${esc(mono(p.name))}</span>`;
+const source = (p) => (p.origin ? 'github.com/' + p.origin : p.path);
+function opened() { try { return JSON.parse(store.get('katse.opened') || '{}') || {}; } catch { return {}; } }
+const ago = (t) => { if (!t) return 'Not opened yet'; const d = Math.floor((Date.now() - t) / 864e5); return d <= 0 ? 'Opened today' : d === 1 ? 'Opened yesterday' : `Opened ${d} days ago`; };
+const BRANCH_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3-11 6.5"/></svg>';
+S.counts = {}; // per project: the state of each branch, read from the same local git as the home (no fetch)
+const countAll = () => Promise.all(S.projects.map(async (p) => {
+  try {
+    const prs = await api(`/projects/${p.id}/prs`);
+    const tones = [...prs.incoming, ...prs.outgoing].map((x) => state(x).tone);
+    S.counts[p.id] = { tones, ok: tones.filter((t) => t === 'ok').length, review: tones.filter((t) => t === 'warn' || t === 'bad').length, open: tones.filter((t) => t === 'no').length };
+  } catch { S.counts[p.id] = null; }
+}));
+function miniTree(tones) {
+  const lanes = tones.slice(0, 5).map((t, i) => {
+    const y = 34 - i * 6, x0 = 18 + i * 22, tip = 120 + i * 24;
+    return `<path d="M${x0} 44C${x0 + 14} 44 ${x0 + 14} ${y} ${x0 + 30} ${y}L${tip} ${y}" stroke="${PAL[t]}"/><circle cx="${tip}" cy="${y}" r="3.5" stroke="${PAL[t]}"/>`;
+  }).join('');
+  return `<svg class="pmini" viewBox="0 0 240 56" aria-hidden="true"><line x1="4" y1="44" x2="236" y2="44"/>${lanes}</svg>`;
+}
+function landingCard(p, op) {
+  const c = S.counts[p.id], cur = p.id === S.pid;
+  const counts = c === undefined ? 'Reading branches…' : c === null ? 'Branches unavailable'
+    : `<span><i style="background:var(--ok)"></i>${c.ok} reproduced</span><span><i style="background:var(--warn)"></i>${c.review} to review</span><span><i class="ring"></i>${c.open} not verified</span>`;
+  return `<button class="pcard${cur ? ' on' : ''}" data-id="${esc(p.id)}"${cur ? ' aria-current="true"' : ''}>
+    <span class="phead">${tile(p)}<span class="pname"><b>${esc(p.name)}</b><small>${esc(source(p))}</small></span>${cur ? '<span class="pnow"><i></i>Open</span>' : ''}</span>
+    ${miniTree(c?.tones || [])}
+    <span class="pcount">${counts}</span>
+    <span class="pfoot"><span class="pbase">${BRANCH_SVG}<span>${esc(p.base || '')}</span></span><span>${ago(op[p.id])}</span></span></button>`;
+}
+function renderLanding() {
+  const raw = $('lq').value.trim(), q = raw.toLowerCase(), op = opened();
+  const list = S.projects.filter((p) => !q || `${p.name} ${source(p)}`.toLowerCase().includes(q));
+  $('lgrid').innerHTML = list.map((p) => landingCard(p, op)).join('')
+    + `<button class="pcard padd" id="laddb" aria-expanded="${!$('ladd').hidden}"><span class="pplus" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><b>Add a project</b><small>Clone a repository or open one on this computer</small></button>`;
+  $('lnone').hidden = !(q && !list.length);
+  $('lnone').textContent = `No project matches “${raw}”.`;
+  $('lgrid').querySelectorAll('.pcard[data-id]').forEach((b) => (b.onclick = () => pickProject(b.dataset.id)));
+  $('laddb').onclick = () => { $('ladd').hidden = !$('ladd').hidden; renderLanding(); if (!$('ladd').hidden) $('lsrc').focus(); };
+}
+function showLanding() {
+  closeSide();
+  $('landing').hidden = false;
+  $('ladd').hidden = S.projects.length > 0; // nothing to pick yet: the add form is the page
+  $('lerr').textContent = '';
+  renderLanding();
+  countAll().then(() => { if (!$('landing').hidden) renderLanding(); });
+}
+function pickProject(id) {
+  const same = id === S.pid;
+  $('landing').hidden = true; closeSide();
+  if (!same) loadProject(id);
+}
+let addMode = 'url';
+function setAddMode(m) {
+  addMode = m;
+  document.querySelectorAll('#ladd [data-m]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.m === m)));
+  $('lsrcl').textContent = m === 'url' ? 'Repository URL' : 'Path to the repository';
+  $('lsrc').placeholder = m === 'url' ? 'https://github.com/org/repo' : '/path/to/repo';
+  $('lgo').textContent = m === 'url' ? 'Clone' : 'Open';
+  $('lerr').textContent = '';
+}
+document.querySelectorAll('#ladd [data-m]').forEach((b) => (b.onclick = () => setAddMode(b.dataset.m)));
+$('lq').oninput = renderLanding;
+$('lsrc').onkeydown = (e) => { if (e.key === 'Enter') $('lgo').click(); };
+$('lgo').onclick = async () => {
+  const v = $('lsrc').value.trim();
+  if (!v) return ($('lerr').textContent = addMode === 'url' ? 'Give a URL.' : 'Give a path.');
+  $('lerr').textContent = addMode === 'url' ? 'Cloning…' : 'Opening…';
+  $('lgo').disabled = true;
+  try {
+    const p = await api('/projects', { body: addMode === 'url' ? { url: v } : { path: v } });
+    if (!S.projects.find((x) => x.id === p.id)) S.projects.push(p);
+    $('lsrc').value = ''; $('lerr').textContent = '';
+    pickProject(p.id);
+  } catch (e) { $('lerr').textContent = e.message; } finally { $('lgo').disabled = false; }
+};
+
+function renderSide() {
+  $('slist').innerHTML = S.projects.map((p) => {
+    const c = S.counts[p.id], on = p.id === S.pid;
+    return `<li><button class="sitem${on ? ' on' : ''}" data-id="${esc(p.id)}"${on ? ' aria-current="page"' : ''}>${tile(p)}<span class="pname"><b>${esc(p.name)}</b><small>${esc(p.base || '')}</small></span>${c?.review ? `<span class="sbadge" aria-label="${c.review} to review">${c.review}</span>` : ''}</button></li>`;
+  }).join('');
+  $('slist').querySelectorAll('[data-id]').forEach((b) => (b.onclick = () => pickProject(b.dataset.id)));
+}
+const sideOpen = () => document.body.classList.contains('sideon');
+function openSide() {
+  renderSide();
+  document.body.classList.add('sideon'); $('side').inert = false; $('sideBtn').setAttribute('aria-expanded', 'true');
+  $('sideX').focus();
+  countAll().then(() => { if (sideOpen()) renderSide(); });
+}
+function closeSide() {
+  if (!sideOpen()) return;
+  document.body.classList.remove('sideon'); $('side').inert = true; $('sideBtn').setAttribute('aria-expanded', 'false');
+}
+$('sideBtn').onclick = () => (sideOpen() ? closeSide() : openSide());
+$('sideX').onclick = () => { closeSide(); $('sideBtn').focus(); };
+$('sideScrim').onclick = closeSide;
+$('sideAdd').onclick = () => { closeSide(); projectsModal(false); };
+$('sideAll').onclick = showLanding;
 
 /* ── Settings: which models the review may call (saved on the server) ── */
 const MODELS = [
@@ -1152,6 +1257,7 @@ addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const typing = e.target.closest?.('input, textarea');
   if (!$('modal').hidden) closeModal();
+  else if (sideOpen()) { closeSide(); $('sideBtn').focus(); }
   else if (typing) e.target.blur(); // first Esc leaves the field; what you typed is not lost
   else if (typeof treeEscape === 'function' && treeEscape()) { /* the review, back to the graph */ }
   else if (typeof debateEscape === 'function' && debateEscape()) { /* the agent, then the debate */ }
