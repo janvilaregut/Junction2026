@@ -498,7 +498,13 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 @media (max-width:900px){.cview{left:16px;right:16px;width:auto;top:auto;height:56vh;bottom:108px}}
 @media (prefers-reduced-motion:reduce){.cview{transition:none}.cload i{animation:none}}
 /* Word heat inside the code view: a soft underline, darker for words that carry more (codeview.js heatLine). */
-.cview .tk{background:linear-gradient(transparent 58%,rgba(255,179,122,var(--a)) 58%,rgba(255,179,122,var(--a)) 92%,transparent 92%);border-radius:2px}
+.cview .tk{font-weight:700;color:var(--fg)}
+.cview .cv-ev{padding:4px 6px 8px}
+.cview .nrows{display:grid;gap:7px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.cview .nrow{display:grid;grid-template-columns:8px 96px 1fr;align-items:center;gap:9px;font-size:12px;cursor:help}
+.cview .nrow i{width:8px;height:8px;border-radius:50%}
+.cview .nrow b{font-weight:500;color:var(--fg2)}
+.cview .nrow span{color:var(--fg);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cview .cv-ai{font:600 10px var(--mono);color:var(--fg2);background:var(--card3);border-radius:5px;padding:1px 6px}
 .cv-chunk.h3 .cv-ai{color:var(--heat);background:rgba(255,179,122,.12)}
 .cv-ctx{margin:2px 0;padding:2px 0;font:400 11.5px/1.55 var(--mono);opacity:.5;border-left:3px solid transparent}
