@@ -1,0 +1,352 @@
+{
+ "repo": "DapperLib_Dapper",
+ "code_lines": 7673,
+ "files": 64,
+ "units": 804,
+ "parse_error_fraction": 0.0,
+ "practices": {
+  "dry": {
+   "point": 0.8791737260523916,
+   "lo": 0.8295750022277717,
+   "hi": 0.9162855603808511,
+   "files": 63,
+   "weight": 7673.0,
+   "violation_mass": 927.0999999999992
+  },
+  "simple_units": {
+   "point": 0.7149061390157281,
+   "lo": 0.6166141537241796,
+   "hi": 0.957521106369335,
+   "files": 48,
+   "weight": 6570.0,
+   "violation_mass": 1873.0666666666666
+  },
+  "small_units": {
+   "point": 0.6285438863521056,
+   "lo": 0.5097912526488729,
+   "hi": 0.9137928068583806,
+   "files": 48,
+   "weight": 6570.0,
+   "violation_mass": 2440.4666666666667
+  },
+  "small_interfaces": {
+   "point": 0.760365296803653,
+   "lo": 0.695038866396088,
+   "hi": 0.9190068810141332,
+   "files": 48,
+   "weight": 6570.0,
+   "violation_mass": 1574.4
+  },
+  "cohesion": {
+   "point": 0.4707259953161592,
+   "lo": 0.21962222303389434,
+   "hi": 0.7964796766649176,
+   "files": 18,
+   "weight": 2135.0,
+   "violation_mass": 1130.0
+  },
+  "coupling": {
+   "point": 0.5980000867641317,
+   "lo": 0.4228877442917989,
+   "hi": 1.0,
+   "files": 57,
+   "weight": 6586.0,
+   "violation_mass": 2647.5714285714284
+  },
+  "dead_code": {
+   "point": 0.9979177511712649,
+   "lo": 0.994998138048188,
+   "hi": 0.9991569235386724,
+   "files": 63,
+   "weight": 7684.0,
+   "violation_mass": 16.0
+  },
+  "magic_numbers": {
+   "point": 0.9945262609148964,
+   "lo": 0.9909912803126351,
+   "hi": 0.9997600314196003,
+   "files": 63,
+   "weight": 7673.0,
+   "violation_mass": 42.0
+  },
+  "encapsulation": {
+   "point": 0.9844961240310077,
+   "lo": 0.9623761792452831,
+   "hi": 1.0,
+   "files": 32,
+   "weight": 129.0,
+   "violation_mass": 2.0
+  },
+  "documentation": {
+   "point": 0.868995633187773,
+   "lo": 0.7663148203656918,
+   "hi": 0.9384606000361467,
+   "files": 49,
+   "weight": 458.0,
+   "violation_mass": 60.0
+  },
+  "naming": {
+   "point": 0.9704277286135693,
+   "lo": 0.9558290615642288,
+   "hi": 0.9783594301969688,
+   "files": 61,
+   "weight": 3390.0,
+   "violation_mass": 100.25
+  },
+  "consistency": {
+   "point": 0.8902821974177269,
+   "lo": 0.8733885707300151,
+   "hi": 0.9324434432396729,
+   "files": 63,
+   "weight": 7.000000000000096,
+   "violation_mass": 0.7680246180759229
+  },
+  "error_handling": {
+   "point": 0.8826923076923077,
+   "lo": 0.819543369890329,
+   "hi": 0.9495195905789126,
+   "files": 21,
+   "weight": 104.0,
+   "violation_mass": 12.2
+  }
+ },
+ "sig": {
+  "small_units": {
+   "bands": [
+    15,
+    30,
+    60
+   ],
+   "shares": [
+    0.584779299847793,
+    0.39619482496194824,
+    0.2141552511415525
+   ],
+   "caps": [
+    0.48,
+    0.242,
+    0.091
+   ],
+   "passes_4star": false
+  },
+  "simple_units": {
+   "bands": [
+    5,
+    10,
+    25
+   ],
+   "shares": [
+    0.4593607305936073,
+    0.3598173515981735,
+    0.15038051750380518
+   ],
+   "caps": [
+    0.207,
+    0.075,
+    0.011
+   ],
+   "passes_4star": false
+  },
+  "small_interfaces": {
+   "bands": [
+    2,
+    4,
+    6
+   ],
+   "shares": [
+    0.49360730593607305,
+    0.1715372907153729,
+    0.07503805175038052
+   ],
+   "caps": [
+    0.154,
+    0.034,
+    0.009
+   ],
+   "passes_4star": false
+  },
+  "duplication_type1": {
+   "density": 0.026977714062296362,
+   "cap": 0.058,
+   "passes_4star": true
+  }
+ },
+ "dimensions": {
+  "security": 100.0,
+  "reliability": 82.1,
+  "tests": null,
+  "maintainability": 76.9,
+  "consistency": 92.9
+ },
+ "dry": {
+  "type1_density": 0.026977714062296362,
+  "type2_density": 0.14192623484947217,
+  "near_miss_pairs": 64,
+  "micro_clones": 34,
+  "type1_classes": 7,
+  "type2_classes": 37,
+  "class_sizes": {
+   "2": 23,
+   "3": 3,
+   "1": 6,
+   "5": 1,
+   "6": 2,
+   "4": 2
+  },
+  "params": {
+   "type1": {
+    "W": 100,
+    "exact": true,
+    "min_lines": 6,
+    "diversity": 0.25,
+    "near_min_tokens": 40,
+    "near_tau": 0.7,
+    "micro_min_tokens": 10
+   },
+   "type2": {
+    "W": 50,
+    "exact": false,
+    "min_lines": 6,
+    "diversity": 0.25,
+    "near_min_tokens": 40,
+    "near_tau": 0.7,
+    "micro_min_tokens": 10
+   }
+  }
+ },
+ "design": {
+  "namespace_cycles": 1,
+  "largest_namespace_cycle": 2,
+  "type_cycles": 4,
+  "largest_type_cycle": 15,
+  "propagation_cost": 0.17230367252141093,
+  "types": 83
+ },
+ "consistency": {
+  "trailing_whitespace": {
+   "majority": "no",
+   "share": 0.9998696728789261,
+   "entropy": 0.0018699564792416597,
+   "norm_entropy": 0.0018699564792416597,
+   "counts": {
+    "no": 7672,
+    "yes": 1
+   },
+   "total": 7673
+  },
+  "indent_char": {
+   "majority": "space",
+   "share": 0.9998622399779584,
+   "entropy": 0.0019655807637891844,
+   "norm_entropy": 0.0019655807637891844,
+   "counts": {
+    "space": 7258,
+    "tab": 1
+   },
+   "total": 7259
+  },
+  "indent_multiple_of_4": {
+   "majority": "yes",
+   "share": 0.9942132818958391,
+   "entropy": 0.051337168543602936,
+   "norm_entropy": 0.051337168543602936,
+   "counts": {
+    "yes": 7216,
+    "no": 42
+   },
+   "total": 7258
+  },
+  "brace_style": {
+   "majority": "own_line",
+   "share": 0.9992006394884093,
+   "entropy": 0.00937728564718525,
+   "norm_entropy": 0.00937728564718525,
+   "counts": {
+    "own_line": 1250,
+    "end_of_line": 1
+   },
+   "total": 1251
+  },
+  "if_braces": {
+   "majority": "braced",
+   "share": 0.6582491582491582,
+   "entropy": 0.9264842943095781,
+   "norm_entropy": 0.9264842943095781,
+   "counts": {
+    "braced": 391,
+    "unbraced": 203
+   },
+   "total": 594
+  },
+  "builtin_alias": {
+   "majority": "alias",
+   "share": 0.9822064056939501,
+   "entropy": 0.12886621151910602,
+   "norm_entropy": 0.12886621151910602,
+   "counts": {
+    "alias": 1656,
+    "framework_name": 30
+   },
+   "total": 1686
+  },
+  "var_usage": {
+   "majority": "var",
+   "share": 0.5983739837398374,
+   "entropy": 0.9718938099332752,
+   "norm_entropy": 0.9718938099332752,
+   "counts": {
+    "explicit": 247,
+    "var": 368
+   },
+   "total": 615
+  }
+ },
+ "security": {
+  "per_kloc": 0.0
+ },
+ "reliability": {
+  "weighted_findings": 1.5,
+  "per_kloc": 0.1954906816108432
+ },
+ "timings": {
+  "parse+units": 0.865847110748291,
+  "dry": 5.15899395942688,
+  "design": 0.20043420791625977,
+  "hygiene": 0.5615808963775635,
+  "security": 0.30231618881225586,
+  "total": 7.121528148651123
+ },
+ "seconds": 7.149200916290283,
+ "rules": {
+  "kiss.complexity": 43,
+  "size.unit_length": 97,
+  "size.parameters": 192,
+  "dry.type1": 15,
+  "dry.type2": 86,
+  "dry.type3": 128,
+  "dry.micro": 34,
+  "srp.lcom4": 9,
+  "srp.god_class": 4,
+  "coupling.cbo": 2,
+  "encap.public_mutable_field": 2,
+  "dead.unused_local": 5,
+  "dead.unreachable": 1,
+  "naming.abbreviation": 179,
+  "naming.too_short": 48,
+  "errors.empty_catch": 10,
+  "dead.commented_out_code": 7,
+  "naming.inconsistent": 29,
+  "errors.catch_general": 6,
+  "naming.convention": 16,
+  "naming.lap.set_returns_value": 4,
+  "magic.number": 68,
+  "errors.reserved_exception": 2,
+  "docs.missing_xml_doc": 60,
+  "style.trailing_whitespace": 1,
+  "style.indent_char": 1,
+  "style.indent_multiple_of_4": 42,
+  "style.brace_style": 1,
+  "style.builtin_alias": 30,
+  "rel.sync_over_async": 3
+ }
+}

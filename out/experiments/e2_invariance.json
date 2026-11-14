@@ -1,0 +1,6566 @@
+{
+ "summary": {
+  "_invalid_transforms": {
+   "count": 2,
+   "cases": [
+    [
+     "src/MessagePack/Internal/ByteArrayStringHashTable.cs",
+     "brace_knr"
+    ],
+    [
+     "src/MessagePack/Internal/Sequence`1.cs",
+     "brace_knr"
+    ]
+   ]
+  },
+  "blank_lines": {
+   "pairs": 170,
+   "invariant": 167,
+   "rate": 0.9823529411764705,
+   "lower95_one_sided": 0.9566672321012696,
+   "differing": {
+    "units": 2,
+    "rules": 2,
+    "dup_lines": 2,
+    "code_lines": 2
+   },
+   "sloc_rel_change_median": 0.0,
+   "examples": [
+    [
+     "src/MessagePack.Experimental/HardwareIntrinsics/Formatters.cs",
+     [
+      "units",
+      "rules",
+      "dup_lines",
+      "code_lines"
+     ]
+    ],
+    [
+     "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     [
+      "units",
+      "code_lines"
+     ]
+    ],
+    [
+     "src/MessagePack/Internal/UnsafeRefSerializeHelper.cs",
+     [
+      "rules",
+      "dup_lines"
+     ]
+    ]
+   ]
+  },
+  "comment_lines": {
+   "pairs": 170,
+   "invariant": 163,
+   "rate": 0.9588235294117647,
+   "lower95_one_sided": 0.9257483295289728,
+   "differing": {
+    "units": 6,
+    "rules": 2,
+    "dup_lines": 5,
+    "code_lines": 7
+   },
+   "sloc_rel_change_median": 0.0,
+   "examples": [
+    [
+     "src/MessagePack.Experimental/HardwareIntrinsics/Formatters.cs",
+     [
+      "units",
+      "rules",
+      "dup_lines",
+      "code_lines"
+     ]
+    ],
+    [
+     "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructFormatter.cs",
+     [
+      "units",
+      "code_lines"
+     ]
+    ],
+    [
+     "src/MessagePack/Internal/UnsafeMemory.Low.cs",
+     [
+      "units",
+      "dup_lines",
+      "code_lines"
+     ]
+    ],
+    [
+     "src/MessagePack/Internal/UnsafeRefDeserializeHelper.cs",
+     [
+      "code_lines"
+     ]
+    ],
+    [
+     "src/MessagePack/Internal/UnsafeRefSerializeHelper.cs",
+     [
+      "units",
+      "rules",
+      "dup_lines",
+      "code_lines"
+     ]
+    ]
+   ]
+  },
+  "rename_locals": {
+   "pairs": 56,
+   "invariant": 56,
+   "rate": 1.0,
+   "lower95_one_sided": 0.9539133024656682,
+   "differing": {},
+   "sloc_rel_change_median": 0.0,
+   "examples": []
+  },
+  "region_wrap": {
+   "pairs": 149,
+   "invariant": 149,
+   "rate": 1.0,
+   "lower95_one_sided": 0.982165815448608,
+   "differing": {},
+   "sloc_rel_change_median": 0.0,
+   "examples": []
+  },
+  "brace_knr": {
+   "pairs": 163,
+   "invariant": 163,
+   "rate": 1.0,
+   "lower95_one_sided": 0.9836725760352842,
+   "differing": {},
+   "sloc_rel_change_median": -0.1896551724137931,
+   "examples": []
+  },
+  "_all": {
+   "pairs": 708,
+   "invariant": 698,
+   "rate": 0.9858757062146892,
+   "lower95_one_sided": 0.9765140138201837
+  },
+  "_clean_parse": {
+   "pairs": 664,
+   "invariant": 664,
+   "rate": 1.0,
+   "lower95_one_sided": 0.9959419196331879
+  },
+  "_needs_containment": {
+   "pairs": 44,
+   "invariant": 34,
+   "rate": 0.7727272727272727,
+   "lower95_one_sided": 0.6548364781240722
+  }
+ },
+ "raw": [
+  {
+   "file": "src/AssemblyInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/AssemblyInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/FormatterCodeFixProvider.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/FormatterCodeFixProvider.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/FormatterCodeFixProvider.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/FormatterCodeFixProvider.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -30,
+   "sloc_rel": -0.15706806282722513,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MessagePackCodeFixProvider.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MessagePackCodeFixProvider.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MessagePackCodeFixProvider.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MessagePackCodeFixProvider.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MessagePackCodeFixProvider.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -35,
+   "sloc_rel": -0.175,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MsgPack015CodeFixProvider.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MsgPack015CodeFixProvider.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MsgPack015CodeFixProvider.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MsgPack015CodeFixProvider.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/CodeFixes/MsgPack015CodeFixProvider.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -10,
+   "sloc_rel": -0.19607843137254902,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/Usings.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Analyzers.CodeFixes/Usings.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/AnalyzerAttributes.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/AnalyzerAttributes.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/AnalyzerAttributes.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/AnalyzerAttributes.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -6,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/Attributes.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/Attributes.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/Attributes.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/Attributes.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -14,
+   "sloc_rel": -0.20588235294117646,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/IMessagePackSerializationCallbackReceiver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/IMessagePackSerializationCallbackReceiver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/IMessagePackSerializationCallbackReceiver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Annotations/IMessagePackSerializationCallbackReceiver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -2,
+   "sloc_rel": -0.25,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackInputFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackInputFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackInputFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackInputFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackInputFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -5,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackOutputFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackOutputFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackOutputFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackOutputFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.AspNetCoreMvcFormatter/MessagePackOutputFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -9,
+   "sloc_rel": -0.1956521739130435,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/Formatters.cs",
+   "transform": "blank_lines",
+   "invariant": false,
+   "differing": [
+    "units",
+    "rules",
+    "dup_lines",
+    "code_lines"
+   ],
+   "sloc_delta": -1,
+   "sloc_rel": -0.0015479876160990713,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/Formatters.cs",
+   "transform": "comment_lines",
+   "invariant": false,
+   "differing": [
+    "units",
+    "rules",
+    "dup_lines",
+    "code_lines"
+   ],
+   "sloc_delta": 12,
+   "sloc_rel": 0.018575851393188854,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/Formatters.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/Formatters.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/Formatters.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -101,
+   "sloc_rel": -0.1563467492260062,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/PrimitiveArrayResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/PrimitiveArrayResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/PrimitiveArrayResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/PrimitiveArrayResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -6,
+   "sloc_rel": -0.2608695652173913,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/UnsafeMemoryAlignmentUtility.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/UnsafeMemoryAlignmentUtility.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/HardwareIntrinsics/UnsafeMemoryAlignmentUtility.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.17391304347826086,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructArrayFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructArrayFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructArrayFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructArrayFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -12,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": false,
+   "differing": [
+    "units",
+    "code_lines"
+   ],
+   "sloc_delta": 1,
+   "sloc_rel": 0.023809523809523808,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -8,
+   "sloc_rel": -0.19047619047619047,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructMemoryFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructMemoryFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructMemoryFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructMemoryFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -11,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructReadOnlyMemoryFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructReadOnlyMemoryFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructReadOnlyMemoryFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructReadOnlyMemoryFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -11,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructReadOnlySequenceFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructReadOnlySequenceFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructReadOnlySequenceFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.Experimental/UnsafeUnmanagedStructFormatter/UnsafeUnmanagedStructReadOnlySequenceFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -16,
+   "sloc_rel": -0.21333333333333335,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ImmutableCollection/AssemblyInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ImmutableCollection/AssemblyInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ReactiveProperty/Formatters.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ReactiveProperty/Formatters.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ReactiveProperty/Formatters.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ReactiveProperty/Formatters.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -73,
+   "sloc_rel": -0.2260061919504644,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ReactiveProperty/ReactivePropertyResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ReactiveProperty/ReactivePropertyResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ReactiveProperty/ReactivePropertyResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.ReactiveProperty/ReactivePropertyResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -14,
+   "sloc_rel": -0.2153846153846154,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator.Unity/CompositeResolverGenerator.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator.Unity/CompositeResolverGenerator.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator.Unity/CompositeResolverGenerator.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator.Unity/CompositeResolverGenerator.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -14,
+   "sloc_rel": -0.21875,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack001SpecifyOptionsAnalyzer.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack001SpecifyOptionsAnalyzer.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack001SpecifyOptionsAnalyzer.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack001SpecifyOptionsAnalyzer.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack001SpecifyOptionsAnalyzer.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -7,
+   "sloc_rel": -0.15217391304347827,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack002UseConstantOptionsAnalyzer.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack002UseConstantOptionsAnalyzer.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack002UseConstantOptionsAnalyzer.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack002UseConstantOptionsAnalyzer.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack002UseConstantOptionsAnalyzer.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -11,
+   "sloc_rel": -0.1746031746031746,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+   "transform": "blank_lines",
+   "invariant": false,
+   "differing": [
+    "units",
+    "code_lines"
+   ],
+   "sloc_delta": -1,
+   "sloc_rel": -0.0024509803921568627,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -24,
+   "sloc_rel": -0.058823529411764705,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/AnalyzerOptions.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/AnalyzerOptions.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/AnalyzerOptions.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/AnalyzerOptions.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -35,
+   "sloc_rel": -0.1881720430107527,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/CodeAnalysisUtilities.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/CodeAnalysisUtilities.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/CodeAnalysisUtilities.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/CodeAnalysisUtilities.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -15,
+   "sloc_rel": -0.18518518518518517,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/CustomFormatterRegisterInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/CustomFormatterRegisterInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/CustomFormatterRegisterInfo.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/CustomFormatterRegisterInfo.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -2,
+   "sloc_rel": -0.16666666666666666,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/EnumSerializationInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/EnumSerializationInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/EnumSerializationInfo.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/EnumSerializationInfo.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.14285714285714285,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/FullModel.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/FullModel.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/FullModel.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/FullModel.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -16,
+   "sloc_rel": -0.1415929203539823,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GenericSerializationInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GenericSerializationInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GenericSerializationInfo.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GenericSerializationInfo.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -3,
+   "sloc_rel": -0.1875,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GenericTypeParameterInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GenericTypeParameterInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GenericTypeParameterInfo.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GenericTypeParameterInfo.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -9,
+   "sloc_rel": -0.14516129032258066,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/MemberSerializationInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/MemberSerializationInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/MemberSerializationInfo.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -11,
+   "sloc_rel": -0.1896551724137931,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ObjectSerializationInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ObjectSerializationInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ObjectSerializationInfo.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ObjectSerializationInfo.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -22,
+   "sloc_rel": -0.15714285714285714,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedArrayTypeName.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedArrayTypeName.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedArrayTypeName.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedArrayTypeName.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -13,
+   "sloc_rel": -0.18840579710144928,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedNamedTypeName.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedNamedTypeName.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedNamedTypeName.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedNamedTypeName.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -35,
+   "sloc_rel": -0.1643192488262911,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedTypeName.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedTypeName.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedTypeName.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/QualifiedTypeName.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -13,
+   "sloc_rel": -0.18309859154929578,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ReferenceSymbols.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ReferenceSymbols.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ReferenceSymbols.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -9,
+   "sloc_rel": -0.12857142857142856,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ResolverRegisterInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ResolverRegisterInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ResolverRegisterInfo.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ResolverRegisterInfo.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -15,
+   "sloc_rel": -0.17045454545454544,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ResolverRegisterInfoComparer.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ResolverRegisterInfoComparer.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ResolverRegisterInfoComparer.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ResolverRegisterInfoComparer.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -2,
+   "sloc_rel": -0.2222222222222222,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -209,
+   "sloc_rel": -0.17005695687550854,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeParameter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeParameter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeParameter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeParameter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -5,
+   "sloc_rel": -0.20833333333333334,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/UnionSerializationInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/UnionSerializationInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/UnionSerializationInfo.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/UnionSerializationInfo.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -6,
+   "sloc_rel": -0.1935483870967742,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/UnionSubTypeInfo.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CodeAnalysis/UnionSubTypeInfo.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CompositeResolverGenerator.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CompositeResolverGenerator.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CompositeResolverGenerator.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CompositeResolverGenerator.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/CompositeResolverGenerator.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -8,
+   "sloc_rel": -0.13114754098360656,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/GeneratorUtilities.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/GeneratorUtilities.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/GeneratorUtilities.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/GeneratorUtilities.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/GeneratorUtilities.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.07692307692307693,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/IGeneratorContext.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/IGeneratorContext.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/IGeneratorContext.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/IGeneratorContext.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -1,
+   "sloc_rel": -0.125,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -21,
+   "sloc_rel": -0.17647058823529413,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Shims/System.CodeDom.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Shims/System.CodeDom.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Shims/System.CodeDom.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Shims/System.CodeDom.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -23,
+   "sloc_rel": -0.21495327102803738,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/GeneratorUtilities.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/GeneratorUtilities.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/GeneratorUtilities.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/GeneratorUtilities.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.26666666666666666,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/IFormatterTemplate.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/IFormatterTemplate.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/IFormatterTemplate.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/IFormatterTemplate.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -1,
+   "sloc_rel": -0.125,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/EmbedStringHelper.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/EmbedStringHelper.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/EmbedStringHelper.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/EmbedStringHelper.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/EmbedStringHelper.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -12,
+   "sloc_rel": -0.17391304347826086,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/StringKeyFormatterDeserializeHelper.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/StringKeyFormatterDeserializeHelper.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/StringKeyFormatterDeserializeHelper.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/StringKeyFormatterDeserializeHelper.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/StringKeyFormatterDeserializeHelper.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -38,
+   "sloc_rel": -0.18269230769230768,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/TemplatePartials.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/TemplatePartials.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/TemplatePartials.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/TemplatePartials.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -11,
+   "sloc_rel": -0.14666666666666667,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/TransformUtilities.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/TransformUtilities.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/TransformUtilities.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/TransformUtilities.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Transforms/TransformUtilities.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -21,
+   "sloc_rel": -0.1875,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Usings.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Usings.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/AnalyzerUtilities.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/AnalyzerUtilities.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/AnalyzerUtilities.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/AnalyzerUtilities.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/AnalyzerUtilities.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -31,
+   "sloc_rel": -0.20394736842105263,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/Constants.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/Constants.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/Constants.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/Constants.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -1,
+   "sloc_rel": -0.05555555555555555,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/ImmutableEquatableArray.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/ImmutableEquatableArray.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/ImmutableEquatableArray.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/ImmutableEquatableArray.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -9,
+   "sloc_rel": -0.14285714285714285,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/RoslynAnalyzerExtensions.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/RoslynAnalyzerExtensions.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/RoslynAnalyzerExtensions.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.SourceGenerator/Utils/RoslynAnalyzerExtensions.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -29,
+   "sloc_rel": -0.22137404580152673,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scenes/SandboxBehaviour.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scenes/SandboxBehaviour.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scenes/SandboxBehaviour.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scenes/SandboxBehaviour.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -8,
+   "sloc_rel": -0.18604651162790697,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnityBlitResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnityBlitResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnityBlitResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnityBlitResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -20,
+   "sloc_rel": -0.2247191011235955,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnsafeBlitFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnsafeBlitFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnsafeBlitFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnsafeBlitFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnsafeBlitFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -44,
+   "sloc_rel": -0.25,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -136,
+   "sloc_rel": -0.13014354066985645,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackInitializer.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackInitializer.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackInitializer.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackInitializer.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.23529411764705882,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/UnityResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/UnityResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/UnityResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/UnityResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -15,
+   "sloc_rel": -0.07772020725388601,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityShims/Shims.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityShims/Shims.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityShims/Shims.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack.UnityShims/Shims.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -56,
+   "sloc_rel": -0.10408921933085502,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/CompositeResolverAttribute.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/CompositeResolverAttribute.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/CompositeResolverAttribute.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/CompositeResolverAttribute.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -3,
+   "sloc_rel": -0.21428571428571427,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ExtensionHeader.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ExtensionHeader.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ExtensionHeader.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ExtensionHeader.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.19047619047619047,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ExtensionResult.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ExtensionResult.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ExtensionResult.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ExtensionResult.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.18181818181818182,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/CollectionFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/CollectionFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/CollectionFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/CollectionFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/CollectionFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -289,
+   "sloc_rel": -0.2361111111111111,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/CollectionHelpers`2.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/CollectionHelpers`2.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/CollectionHelpers`2.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.18181818181818182,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DateTimeFormatters.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DateTimeFormatters.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DateTimeFormatters.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DateTimeFormatters.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -21,
+   "sloc_rel": -0.2441860465116279,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DictionaryFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DictionaryFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DictionaryFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DictionaryFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -58,
+   "sloc_rel": -0.22393822393822393,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DynamicObjectTypeFallbackFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DynamicObjectTypeFallbackFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DynamicObjectTypeFallbackFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/DynamicObjectTypeFallbackFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -12,
+   "sloc_rel": -0.1791044776119403,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/EnumAsStringFormatter`1.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/EnumAsStringFormatter`1.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/EnumAsStringFormatter`1.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/EnumAsStringFormatter`1.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -19,
+   "sloc_rel": -0.1792452830188679,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/ExpandoObjectFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/ExpandoObjectFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/ExpandoObjectFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/ExpandoObjectFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -12,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/FrozenCollectionFormatters.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/FrozenCollectionFormatters.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/FrozenCollectionFormatters.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/FrozenCollectionFormatters.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/FrozenCollectionFormatters.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -27,
+   "sloc_rel": -0.20454545454545456,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/GenericEnumFormatter`1.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/GenericEnumFormatter`1.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/GenericEnumFormatter`1.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -6,
+   "sloc_rel": -0.0967741935483871,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/IMessagePackFormatter`1.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/IMessagePackFormatter`1.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/IMessagePackFormatter`1.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/IMessagePackFormatter`1.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -3,
+   "sloc_rel": -0.23076923076923078,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/IgnoreFormatter`1.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/IgnoreFormatter`1.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/IgnoreFormatter`1.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/IgnoreFormatter`1.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.25,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/ImmutableCollectionFormatters.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/ImmutableCollectionFormatters.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/ImmutableCollectionFormatters.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/ImmutableCollectionFormatters.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -69,
+   "sloc_rel": -0.25650557620817843,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/MultiDimensionalArrayFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/MultiDimensionalArrayFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/MultiDimensionalArrayFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/MultiDimensionalArrayFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/MultiDimensionalArrayFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -46,
+   "sloc_rel": -0.18326693227091634,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/NilFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/NilFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/NilFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/NilFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -9,
+   "sloc_rel": -0.2727272727272727,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/NullableFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/NullableFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/NullableFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -16,
+   "sloc_rel": -0.25806451612903225,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/PrimitiveObjectFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/PrimitiveObjectFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/PrimitiveObjectFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/PrimitiveObjectFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/PrimitiveObjectFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -46,
+   "sloc_rel": -0.152317880794702,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/StandardClassLibraryFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/StandardClassLibraryFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/StandardClassLibraryFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/StandardClassLibraryFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/StandardClassLibraryFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -161,
+   "sloc_rel": -0.22772277227722773,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/StringInterningFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/StringInterningFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/StringInterningFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/StringInterningFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -10,
+   "sloc_rel": -0.23255813953488372,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/TypelessFormatter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/TypelessFormatter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/TypelessFormatter.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/TypelessFormatter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/TypelessFormatter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -38,
+   "sloc_rel": -0.15702479338842976,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/UnsafeBinaryFormatters.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/UnsafeBinaryFormatters.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/UnsafeBinaryFormatters.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Formatters/UnsafeBinaryFormatters.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -15,
+   "sloc_rel": -0.21739130434782608,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/GeneratedMessagePackResolverAttribute.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/GeneratedMessagePackResolverAttribute.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/GeneratedMessagePackResolverAttribute.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/GeneratedMessagePackResolverAttribute.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -3,
+   "sloc_rel": -0.21428571428571427,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/IFormatterResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/IFormatterResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/IFormatterResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/IFormatterResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -19,
+   "sloc_rel": -0.19387755102040816,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AsymmetricKeyHashTable.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AsymmetricKeyHashTable.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AsymmetricKeyHashTable.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AsymmetricKeyHashTable.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AsymmetricKeyHashTable.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -55,
+   "sloc_rel": -0.2131782945736434,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AutomataDictionary.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AutomataDictionary.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AutomataDictionary.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AutomataDictionary.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AutomataDictionary.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -62,
+   "sloc_rel": -0.19314641744548286,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AutomataKeyGen.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AutomataKeyGen.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AutomataKeyGen.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/AutomataKeyGen.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -14,
+   "sloc_rel": -0.1590909090909091,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ByteArrayStringHashTable.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ByteArrayStringHashTable.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ByteArrayStringHashTable.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ByteArrayStringHashTable.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/CodeGenHelpers.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/CodeGenHelpers.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/CodeGenHelpers.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/CodeGenHelpers.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -13,
+   "sloc_rel": -0.17333333333333334,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DateTimeConstants.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DateTimeConstants.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DateTimeConstants.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DateTimeConstants.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -2,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DynamicAssembly.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DynamicAssembly.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DynamicAssembly.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DynamicAssembly.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -3,
+   "sloc_rel": -0.125,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DynamicAssemblyFactory.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DynamicAssemblyFactory.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DynamicAssemblyFactory.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/DynamicAssemblyFactory.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -12,
+   "sloc_rel": -0.19047619047619047,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ExpressionUtility.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ExpressionUtility.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ExpressionUtility.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ExpressionUtility.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ExpressionUtility.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -13,
+   "sloc_rel": -0.24074074074074073,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/FarmHash.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/FarmHash.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/FarmHash.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/FarmHash.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -60,
+   "sloc_rel": -0.12219959266802444,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/GeneratedAssemblyMessagePackResolverAttribute.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/GeneratedAssemblyMessagePackResolverAttribute.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/GeneratedAssemblyMessagePackResolverAttribute.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/GeneratedAssemblyMessagePackResolverAttribute.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -3,
+   "sloc_rel": -0.17647058823529413,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/GuidBits.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/GuidBits.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/GuidBits.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/GuidBits.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/GuidBits.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -22,
+   "sloc_rel": -0.06606606606606606,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ILGeneratorExtensions.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ILGeneratorExtensions.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ILGeneratorExtensions.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ILGeneratorExtensions.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -61,
+   "sloc_rel": -0.18541033434650456,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ReflectionExtensions.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ReflectionExtensions.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ReflectionExtensions.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ReflectionExtensions.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ReflectionExtensions.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -10,
+   "sloc_rel": -0.20833333333333334,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/RuntimeTypeHandleEqualityComparer.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/RuntimeTypeHandleEqualityComparer.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/RuntimeTypeHandleEqualityComparer.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/RuntimeTypeHandleEqualityComparer.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -5,
+   "sloc_rel": -0.25,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/Sequence`1.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/Sequence`1.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/Sequence`1.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ThreadsafeTypeKeyHashTable.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ThreadsafeTypeKeyHashTable.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ThreadsafeTypeKeyHashTable.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ThreadsafeTypeKeyHashTable.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/ThreadsafeTypeKeyHashTable.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -40,
+   "sloc_rel": -0.20512820512820512,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/TinyJsonReader.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/TinyJsonReader.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/TinyJsonReader.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/TinyJsonReader.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -52,
+   "sloc_rel": -0.1368421052631579,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeMemory.Low.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeMemory.Low.cs",
+   "transform": "comment_lines",
+   "invariant": false,
+   "differing": [
+    "units",
+    "dup_lines",
+    "code_lines"
+   ],
+   "sloc_delta": 5,
+   "sloc_rel": 0.038461538461538464,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeMemory.Low.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeMemory.Low.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -24,
+   "sloc_rel": -0.18461538461538463,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefDeserializeHelper.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefDeserializeHelper.cs",
+   "transform": "comment_lines",
+   "invariant": false,
+   "differing": [
+    "code_lines"
+   ],
+   "sloc_delta": 2,
+   "sloc_rel": 0.029411764705882353,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefDeserializeHelper.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefDeserializeHelper.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefDeserializeHelper.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -13,
+   "sloc_rel": -0.19117647058823528,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefSerializeHelper.cs",
+   "transform": "blank_lines",
+   "invariant": false,
+   "differing": [
+    "rules",
+    "dup_lines"
+   ],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefSerializeHelper.cs",
+   "transform": "comment_lines",
+   "invariant": false,
+   "differing": [
+    "units",
+    "rules",
+    "dup_lines",
+    "code_lines"
+   ],
+   "sloc_delta": 23,
+   "sloc_rel": 0.018518518518518517,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefSerializeHelper.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefSerializeHelper.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/Internal/UnsafeRefSerializeHelper.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -214,
+   "sloc_rel": -0.1723027375201288,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Helper.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Helper.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Helper.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Helper.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -12,
+   "sloc_rel": -0.23076923076923078,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -19,
+   "sloc_rel": -0.2602739726027397,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs",
+   "transform": "comment_lines",
+   "invariant": false,
+   "differing": [
+    "units",
+    "dup_lines",
+    "code_lines"
+   ],
+   "sloc_delta": 6,
+   "sloc_rel": 0.010810810810810811,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -83,
+   "sloc_rel": -0.14954954954954955,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs",
+   "transform": "comment_lines",
+   "invariant": false,
+   "differing": [
+    "units",
+    "dup_lines",
+    "code_lines"
+   ],
+   "sloc_delta": 6,
+   "sloc_rel": 0.0106951871657754,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -86,
+   "sloc_rel": -0.1532976827094474,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/LZ4/LZ4Codec.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -13,
+   "sloc_rel": -0.14772727272727273,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackCode.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackCode.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackCode.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackCode.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -17,
+   "sloc_rel": -0.08056872037914692,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackCompression.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackCompression.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackCompression.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackCompression.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.25,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackEventSource.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackEventSource.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackEventSource.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackEventSource.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -9,
+   "sloc_rel": -0.23076923076923078,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackPrimitives.Readers.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackPrimitives.Readers.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackPrimitives.Readers.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackPrimitives.Readers.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -74,
+   "sloc_rel": -0.15384615384615385,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackPrimitives.Writers.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackPrimitives.Writers.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackPrimitives.Writers.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackPrimitives.Writers.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackPrimitives.Writers.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -95,
+   "sloc_rel": -0.17055655296229802,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackReader.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/MessagePackReader.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/MessagePackReader.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/MessagePackReader.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -103,
+   "sloc_rel": -0.15725190839694655,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/MessagePackSecurity.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSecurity.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSecurity.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSecurity.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -40,
+   "sloc_rel": -0.16877637130801687,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializationException.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializationException.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializationException.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializationException.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -6,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer+Typeless.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer+Typeless.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer+Typeless.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer+Typeless.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -3,
+   "sloc_rel": -0.11538461538461539,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.Json.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.Json.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.Json.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.Json.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.Json.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -71,
+   "sloc_rel": -0.17149758454106281,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.NonGeneric.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.NonGeneric.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.NonGeneric.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.NonGeneric.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -47,
+   "sloc_rel": -0.1540983606557377,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializer.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -95,
+   "sloc_rel": -0.202991452991453,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializerOptions.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializerOptions.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializerOptions.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackSerializerOptions.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -36,
+   "sloc_rel": -0.1956521739130435,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Arrays.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Arrays.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Arrays.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Arrays.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Arrays.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -14,
+   "sloc_rel": -0.21212121212121213,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Maps.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Maps.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Maps.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Maps.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.Maps.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -8,
+   "sloc_rel": -0.21052631578947367,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackStreamReader.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -23,
+   "sloc_rel": -0.20535714285714285,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackWriter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackWriter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackWriter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MessagePackWriter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -80,
+   "sloc_rel": -0.182648401826484,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MonoProtection.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MonoProtection.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MonoProtection.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/MonoProtection.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -6,
+   "sloc_rel": -0.2222222222222222,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Nil.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Nil.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Nil.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Nil.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -6,
+   "sloc_rel": -0.20689655172413793,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ReservedExtensionTypeCodes.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ReservedExtensionTypeCodes.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ReservedExtensionTypeCodes.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/ReservedExtensionTypeCodes.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -2,
+   "sloc_rel": -0.10526315789473684,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/AttributeFormatterResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/AttributeFormatterResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/AttributeFormatterResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/AttributeFormatterResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -8,
+   "sloc_rel": -0.2222222222222222,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/BuiltinResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/BuiltinResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/BuiltinResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/BuiltinResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -12,
+   "sloc_rel": -0.07947019867549669,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/CachingFormatterResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/CachingFormatterResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/CachingFormatterResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/CachingFormatterResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -4,
+   "sloc_rel": -0.21052631578947367,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/CompositeResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/CompositeResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/CompositeResolver.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/CompositeResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/CompositeResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -13,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ContractlessReflectionObjectResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ContractlessReflectionObjectResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ContractlessReflectionObjectResolver.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ContractlessReflectionObjectResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -1,
+   "sloc_rel": -0.125,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumAsStringIgnoreCaseResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumAsStringIgnoreCaseResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumAsStringIgnoreCaseResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumAsStringIgnoreCaseResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -10,
+   "sloc_rel": -0.2127659574468085,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumAsStringResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumAsStringResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumAsStringResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumAsStringResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -11,
+   "sloc_rel": -0.21153846153846154,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicEnumResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -15,
+   "sloc_rel": -0.15306122448979592,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicGenericResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicGenericResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicGenericResolver.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicGenericResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicGenericResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -56,
+   "sloc_rel": -0.17391304347826086,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicObjectResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicObjectResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicObjectResolver.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicObjectResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicObjectResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -290,
+   "sloc_rel": -0.17835178351783518,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicUnionResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicUnionResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicUnionResolver.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicUnionResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/DynamicUnionResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -40,
+   "sloc_rel": -0.11019283746556474,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ExpandoObjectResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ExpandoObjectResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ExpandoObjectResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ExpandoObjectResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -6,
+   "sloc_rel": -0.17142857142857143,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ImmutableCollectionResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ImmutableCollectionResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ImmutableCollectionResolver.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ImmutableCollectionResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ImmutableCollectionResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -15,
+   "sloc_rel": -0.1875,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeDateTimeResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeDateTimeResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeDateTimeResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeDateTimeResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -13,
+   "sloc_rel": -0.24528301886792453,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeDecimalResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeDecimalResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeDecimalResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeDecimalResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -9,
+   "sloc_rel": -0.25,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeGuidResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeGuidResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeGuidResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/NativeGuidResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -9,
+   "sloc_rel": -0.25,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/PrimitiveObjectResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/PrimitiveObjectResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/PrimitiveObjectResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/PrimitiveObjectResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -7,
+   "sloc_rel": -0.22580645161290322,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ResolverUtilities.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ResolverUtilities.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ResolverUtilities.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/ResolverUtilities.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -10,
+   "sloc_rel": -0.2564102564102564,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/SkipClrVisibilityChecks.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/SkipClrVisibilityChecks.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/SkipClrVisibilityChecks.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/SkipClrVisibilityChecks.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -25,
+   "sloc_rel": -0.1724137931034483,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/SourceGeneratedFormatterResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/SourceGeneratedFormatterResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/SourceGeneratedFormatterResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/SourceGeneratedFormatterResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -7,
+   "sloc_rel": -0.21212121212121213,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/StandardResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/StandardResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/StandardResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/StandardResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -43,
+   "sloc_rel": -0.2205128205128205,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/StaticCompositeResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/StaticCompositeResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/StaticCompositeResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/StaticCompositeResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -20,
+   "sloc_rel": -0.2222222222222222,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/TypelessContractlessStandardResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/TypelessContractlessStandardResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/TypelessContractlessStandardResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/TypelessContractlessStandardResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -8,
+   "sloc_rel": -0.13559322033898305,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/TypelessObjectResolver.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/TypelessObjectResolver.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/TypelessObjectResolver.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/TypelessObjectResolver.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Resolvers/TypelessObjectResolver.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -21,
+   "sloc_rel": -0.1926605504587156,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SafeBitConverter.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SafeBitConverter.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SafeBitConverter.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SafeBitConverter.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -1,
+   "sloc_rel": -0.07142857142857142,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SequencePool.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SequencePool.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SequencePool.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SequencePool.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -17,
+   "sloc_rel": -0.2073170731707317,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SequenceReader.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/SequenceReader.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/SequenceReader.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -59,
+   "sloc_rel": -0.1782477341389728,
+   "clean": false
+  },
+  {
+   "file": "src/MessagePack/SequenceReaderExtensions.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SequenceReaderExtensions.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SequenceReaderExtensions.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SequenceReaderExtensions.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -30,
+   "sloc_rel": -0.2,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SipHash.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SipHash.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SipHash.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/SipHash.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -11,
+   "sloc_rel": -0.05365853658536585,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/StreamPolyfillExtensions.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/StreamPolyfillExtensions.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/StreamPolyfillExtensions.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/StreamPolyfillExtensions.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -21,
+   "sloc_rel": -0.21875,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/StringEncoding.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/StringEncoding.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/StringEncoding.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/StringEncoding.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -2,
+   "sloc_rel": -0.16666666666666666,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Utilities.cs",
+   "transform": "blank_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Utilities.cs",
+   "transform": "comment_lines",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Utilities.cs",
+   "transform": "rename_locals",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Utilities.cs",
+   "transform": "region_wrap",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": 0,
+   "sloc_rel": 0.0,
+   "clean": true
+  },
+  {
+   "file": "src/MessagePack/Utilities.cs",
+   "transform": "brace_knr",
+   "invariant": true,
+   "differing": [],
+   "sloc_delta": -11,
+   "sloc_rel": -0.2,
+   "clean": true
+  }
+ ]
+}

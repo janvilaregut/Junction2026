@@ -4,3 +4,13 @@ __pycache__/
 corpus/
 out/cache/
 .DS_Store
+# raw tool outputs (large, and contain absolute local paths); summaries are committed
+out/dotnet/*
+!out/dotnet/summary.json
+out/tools/*
+!out/tools/summary.json
+!out/tools/e5/
+out/tools/e5/*/
+out/experiments/logs/
+out/messagepack/heat.json
+report/_test_*.html

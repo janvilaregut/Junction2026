@@ -239,6 +239,9 @@ def _mask_errors(text: str, max_iter: int = 40):
     return text, tree, {m + 1 for m in masked}
 
 
+_COMMENT_LINE = re.compile(r"^(//|/\*|\*(\s|/|$))")   # `*(int*)p = v;` is code, `* text` is a comment
+
+
 def load_file(repo: Path, rel: str, symbols=DEFAULT_SYMBOLS, text: str | None = None) -> SourceFile:
     raw = text if text is not None else (repo / rel).read_text(encoding="utf-8-sig", errors="replace")
     raw = raw.replace("\r\n", "\n")
@@ -248,7 +251,11 @@ def load_file(repo: Path, rel: str, symbols=DEFAULT_SYMBOLS, text: str | None = 
     sf.tree = tree
     sf.masked_lines = masked
     _walk_tokens(sf.tree.root_node, sf.tokens, sf.code_lines, sf.comment_lines)
-    sf.code_lines |= masked
+    raw_lines = raw.split("\n")
+    # masked lines count as (unmeasured) code only if they held code, not comments
+    sf.masked_lines = {m for m in masked if m - 1 < len(raw_lines)
+                       and raw_lines[m - 1].strip() and not _COMMENT_LINE.match(raw_lines[m - 1].lstrip())}
+    sf.code_lines |= sf.masked_lines
     return sf
 
 

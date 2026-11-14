@@ -1,0 +1,47 @@
+{
+ "functions_ours": 1482,
+ "functions_lizard": 1609,
+ "matched": 1469,
+ "cc": {
+  "spearman": [
+   0.9450529312307268,
+   0.0
+  ],
+  "icc": 0.9467737841381519,
+  "exact_agreement": 0.8468345813478557,
+  "bias": -0.179714091218516,
+  "loa": [
+   -5.124686573103443,
+   4.765258390666411
+  ],
+  "ours_higher": 80,
+  "lizard_higher": 145
+ },
+ "params": {
+  "spearman": [
+   0.9816200261146564,
+   0.0
+  ],
+  "exact_agreement": 0.9836623553437712
+ },
+ "length": {
+  "spearman": [
+   0.9977500488242053,
+   0.0
+  ],
+  "icc": 0.9995098366308115,
+  "mean_ratio": 1.0090778778048357
+ },
+ "disagreement_causes": {
+  "other (nullable '?' tokens / ?. counted by lizard, catch, local functions)": 128,
+  "foreach (lizard ignores)": 66,
+  "switch-expression arms (lizard ignores)": 14,
+  "and/or patterns": 8,
+  "do-while": 3,
+  "foreach (lizard ignores) + and/or patterns": 2,
+  "foreach (lizard ignores) + switch-expression arms (lizard ignores) + do-while + and/or patterns": 1,
+  "do-while + and/or patterns": 1,
+  "switch-expression arms (lizard ignores) + and/or patterns": 1,
+  "foreach (lizard ignores) + do-while": 1
+ }
+}

@@ -1,0 +1,1731 @@
+[
+  {
+    "id": "GHSA-2f33-pr97-265q",
+    "aliases": [
+      "CVE-2026-48509"
+    ],
+    "summary": "MessagePack-CSharp: ASP.NET Core MessagePackInputFormatter defaults to TrustedData for HTTP request bodies",
+    "cwes": [
+      "CWE-1188"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "f077798e"
+    ],
+    "attribution": "commit 'Default MVC input formatter to UntrustedData for CWE-1188'",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack.AspNetCoreMvcFormatter/MessagePackInputFormatter.cs": [
+        12,
+        15,
+        21
+      ]
+    },
+    "n_vulnerable_lines": 3
+  },
+  {
+    "id": "GHSA-2x83-8g95-xh59",
+    "aliases": [
+      "CVE-2026-48511"
+    ],
+    "summary": "MessagePack-CSharp: ExpandoObject formatter can perform quadratic insertion work on untrusted maps",
+    "cwes": [
+      "CWE-407"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "25a3493e"
+    ],
+    "attribution": "commit 'Limit untrusted ExpandoObject maps for CWE-407'",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/Formatters/ExpandoObjectFormatter.cs": [
+        10,
+        11,
+        25,
+        26,
+        51,
+        52
+      ],
+      "src/MessagePack/Resolvers/ExpandoObjectResolver.cs": [
+        42,
+        43
+      ]
+    },
+    "n_vulnerable_lines": 8
+  },
+  {
+    "id": "GHSA-382j-8mxh-c7x2",
+    "aliases": [
+      "CVE-2026-48502"
+    ],
+    "summary": "MessagePack-CSharp: Denial of service vulnerabilities can swamp the CPU or crash the process with stack and heap overflows",
+    "cwes": [
+      "CWE-1188",
+      "CWE-125",
+      "CWE-190",
+      "CWE-407",
+      "CWE-409",
+      "CWE-470",
+      "CWE-502",
+      "CWE-674",
+      "CWE-789"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "26d4e743",
+      "46c6a0fe"
+    ],
+    "attribution": "advisory text = ReadDateTime stackalloc -> 'Reject invalid DateTime ext lengths for CWE-789'; plus 'Fix CWE-190 map header length overflow' (CWE-190 listed only in this advisory)",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/MessagePackPrimitives.Readers.cs": [
+        344,
+        345
+      ],
+      "src/MessagePack/MessagePackReader.cs": [
+        374
+      ]
+    },
+    "n_vulnerable_lines": 3
+  },
+  {
+    "id": "GHSA-4qm4-8hg2-g2xm",
+    "aliases": [
+      "CVE-2024-48924"
+    ],
+    "summary": "MessagePack allows untrusted data to lead to DoS attack due to hash collisions and stack overflow",
+    "cwes": [
+      "CWE-328"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.187"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "2.6.95-alpha"
+          },
+          {
+            "fixed": "3.0.214-rc.1"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.187",
+      "3.0.214-rc.1"
+    ],
+    "fix_commits": [
+      "8e599af0"
+    ],
+    "attribution": "merge 'secureHash_v3' (Use a collision-resistant hash algorithm), first v3 release 3.0.214-rc.1",
+    "vulnerable_snapshot": "9be35840b831fae041e6cf8acc864ec34e4b7d50",
+    "snapshot_describe": "v3.0.208-rc.1-4-g9be35840",
+    "vulnerable_lines": {
+      "src/MessagePack/MessagePackSecurity.cs": [
+        8,
+        9,
+        10,
+        33,
+        34,
+        140,
+        141,
+        148,
+        149,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        161,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174,
+        175,
+        176,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        196,
+        235,
+        236,
+        240,
+        242,
+        243,
+        250,
+        254,
+        307,
+        309,
+        310,
+        311,
+        312,
+        313,
+        314,
+        315,
+        316,
+        317,
+        318,
+        319,
+        320,
+        321,
+        322,
+        323,
+        326,
+        327,
+        328,
+        330,
+        331,
+        332,
+        333,
+        334,
+        335,
+        336,
+        337,
+        338,
+        339,
+        340,
+        341,
+        344,
+        346,
+        349,
+        350,
+        351,
+        353,
+        354,
+        356,
+        357,
+        358,
+        359,
+        360,
+        362,
+        363,
+        364,
+        367,
+        369,
+        370,
+        371,
+        372,
+        373,
+        374,
+        375,
+        376,
+        377,
+        378,
+        380,
+        381,
+        386,
+        390,
+        391,
+        392,
+        393,
+        394,
+        395,
+        396,
+        397,
+        398,
+        399,
+        400,
+        401,
+        405,
+        407,
+        409,
+        410,
+        412,
+        413,
+        414,
+        416
+      ]
+    },
+    "n_vulnerable_lines": 135
+  },
+  {
+    "id": "GHSA-7q36-4xx7-xcxf",
+    "aliases": [
+      "CVE-2020-5234"
+    ],
+    "summary": "Untrusted data can lead to DoS attack due to hash collisions and stack overflow in MessagePack",
+    "cwes": [
+      "CWE-121"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "1.9.11"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "2.0.0"
+          },
+          {
+            "fixed": "2.1.90"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack.ImmutableCollection",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "1.9.11"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack.ImmutableCollection",
+        "events": [
+          {
+            "introduced": "2.0.0"
+          },
+          {
+            "fixed": "2.1.90"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack.ReactiveProperty",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "1.9.11"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack.ReactiveProperty",
+        "events": [
+          {
+            "introduced": "2.0.0"
+          },
+          {
+            "fixed": "2.1.90"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack.UnityShims",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "1.9.11"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack.UnityShims",
+        "events": [
+          {
+            "introduced": "2.0.0"
+          },
+          {
+            "fixed": "2.1.90"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack.Unity",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "1.9.11"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack.Unity",
+        "events": [
+          {
+            "introduced": "2.0.0"
+          },
+          {
+            "fixed": "2.1.90"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "1.9.11",
+      "2.1.90"
+    ],
+    "fix_commits": [
+      "56fa8621"
+    ],
+    "attribution": "OSV reference commit 'Merge security fixes in for v2.1' (v2.1.90)",
+    "vulnerable_snapshot": "7e5558fddb9b44e9889e224549d3b85df412dfe1",
+    "snapshot_describe": "v2.0.335-113-g7e5558fd",
+    "vulnerable_lines": {
+      "src/MessagePack.GeneratorCore/Generator/FormatterTemplate.cs": [
+        3,
+        4,
+        6,
+        7,
+        139,
+        140,
+        194
+      ],
+      "src/MessagePack.GeneratorCore/Generator/UnionTemplate.cs": [
+        3,
+        4,
+        6,
+        7,
+        115,
+        116,
+        117,
+        130
+      ],
+      "src/MessagePack.ImmutableCollection/Formatters.cs": [
+        48,
+        50,
+        95,
+        118,
+        243,
+        261
+      ],
+      "src/MessagePack.ReactiveProperty/Formatters.cs": [
+        150,
+        152,
+        189,
+        191,
+        192,
+        193,
+        194,
+        195,
+        196,
+        233,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        342,
+        344,
+        346
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/CollectionFormatter.cs": [
+        52,
+        54,
+        55,
+        163,
+        165,
+        166,
+        256,
+        258,
+        259,
+        429,
+        580,
+        581,
+        582,
+        711,
+        713,
+        714,
+        759,
+        761,
+        762,
+        802,
+        803,
+        805,
+        806,
+        807,
+        808,
+        853,
+        854,
+        856,
+        857,
+        858,
+        859,
+        947
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/DictionaryFormatter.cs": [
+        7,
+        8,
+        86,
+        88,
+        89,
+        91,
+        93,
+        145,
+        164,
+        177,
+        236,
+        254,
+        268
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/MultiDimensionalArrayFormatter.cs": [
+        69,
+        71,
+        72,
+        74,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        148,
+        150,
+        151,
+        153,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        236,
+        238,
+        239,
+        240,
+        241,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        250,
+        251,
+        252,
+        254,
+        255,
+        256,
+        257,
+        258,
+        259,
+        260,
+        261,
+        262
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/PrimitiveObjectFormatter.cs": [
+        16,
+        17,
+        286,
+        288,
+        299,
+        300,
+        302,
+        304,
+        306
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/StandardClassLibraryFormatter.cs": [
+        371,
+        372,
+        373,
+        576,
+        577,
+        578,
+        579
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackReader.cs": [
+        40,
+        41,
+        49,
+        50,
+        56,
+        57,
+        112,
+        113
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs": [
+        101,
+        105,
+        111,
+        268,
+        308,
+        309,
+        311,
+        312,
+        313,
+        315,
+        316,
+        317,
+        319,
+        326,
+        327,
+        329,
+        331,
+        332,
+        334,
+        336,
+        338,
+        339,
+        340,
+        342,
+        344,
+        345,
+        346,
+        347,
+        348,
+        351,
+        352,
+        353,
+        354,
+        356,
+        357,
+        378,
+        389
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializerOptions.cs": [
+        61,
+        62,
+        106,
+        107,
+        231,
+        232
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Resolvers/DynamicObjectResolver.cs": [
+        852,
+        872,
+        873,
+        942,
+        978,
+        1034,
+        1079,
+        1080,
+        1228,
+        1229
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ForceSizePrimitiveFormatter.cs": [
+        100,
+        102,
+        196,
+        198,
+        292,
+        294,
+        388,
+        390,
+        484,
+        486,
+        580,
+        582,
+        728,
+        730
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs": [
+        46,
+        48,
+        86,
+        87,
+        89,
+        128,
+        129,
+        130,
+        132,
+        172,
+        173,
+        174,
+        175,
+        177,
+        218,
+        219,
+        220,
+        221,
+        222,
+        224,
+        266,
+        267,
+        268,
+        269,
+        270,
+        271,
+        272,
+        273,
+        316,
+        317,
+        318,
+        319,
+        320,
+        321,
+        322,
+        323,
+        324,
+        368,
+        369,
+        370,
+        371,
+        372,
+        373,
+        374,
+        375,
+        376,
+        377
+      ],
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs": [
+        39,
+        41,
+        72,
+        73,
+        75,
+        107,
+        108,
+        109,
+        111,
+        144,
+        145,
+        146,
+        147,
+        149,
+        183,
+        184,
+        185,
+        186,
+        187,
+        189,
+        224,
+        225,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        267,
+        268,
+        269,
+        270,
+        271,
+        272,
+        273,
+        274,
+        275,
+        313,
+        314,
+        315,
+        316,
+        317,
+        318,
+        319,
+        320,
+        321,
+        322
+      ],
+      "src/MessagePack/Formatters/ForceSizePrimitiveFormatter.cs": [
+        100,
+        102,
+        196,
+        198,
+        292,
+        294,
+        388,
+        390,
+        484,
+        486,
+        580,
+        582,
+        728,
+        730
+      ],
+      "src/MessagePack/Formatters/TupleFormatter.cs": [
+        46,
+        48,
+        86,
+        87,
+        89,
+        128,
+        129,
+        130,
+        132,
+        172,
+        173,
+        174,
+        175,
+        177,
+        218,
+        219,
+        220,
+        221,
+        222,
+        224,
+        266,
+        267,
+        268,
+        269,
+        270,
+        271,
+        272,
+        273,
+        316,
+        317,
+        318,
+        319,
+        320,
+        321,
+        322,
+        323,
+        324,
+        368,
+        369,
+        370,
+        371,
+        372,
+        373,
+        374,
+        375,
+        376,
+        377
+      ],
+      "src/MessagePack/Formatters/ValueTupleFormatter.cs": [
+        39,
+        41,
+        72,
+        73,
+        75,
+        107,
+        108,
+        109,
+        111,
+        144,
+        145,
+        146,
+        147,
+        149,
+        183,
+        184,
+        185,
+        186,
+        187,
+        189,
+        224,
+        225,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        267,
+        268,
+        269,
+        270,
+        271,
+        272,
+        273,
+        274,
+        275,
+        313,
+        314,
+        315,
+        316,
+        317,
+        318,
+        319,
+        320,
+        321,
+        322
+      ]
+    },
+    "n_vulnerable_lines": 430
+  },
+  {
+    "id": "GHSA-cj9g-3mj2-g8vv",
+    "aliases": [
+      "CVE-2026-48512"
+    ],
+    "summary": "MessagePack-CSharp: JSON conversion APIs can recurse without consistent depth enforcement",
+    "cwes": [
+      "CWE-674"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "b3af7cf7",
+      "66ad0894",
+      "082ba7da"
+    ],
+    "attribution": "commits 'Guard JSON conversion depth', 'Avoid JSON separator recursion', 'Guard typeless JSON depth' (CWE-674)",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/Internal/TinyJsonReader.cs": [
+        140,
+        141,
+        142,
+        143,
+        145,
+        146,
+        147,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174,
+        175,
+        176,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195
+      ],
+      "src/MessagePack/MessagePackSerializer.Json.cs": [
+        189,
+        190,
+        198,
+        199,
+        203,
+        215,
+        216,
+        220,
+        275,
+        276,
+        398,
+        399,
+        400,
+        401,
+        402,
+        403,
+        404,
+        406,
+        407,
+        408,
+        410,
+        411,
+        413,
+        415,
+        416,
+        417,
+        418,
+        419,
+        421,
+        422,
+        423,
+        424,
+        426,
+        427,
+        428,
+        429,
+        431,
+        433,
+        435,
+        437
+      ]
+    },
+    "n_vulnerable_lines": 93
+  },
+  {
+    "id": "GHSA-cxmj-83gh-fp49",
+    "aliases": [
+      "CVE-2026-48515"
+    ],
+    "summary": "MessagePack-CSharp: Multi-dimensional array formatters allocate from unchecked dimensions",
+    "cwes": [
+      "CWE-770"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "9b5783a7"
+    ],
+    "attribution": "commit 'Fix CWE-789 multidimensional array allocation validation'",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/Formatters/MultiDimensionalArrayFormatter.cs": [
+        5,
+        6,
+        7,
+        66,
+        67,
+        153,
+        154,
+        250,
+        251,
+        297,
+        298
+      ]
+    },
+    "n_vulnerable_lines": 11
+  },
+  {
+    "id": "GHSA-hv8m-jj95-wg3x",
+    "aliases": [
+      "CVE-2026-48109"
+    ],
+    "summary": " MessagePack's LZ4 decompression may fail with AccessViolationException after dereferencing memory from bad input",
+    "cwes": [
+      "CWE-20"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0.214-rc.1"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "719e690a"
+    ],
+    "attribution": "commit 'Bound LZ4 input reads for CWE-125' (advisory: LZ4 out-of-bounds reads)",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/LZ4/LZ4Codec.Unsafe.cs": [
+        102,
+        106
+      ],
+      "src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs": [
+        602,
+        603,
+        611,
+        612,
+        629,
+        630,
+        634,
+        636,
+        637,
+        639,
+        651,
+        652,
+        656,
+        657,
+        670,
+        671,
+        681,
+        683,
+        684,
+        686
+      ],
+      "src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs": [
+        614,
+        615,
+        624,
+        625,
+        642,
+        643,
+        647,
+        649,
+        650,
+        652,
+        664,
+        665,
+        669,
+        670,
+        680,
+        681,
+        691,
+        693,
+        694,
+        696
+      ]
+    },
+    "n_vulnerable_lines": 42
+  },
+  {
+    "id": "GHSA-q2h6-ghwm-5qm8",
+    "aliases": [
+      "CVE-2026-48516"
+    ],
+    "summary": "MessagePack-CSharp: InterfaceLookupFormatter bypasses collision-resistant comparer settings",
+    "cwes": [
+      "CWE-407"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "f96fcf05"
+    ],
+    "attribution": "commit 'Use secure lookup comparer for CWE-407' (InterfaceLookupFormatter)",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/Formatters/CollectionFormatter.cs": [
+        931
+      ]
+    },
+    "n_vulnerable_lines": 1
+  },
+  {
+    "id": "GHSA-qhmf-xw27-6rqr",
+    "aliases": [
+      "CVE-2026-48517"
+    ],
+    "summary": "MessagePack-CSharp: Typeless deserialization type restrictions do not recurse into arrays or generic arguments",
+    "cwes": [
+      "CWE-470",
+      "CWE-502"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "f093bdc1",
+      "fb0fe9f0"
+    ],
+    "attribution": "commits 'Reject nested typeless blocklist bypass for CWE-502', 'Honor TypeFormatter options hooks for CWE-470'",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/Formatters/StandardClassLibraryFormatter.cs": [
+        840,
+        841,
+        842
+      ],
+      "src/MessagePack/MessagePackSerializerOptions.cs": [
+        177,
+        178,
+        180,
+        181,
+        182,
+        185,
+        187,
+        364,
+        365
+      ]
+    },
+    "n_vulnerable_lines": 12
+  },
+  {
+    "id": "GHSA-qhrr-8q5h-9q3h",
+    "aliases": [
+      "CVE-2026-92707"
+    ],
+    "summary": "MessagePack: Nested arrays can blow past buffer length limits",
+    "cwes": [
+      "CWE-1325"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.303"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0.0"
+          },
+          {
+            "fixed": "3.1.9"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.303",
+      "3.1.9"
+    ],
+    "fix_commits": [
+      "95b63fca"
+    ],
+    "attribution": "OSV reference commit 'Merge v2 nested container allocation fix' (v3.1.9)",
+    "vulnerable_snapshot": "14aabf68ae9dc021e2e32061685c43700132028f",
+    "snapshot_describe": "v3.1.8-34-g14aabf68",
+    "vulnerable_lines": {
+      "src/MessagePack/MessagePackReader.cs": [
+        33,
+        34,
+        356,
+        433,
+        1004,
+        1005
+      ]
+    },
+    "n_vulnerable_lines": 6
+  },
+  {
+    "id": "GHSA-v72x-2h86-7f8m",
+    "aliases": [
+      "CVE-2026-48510"
+    ],
+    "summary": "MessagePack-CSharp: LZ4 decompression allocates from unbounded declared output lengths",
+    "cwes": [
+      "CWE-409",
+      "CWE-770"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "2b5a500a"
+    ],
+    "attribution": "commit 'Guard LZ4 decompression length for CWE-409'",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/MessagePackSecurity.cs": [
+        21,
+        22,
+        29,
+        30,
+        38,
+        39,
+        64,
+        65,
+        88,
+        89,
+        103,
+        104
+      ],
+      "src/MessagePack/MessagePackSerializer.Json.cs": [
+        95
+      ],
+      "src/MessagePack/MessagePackSerializer.cs": [
+        236,
+        484,
+        505,
+        506,
+        531,
+        532,
+        540,
+        541,
+        560,
+        561
+      ]
+    },
+    "n_vulnerable_lines": 23
+  },
+  {
+    "id": "GHSA-vh6j-jc39-fggf",
+    "aliases": [
+      "CVE-2026-48506"
+    ],
+    "summary": "MessagePack-CSharp: MessagePackReader.Skip can recurse without enforcing maximum object graph depth",
+    "cwes": [
+      "CWE-674"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "b9cb6050"
+    ],
+    "attribution": "commit 'Use iteration for skipping msgpack structures for CWE-674' (Skip recursion)",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/MessagePackReader.cs": [
+        156,
+        158,
+        159,
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174,
+        175,
+        176,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202,
+        203,
+        204,
+        205,
+        206,
+        207,
+        208,
+        209,
+        210,
+        211,
+        212,
+        213,
+        214,
+        1102,
+        1103,
+        1104,
+        1105,
+        1106,
+        1107,
+        1108,
+        1109,
+        1110,
+        1111,
+        1112,
+        1113,
+        1114,
+        1115,
+        1116,
+        1117
+      ]
+    },
+    "n_vulnerable_lines": 73
+  },
+  {
+    "id": "GHSA-w567-gjr2-hm5j",
+    "aliases": [
+      "CVE-2026-48514"
+    ],
+    "summary": "MessagePack-CSharp: Unity unsafe blit formatter allocates from unbounded byte length",
+    "cwes": [
+      "CWE-770"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "0555f07c"
+    ],
+    "attribution": "commit 'Validate Unity blit lengths for CWE-789' (advisory CWE-770)",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnsafeBlitFormatter.cs": [
+        58,
+        59,
+        64,
+        65,
+        70
+      ]
+    },
+    "n_vulnerable_lines": 5
+  },
+  {
+    "id": "GHSA-wfr3-xj75-pfwh",
+    "aliases": [
+      "CVE-2026-48513"
+    ],
+    "summary": "MessagePack-CSharp: DynamicUnionResolver-generated deserializers miss depth enforcement",
+    "cwes": [
+      "CWE-674"
+    ],
+    "affected": [
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "0"
+          },
+          {
+            "fixed": "2.5.301"
+          }
+        ]
+      },
+      {
+        "package": "MessagePack",
+        "events": [
+          {
+            "introduced": "3.0"
+          },
+          {
+            "fixed": "3.1.7"
+          }
+        ]
+      }
+    ],
+    "fixed_versions": [
+      "2.5.301",
+      "3.1.7"
+    ],
+    "fix_commits": [
+      "b414e6df"
+    ],
+    "attribution": "commit 'Guard dynamic union depth for CWE-674'",
+    "vulnerable_snapshot": "06ea24954efa0fe6f1cac5d87046f9b54dac2dcc",
+    "snapshot_describe": "v3.1.4-20-g06ea2495",
+    "vulnerable_lines": {
+      "src/MessagePack/Resolvers/DynamicUnionResolver.cs": [
+        323,
+        324,
+        332,
+        398,
+        399,
+        422,
+        423
+      ]
+    },
+    "n_vulnerable_lines": 7
+  }
+]

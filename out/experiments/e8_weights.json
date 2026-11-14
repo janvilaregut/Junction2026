@@ -1,0 +1,131 @@
+{
+ "repos": [
+  "AArnott_Nerdbank.MessagePack",
+  "App-vNext_Polly",
+  "Cysharp_MemoryPack",
+  "DapperLib_Dapper",
+  "FluentValidation_FluentValidation",
+  "Humanizr_Humanizer",
+  "JamesNK_Newtonsoft.Json",
+  "JoshClose_CsvHelper",
+  "StackExchange_StackExchange.Redis",
+  "autofac_Autofac",
+  "bchavez_Bogus",
+  "devlooped_moq",
+  "dotnet_BenchmarkDotNet",
+  "dotnet_command-line-api",
+  "messagepack-csharp",
+  "microsoft_vs-streamjsonrpc",
+  "microsoft_vs-threading",
+  "morelinq_MoreLINQ",
+  "nodatime_nodatime",
+  "npgsql_npgsql",
+  "nunit_nunit",
+  "protobuf-net_protobuf-net",
+  "restsharp_RestSharp",
+  "serilog_serilog",
+  "spectreconsole_spectre.console",
+  "xunit_xunit"
+ ],
+ "dims": [
+  "security",
+  "reliability",
+  "maintainability",
+  "consistency"
+ ],
+ "weights_renormalised": [
+  0.37499999999999994,
+  0.3125,
+  0.18749999999999997,
+  0.125
+ ],
+ "dimension_std": [
+  14.037971013558717,
+  13.069758784099887,
+  8.057321452820585,
+  2.4609734928569185
+ ],
+ "dimension_mean": [
+  92.01923076923079,
+  84.64230769230768,
+  78.17307692307693,
+  94.92307692307692
+ ],
+ "effective_weight_share_of_variance": {
+  "security": 0.5622916622036508,
+  "reliability": 0.36786675245151906,
+  "maintainability": 0.05631503195142407,
+  "consistency": 0.013526553393406018
+ },
+ "stated_weight": {
+  "security": 0.37499999999999994,
+  "reliability": 0.3125,
+  "maintainability": 0.18749999999999997,
+  "consistency": 0.125
+ },
+ "stability_uniform": {
+  "kendall_tau_median": 0.7230769230769231,
+  "kendall_tau_p05": 0.556923076923077,
+  "mean_rank_shift": 2.6381846153846156,
+  "top5_probability": {
+   "AArnott_Nerdbank.MessagePack": 0.8188,
+   "App-vNext_Polly": 0.1794,
+   "Cysharp_MemoryPack": 0.0336,
+   "FluentValidation_FluentValidation": 0.424,
+   "Humanizr_Humanizer": 0.1918,
+   "JamesNK_Newtonsoft.Json": 0.0066,
+   "autofac_Autofac": 0.6318,
+   "devlooped_moq": 0.9956,
+   "messagepack-csharp": 0.109,
+   "microsoft_vs-streamjsonrpc": 0.4472,
+   "morelinq_MoreLINQ": 0.5056,
+   "restsharp_RestSharp": 0.0248,
+   "serilog_serilog": 0.1716,
+   "spectreconsole_spectre.console": 0.4602
+  }
+ },
+ "stability_ordered": {
+  "kendall_tau_median": 0.9076923076923077,
+  "kendall_tau_p05": 0.7661538461538462,
+  "mean_rank_shift": 1.0519846153846155,
+  "top5_probability": {
+   "AArnott_Nerdbank.MessagePack": 1.0,
+   "Cysharp_MemoryPack": 0.0502,
+   "FluentValidation_FluentValidation": 0.5588,
+   "autofac_Autofac": 0.7642,
+   "devlooped_moq": 1.0,
+   "messagepack-csharp": 0.3728,
+   "morelinq_MoreLINQ": 0.9994,
+   "restsharp_RestSharp": 0.2536,
+   "spectreconsole_spectre.console": 0.001
+  }
+ },
+ "stability_concentrated": {
+  "kendall_tau_median": 0.9384615384615386,
+  "kendall_tau_p05": 0.8092307692307692,
+  "mean_rank_shift": 0.8455846153846154,
+  "top5_probability": {
+   "AArnott_Nerdbank.MessagePack": 1.0,
+   "FluentValidation_FluentValidation": 0.8942,
+   "autofac_Autofac": 0.713,
+   "devlooped_moq": 1.0,
+   "messagepack-csharp": 0.1246,
+   "microsoft_vs-streamjsonrpc": 0.1702,
+   "morelinq_MoreLINQ": 1.0,
+   "restsharp_RestSharp": 0.06,
+   "serilog_serilog": 0.0002,
+   "spectreconsole_spectre.console": 0.0378
+  }
+ },
+ "arith_vs_geom_kendall": 0.9692307692307693,
+ "compensation_cases": [],
+ "closed_form": {
+  "S_needed_for_Q95_if_rest_perfect": 83.33333333333333,
+  "Q_if_S_zero_rest_perfect": 70.0,
+  "exchange_rate_S_to_C": 2.9999999999999996,
+  "note": "weighted arithmetic mean is fully compensatory: 1 point of S always buys 3 points of C",
+  "Q_with_one_critical_if_penalty_25": 92.5,
+  "Q_with_one_critical_if_penalty_50": 85.0,
+  "Q_with_one_critical_if_penalty_100": 70.0
+ }
+}

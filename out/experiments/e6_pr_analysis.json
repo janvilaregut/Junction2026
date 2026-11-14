@@ -1,0 +1,1280 @@
+{
+ "prs": {
+  "2129": {
+   "added_code_lines": 321,
+   "added_lines_all": 845,
+   "introduced_findings": [
+    {
+     "rule": "kiss.complexity",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 35,
+     "severity": 0.4666666666666667,
+     "message": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect: cyclomatic 17 exceed thresholds"
+    },
+    {
+     "rule": "size.unit_length",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 35,
+     "severity": 1.0,
+     "message": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect: 83 SLOC"
+    },
+    {
+     "rule": "size.parameters",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 35,
+     "severity": 1.0,
+     "message": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect: 7 parameters"
+    },
+    {
+     "rule": "kiss.complexity",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 147,
+     "severity": 0.4666666666666667,
+     "message": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers: cyclomatic 17, cognitive 16 exceed thresholds"
+    },
+    {
+     "rule": "size.unit_length",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 147,
+     "severity": 1.0,
+     "message": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers: 60 SLOC"
+    },
+    {
+     "rule": "size.parameters",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 147,
+     "severity": 0.8,
+     "message": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers: 6 parameters"
+    },
+    {
+     "rule": "size.unit_length",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 215,
+     "severity": 0.26666666666666666,
+     "message": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateMember: 27 SLOC"
+    },
+    {
+     "rule": "size.parameters",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 215,
+     "severity": 0.2,
+     "message": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateMember: 3 parameters"
+    },
+    {
+     "rule": "size.unit_length",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 249,
+     "severity": 0.2,
+     "message": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers: 24 SLOC"
+    },
+    {
+     "rule": "kiss.complexity",
+     "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+     "line": 15,
+     "severity": 0.6666666666666666,
+     "message": "MessagePack.SourceGenerator.MessagePackGenerator.Initialize: cyclomatic 13, cognitive 25 exceed thresholds"
+    },
+    {
+     "rule": "dry.type2",
+     "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     "line": 47,
+     "severity": 0.7,
+     "message": "Type-2 clone (renamed identifiers/literals) (1468 tokens, 1 instances); also at same region"
+    },
+    {
+     "rule": "naming.abbreviation",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 54,
+     "severity": 0.25,
+     "message": "'formatterInterfaces' contains non-dictionary token(s) ['interfaces'] (likely abbreviation)"
+    },
+    {
+     "rule": "naming.abbreviation",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 133,
+     "severity": 0.25,
+     "message": "'targets' contains non-dictionary token(s) ['targets'] (likely abbreviation)"
+    },
+    {
+     "rule": "naming.abbreviation",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+     "line": 157,
+     "severity": 0.25,
+     "message": "'claimedKeys' contains non-dictionary token(s) ['claimed'] (likely abbreviation)"
+    },
+    {
+     "rule": "docs.missing_xml_doc",
+     "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     "line": 32,
+     "severity": 1.0,
+     "message": "public field MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustBePartialId has no XML documentation (CS1591)"
+    },
+    {
+     "rule": "docs.missing_xml_doc",
+     "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     "line": 33,
+     "severity": 1.0,
+     "message": "public field MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustImplementFormatterId has no XML documentation (CS1591)"
+    },
+    {
+     "rule": "docs.missing_xml_doc",
+     "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     "line": 34,
+     "severity": 1.0,
+     "message": "public field MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterDataTypeNotSupportedId has no XML documentation (CS1591)"
+    },
+    {
+     "rule": "docs.missing_xml_doc",
+     "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     "line": 35,
+     "severity": 1.0,
+     "message": "public field MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.SurrogateMemberNotFoundId has no XML documentation (CS1591)"
+    },
+    {
+     "rule": "docs.missing_xml_doc",
+     "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     "line": 318,
+     "severity": 1.0,
+     "message": "public field MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustBePartial has no XML documentation (CS1591)"
+    },
+    {
+     "rule": "docs.missing_xml_doc",
+     "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     "line": 327,
+     "severity": 1.0,
+     "message": "public field MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustImplementFormatter has no XML documentation (CS1591)"
+    },
+    {
+     "rule": "docs.missing_xml_doc",
+     "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     "line": 336,
+     "severity": 1.0,
+     "message": "public field MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterDataTypeNotSupported has no XML documentation (CS1591)"
+    },
+    {
+     "rule": "docs.missing_xml_doc",
+     "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+     "line": 345,
+     "severity": 1.0,
+     "message": "public field MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.SurrogateMemberNotFound has no XML documentation (CS1591)"
+    }
+   ],
+   "introduced_by_rule": {
+    "kiss.complexity": 3,
+    "size.unit_length": 4,
+    "size.parameters": 3,
+    "dry.type2": 1,
+    "naming.abbreviation": 3,
+    "docs.missing_xml_doc": 8
+   },
+   "new_code_compliance": {
+    "simple_units": {
+     "compliance": 0.6376237623762377,
+     "entities": 11
+    },
+    "small_units": {
+     "compliance": 0.2629812981298131,
+     "entities": 11
+    },
+    "small_interfaces": {
+     "compliance": 0.3937777777777778,
+     "entities": 8
+    },
+    "dry": {
+     "compliance": 0.9302180685358256,
+     "entities": 321
+    },
+    "coupling": {
+     "compliance": 0.9877416313059877,
+     "entities": 8
+    },
+    "cohesion": {
+     "compliance": 1.0,
+     "entities": 2
+    },
+    "encapsulation": {
+     "compliance": 1.0,
+     "entities": 5
+    },
+    "naming": {
+     "compliance": 0.9910714285714286,
+     "entities": 84
+    },
+    "magic_numbers": {
+     "compliance": 1.0,
+     "entities": 321
+    },
+    "dead_code": {
+     "compliance": 1.0,
+     "entities": 321
+    },
+    "documentation": {
+     "compliance": 0.33333333333333337,
+     "entities": 12
+    },
+    "consistency": {
+     "compliance": 0.8311810399097248,
+     "entities": 1048
+    }
+   },
+   "new_dup_lines": 32,
+   "impact": {
+    "changed_units": [
+     "MessagePack.SourceGenerator.CodeAnalysis.ObjectSerializationInfo.Equals",
+     "MessagePack.SourceGenerator.GeneratorUtilities.GetAnalyzerOption",
+     "MessagePack.SourceGenerator.MessagePackGenerator.Initialize"
+    ],
+    "new_units": [
+     "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+     "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateContractlessMembers",
+     "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+     "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateMember",
+     "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+     "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.IsPublicReadWrite",
+     "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetMemberType",
+     "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.IsPartial"
+    ],
+    "removed_units": [],
+    "public_api_added": [
+     [
+      "class",
+      "MessagePack.GeneratedMessagePackFormatterAttribute"
+     ],
+     [
+      "field",
+      "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterDataTypeNotSupported"
+     ],
+     [
+      "field",
+      "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterDataTypeNotSupportedId"
+     ],
+     [
+      "field",
+      "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustBePartial"
+     ],
+     [
+      "field",
+      "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustBePartialId"
+     ],
+     [
+      "field",
+      "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustImplementFormatter"
+     ],
+     [
+      "field",
+      "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustImplementFormatterId"
+     ],
+     [
+      "field",
+      "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.SurrogateMemberNotFound"
+     ],
+     [
+      "field",
+      "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.SurrogateMemberNotFoundId"
+     ],
+     [
+      "property",
+      "MessagePack.GeneratedMessagePackFormatterAttribute.SurrogateType"
+     ],
+     [
+      "property",
+      "MessagePack.SourceGenerator.CodeAnalysis.ObjectSerializationInfo.IsUserDeclaredFormatter"
+     ],
+     [
+      "record",
+      "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterRequest"
+     ]
+    ],
+    "public_api_removed": [],
+    "new_conditions": [
+     {
+      "unit": "MessagePack.SourceGenerator.MessagePackGenerator.Initialize",
+      "kind": "if_statement",
+      "line": 123
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.MessagePackGenerator.Initialize",
+      "kind": "foreach_statement",
+      "line": 70
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.MessagePackGenerator.Initialize",
+      "kind": "if_statement",
+      "line": 72
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.MessagePackGenerator.Initialize",
+      "kind": "foreach_statement",
+      "line": 65
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.MessagePackGenerator.Initialize",
+      "kind": "foreach_statement",
+      "line": 60
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "if_statement",
+      "line": 99
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "if_statement",
+      "line": 89
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "&&",
+      "line": 84
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "&&",
+      "line": 85
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "||",
+      "line": 85
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "if_statement",
+      "line": 77
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "&&",
+      "line": 77
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "&&",
+      "line": 77
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "if_statement",
+      "line": 64
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "||",
+      "line": 64
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "||",
+      "line": 64
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "or_pattern",
+      "line": 65
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "if_statement",
+      "line": 57
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "&&",
+      "line": 55
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "if_statement",
+      "line": 47
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.Collect",
+      "kind": "??",
+      "line": 44
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateContractlessMembers",
+      "kind": "for_statement",
+      "line": 135
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "??",
+      "line": 211
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "foreach_statement",
+      "line": 161
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "conditional_expression",
+      "line": 206
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "if_statement",
+      "line": 200
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "??",
+      "line": 202
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "if_statement",
+      "line": 190
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "??",
+      "line": 194
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "||",
+      "line": 190
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "||",
+      "line": 190
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "if_statement",
+      "line": 183
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "??",
+      "line": 185
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "if_statement",
+      "line": 171
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "??",
+      "line": 175
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "or_pattern",
+      "line": 171
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "conditional_expression",
+      "line": 170
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateSurrogateMembers",
+      "kind": "if_statement",
+      "line": 164
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateMember",
+      "kind": "arm",
+      "line": 223
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.CreateMember",
+      "kind": "arm",
+      "line": 222
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+      "kind": "for_statement",
+      "line": 253
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+      "kind": "foreach_statement",
+      "line": 255
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+      "kind": "if_statement",
+      "line": 267
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+      "kind": "if_statement",
+      "line": 262
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+      "kind": "if_statement",
+      "line": 257
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+      "kind": "||",
+      "line": 257
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+      "kind": "or_pattern",
+      "line": 257
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+      "kind": "||",
+      "line": 257
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetInstanceMembers",
+      "kind": "&&",
+      "line": 253
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.IsPublicReadWrite",
+      "kind": "arm",
+      "line": 282
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.IsPublicReadWrite",
+      "kind": "&&",
+      "line": 282
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.IsPublicReadWrite",
+      "kind": "&&",
+      "line": 282
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.IsPublicReadWrite",
+      "kind": "arm",
+      "line": 279
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.IsPublicReadWrite",
+      "kind": "&&",
+      "line": 279
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.IsPublicReadWrite",
+      "kind": "&&",
+      "line": 279
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetMemberType",
+      "kind": "arm",
+      "line": 289
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector.GetMemberType",
+      "kind": "arm",
+      "line": 288
+     }
+    ],
+    "changed_types": [
+     "MessagePack.SourceGenerator.CodeAnalysis.GeneratedFormatterCollector",
+     "MessagePack.SourceGenerator.CodeAnalysis.ObjectSerializationInfo",
+     "MessagePack.SourceGenerator.GeneratorUtilities",
+     "MessagePack.SourceGenerator.MessagePackGenerator"
+    ],
+    "impacted_depth1": 6,
+    "impacted_depth2": 7,
+    "impacted_all": 22,
+    "types_total": 469,
+    "tests_statically_reaching": 18,
+    "tests_reaching_new_in_pr": 0,
+    "reaching_examples": [
+     {
+      "file": "src/MessagePack.UnityClient/Assets/Scripts/Tests/IL2CPPTest.cs",
+      "direct": [
+       "Equals"
+      ],
+      "via": [],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.Experimental.Tests/UnsafeUnmanagedStruct/UnsafeUnmanagedStructTest.cs",
+      "direct": [
+       "Equals"
+      ],
+      "via": [],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.ExecutionTests/DeserializingConstructorStartsWithIdx1.cs",
+      "direct": [
+       "Equals"
+      ],
+      "via": [],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.ExecutionTests/NewPropertyInDerivedType.cs",
+      "direct": [
+       "Equals"
+      ],
+      "via": [],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.MapModeExecutionTests/ClassWithUseMapAndMembersOfVariousVisibility.cs",
+      "direct": [
+       "Equals"
+      ],
+      "via": [],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.MapModeExecutionTests/MapModeWithOverriddenKeyCollision.cs",
+      "direct": [
+       "Equals"
+      ],
+      "via": [],
+      "new_in_pr": false
+     }
+    ]
+   },
+   "evidence": {
+    "tests": 1602,
+    "failed": 0,
+    "patch_coverage": [
+     213,
+     278
+    ],
+    "patch_cov_wilson": [
+     71.30122499508725,
+     81.21056678291258
+    ],
+    "analyzer_new": 42
+   },
+   "gate_naive": {
+    "state": "FAIL",
+    "binding": [
+     "patch_coverage",
+     "new_duplication"
+    ],
+    "conditions": {
+     "failing_tests": "PASS",
+     "new_high_findings": "PASS",
+     "patch_coverage": "FAIL",
+     "new_duplication": "FAIL",
+     "analyzers_completed": "PASS"
+    }
+   },
+   "gate_statistical": {
+    "state": "FAIL",
+    "binding": [
+     "new_duplication"
+    ],
+    "conditions": {
+     "failing_tests": "PASS",
+     "new_high_findings": "PASS",
+     "patch_coverage": "INCOMPLETE",
+     "new_duplication": "FAIL",
+     "analyzers_completed": "PASS"
+    }
+   }
+  },
+  "2234": {
+   "added_code_lines": 18,
+   "added_lines_all": 248,
+   "introduced_findings": [],
+   "introduced_by_rule": {},
+   "new_code_compliance": {
+    "simple_units": {
+     "compliance": 0.0,
+     "entities": 1
+    },
+    "small_units": {
+     "compliance": 0.0,
+     "entities": 1
+    },
+    "dry": {
+     "compliance": 0.4444444444444444,
+     "entities": 18
+    },
+    "cohesion": {
+     "compliance": 1.0,
+     "entities": 1
+    },
+    "coupling": {
+     "compliance": 0.0,
+     "entities": 1
+    },
+    "magic_numbers": {
+     "compliance": 1.0,
+     "entities": 18
+    },
+    "dead_code": {
+     "compliance": 1.0,
+     "entities": 18
+    },
+    "consistency": {
+     "compliance": 1.0,
+     "entities": 62
+    }
+   },
+   "new_dup_lines": 10,
+   "impact": {
+    "changed_units": [
+     "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.GetObjectInfo"
+    ],
+    "new_units": [],
+    "removed_units": [],
+    "public_api_added": [],
+    "public_api_removed": [],
+    "new_conditions": [
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.GetObjectInfo",
+      "kind": "if_statement",
+      "line": 1179
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.GetObjectInfo",
+      "kind": "if_statement",
+      "line": 1163
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.GetObjectInfo",
+      "kind": "if_statement",
+      "line": 1039
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.GetObjectInfo",
+      "kind": "if_statement",
+      "line": 1023
+     }
+    ],
+    "changed_types": [
+     "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector"
+    ],
+    "impacted_depth1": 2,
+    "impacted_depth2": 6,
+    "impacted_all": 24,
+    "types_total": 466,
+    "tests_statically_reaching": 8,
+    "tests_reaching_new_in_pr": 0,
+    "reaching_examples": [
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/CodeAnalysis/FullModelTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.CodeAnalysis.AnalyzerOptions",
+       "MessagePack.SourceGenerator.CodeAnalysis.CustomFormatterRegisterInfo",
+       "MessagePack.SourceGenerator.CodeAnalysis.FullModel",
+       "MessagePack.SourceGenerator.CodeAnalysis.ObjectSerializationInfo"
+      ],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/CodeAnalysis/MemberSerializationInfoTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.CodeAnalysis.MemberSerializationInfo"
+      ],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/FormatterCodeFixProviderTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer"
+      ],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/ImplicitResolverForCustomFormattersTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer"
+      ],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/MsgPack00xAnalyzerTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.Analyzers.CodeFixes.MessagePackCodeFixProvider"
+      ],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/MsgPack011PartialTypeRequiredTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer"
+      ],
+      "new_in_pr": false
+     }
+    ]
+   },
+   "evidence": {
+    "tests": 1601,
+    "failed": 0,
+    "patch_coverage": [
+     13,
+     18
+    ],
+    "patch_cov_wilson": [
+     49.12734343970254,
+     87.500246620446
+    ],
+    "analyzer_new": 0
+   },
+   "gate_naive": {
+    "state": "FAIL",
+    "binding": [
+     "patch_coverage",
+     "new_duplication"
+    ],
+    "conditions": {
+     "failing_tests": "PASS",
+     "new_high_findings": "PASS",
+     "patch_coverage": "FAIL",
+     "new_duplication": "FAIL",
+     "analyzers_completed": "PASS"
+    }
+   },
+   "gate_statistical": {
+    "state": "FAIL",
+    "binding": [
+     "new_duplication"
+    ],
+    "conditions": {
+     "failing_tests": "PASS",
+     "new_high_findings": "PASS",
+     "patch_coverage": "INCOMPLETE",
+     "new_duplication": "FAIL",
+     "analyzers_completed": "PASS"
+    }
+   }
+  },
+  "2283": {
+   "added_code_lines": 11,
+   "added_lines_all": 215,
+   "introduced_findings": [
+    {
+     "rule": "naming.abbreviation",
+     "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+     "line": 1444,
+     "severity": 0.25,
+     "message": "'ReportIfLocatedInCompilation' contains non-dictionary token(s) ['located'] (likely abbreviation)"
+    }
+   ],
+   "introduced_by_rule": {
+    "naming.abbreviation": 1
+   },
+   "new_code_compliance": {
+    "simple_units": {
+     "compliance": 0.043520000000000114,
+     "entities": 4
+    },
+    "small_units": {
+     "compliance": 0.043520000000000114,
+     "entities": 4
+    },
+    "small_interfaces": {
+     "compliance": 1.0,
+     "entities": 2
+    },
+    "dry": {
+     "compliance": 0.9090909090909091,
+     "entities": 11
+    },
+    "cohesion": {
+     "compliance": 1.0,
+     "entities": 1
+    },
+    "coupling": {
+     "compliance": 0.0,
+     "entities": 1
+    },
+    "naming": {
+     "compliance": 0.95,
+     "entities": 5
+    },
+    "magic_numbers": {
+     "compliance": 1.0,
+     "entities": 11
+    },
+    "dead_code": {
+     "compliance": 1.0,
+     "entities": 11
+    },
+    "consistency": {
+     "compliance": 1.0,
+     "entities": 36
+    }
+   },
+   "new_dup_lines": 1,
+   "impact": {
+    "changed_units": [
+     "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.TypeCollector",
+     "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.GetObjectInfo"
+    ],
+    "new_units": [
+     "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.GetPropertyIdentifierLocation",
+     "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.ReportIfLocatedInCompilation"
+    ],
+    "removed_units": [],
+    "public_api_added": [],
+    "public_api_removed": [],
+    "new_conditions": [
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.TypeCollector",
+      "kind": "conditional_expression",
+      "line": 239
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.ReportIfLocatedInCompilation",
+      "kind": "if_statement",
+      "line": 1446
+     },
+     {
+      "unit": "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector.ReportIfLocatedInCompilation",
+      "kind": "&&",
+      "line": 1446
+     }
+    ],
+    "changed_types": [
+     "MessagePack.SourceGenerator.CodeAnalysis.TypeCollector"
+    ],
+    "impacted_depth1": 2,
+    "impacted_depth2": 6,
+    "impacted_all": 24,
+    "types_total": 466,
+    "tests_statically_reaching": 9,
+    "tests_reaching_new_in_pr": 1,
+    "reaching_examples": [
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/CodeAnalysis/FullModelTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.CodeAnalysis.AnalyzerOptions",
+       "MessagePack.SourceGenerator.CodeAnalysis.CustomFormatterRegisterInfo",
+       "MessagePack.SourceGenerator.CodeAnalysis.FullModel",
+       "MessagePack.SourceGenerator.CodeAnalysis.ObjectSerializationInfo"
+      ],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/CodeAnalysis/MemberSerializationInfoTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.CodeAnalysis.MemberSerializationInfo"
+      ],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/FormatterCodeFixProviderTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer"
+      ],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/GenericsFormatterTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.MessagePackGenerator"
+      ],
+      "new_in_pr": true
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/ImplicitResolverForCustomFormattersTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer"
+      ],
+      "new_in_pr": false
+     },
+     {
+      "file": "tests/MessagePack.SourceGenerator.Tests/MsgPack00xAnalyzerTests.cs",
+      "direct": [],
+      "via": [
+       "MessagePack.Analyzers.CodeFixes.MessagePackCodeFixProvider"
+      ],
+      "new_in_pr": false
+     }
+    ]
+   },
+   "evidence": {
+    "tests": 1592,
+    "failed": 0,
+    "patch_coverage": [
+     10,
+     10
+    ],
+    "patch_cov_wilson": [
+     72.24672001371107,
+     99.99999999999999
+    ],
+    "analyzer_new": 1
+   },
+   "gate_naive": {
+    "state": "FAIL",
+    "binding": [
+     "new_duplication"
+    ],
+    "conditions": {
+     "failing_tests": "PASS",
+     "new_high_findings": "PASS",
+     "patch_coverage": "PASS",
+     "new_duplication": "FAIL",
+     "analyzers_completed": "PASS"
+    }
+   },
+   "gate_statistical": {
+    "state": "INCOMPLETE",
+    "binding": [
+     "new_duplication"
+    ],
+    "conditions": {
+     "failing_tests": "PASS",
+     "new_high_findings": "PASS",
+     "patch_coverage": "PASS",
+     "new_duplication": "INCOMPLETE",
+     "analyzers_completed": "PASS"
+    }
+   }
+  },
+  "2297": {
+   "added_code_lines": 1,
+   "added_lines_all": 1353,
+   "introduced_findings": [],
+   "introduced_by_rule": {},
+   "new_code_compliance": {
+    "simple_units": {
+     "compliance": 0.6666666666666667,
+     "entities": 1
+    },
+    "small_units": {
+     "compliance": 0.24444444444444446,
+     "entities": 1
+    },
+    "dry": {
+     "compliance": 1.0,
+     "entities": 1
+    },
+    "coupling": {
+     "compliance": 1.0,
+     "entities": 1
+    },
+    "magic_numbers": {
+     "compliance": 1.0,
+     "entities": 1
+    },
+    "dead_code": {
+     "compliance": 1.0,
+     "entities": 1
+    },
+    "consistency": {
+     "compliance": 1.0,
+     "entities": 3
+    }
+   },
+   "new_dup_lines": 0,
+   "impact": {
+    "changed_units": [
+     "MessagePack.SourceGenerator.Transforms.TransformUtilities.EmitNestingTypesAndNamespaces"
+    ],
+    "new_units": [],
+    "removed_units": [],
+    "public_api_added": [],
+    "public_api_removed": [],
+    "new_conditions": [
+     {
+      "unit": "MessagePack.SourceGenerator.Transforms.TransformUtilities.EmitNestingTypesAndNamespaces",
+      "kind": "conditional_expression",
+      "line": 58
+     }
+    ],
+    "changed_types": [
+     "MessagePack.SourceGenerator.Transforms.TransformUtilities"
+    ],
+    "impacted_depth1": 0,
+    "impacted_depth2": 0,
+    "impacted_all": 0,
+    "types_total": 466,
+    "tests_statically_reaching": 0,
+    "tests_reaching_new_in_pr": 0,
+    "reaching_examples": []
+   },
+   "evidence": {
+    "tests": 1591,
+    "failed": 0,
+    "patch_coverage": [
+     14,
+     14
+    ],
+    "patch_cov_wilson": [
+     78.46891972623644,
+     100.0
+    ],
+    "analyzer_new": 0
+   },
+   "gate_naive": {
+    "state": "PASS",
+    "binding": [],
+    "conditions": {
+     "failing_tests": "PASS",
+     "new_high_findings": "PASS",
+     "patch_coverage": "PASS",
+     "new_duplication": "PASS",
+     "analyzers_completed": "PASS"
+    }
+   },
+   "gate_statistical": {
+    "state": "PASS",
+    "binding": [],
+    "conditions": {
+     "failing_tests": "PASS",
+     "new_high_findings": "PASS",
+     "patch_coverage": "PASS",
+     "new_duplication": "PASS",
+     "analyzers_completed": "PASS"
+    }
+   }
+  }
+ },
+ "scores": {
+  "base": {
+   "dimensions": {
+    "security": 100.0,
+    "reliability": 96.7,
+    "tests": 56.244104391573195,
+    "maintainability": 70.4,
+    "consistency": 92.6
+   },
+   "Q_team": 85.24382087831464,
+   "Q_geometric": 83.20875369775175,
+   "Q_roc_geometric": 87.50862058347516,
+   "practices": {
+    "dry": 71.7,
+    "simple_units": 75.3,
+    "small_units": 56.1,
+    "small_interfaces": 86.0,
+    "cohesion": 80.8,
+    "coupling": 80.5,
+    "dead_code": 99.8,
+    "magic_numbers": 96.3,
+    "encapsulation": 91.9,
+    "documentation": 20.1,
+    "naming": 92.6,
+    "consistency": 92.6,
+    "error_handling": 98.4
+   }
+  },
+  "2129": {
+   "dimensions": {
+    "security": 100.0,
+    "reliability": 96.8,
+    "tests": 56.3895137567053,
+    "maintainability": 70.4,
+    "consistency": 92.6
+   },
+   "Q_team": 85.29790275134106,
+   "Q_geometric": 83.27324848791136,
+   "Q_roc_geometric": 87.5672535227765,
+   "practices": {
+    "dry": 72.0,
+    "simple_units": 75.0,
+    "small_units": 55.7,
+    "small_interfaces": 85.5,
+    "cohesion": 80.8,
+    "coupling": 80.7,
+    "dead_code": 99.8,
+    "magic_numbers": 96.3,
+    "encapsulation": 92.0,
+    "documentation": 20.2,
+    "naming": 92.7,
+    "consistency": 92.5,
+    "error_handling": 98.4
+   }
+  },
+  "2234": {
+   "dimensions": {
+    "security": 100.0,
+    "reliability": 96.7,
+    "tests": 56.334031779291074,
+    "maintainability": 70.4,
+    "consistency": 92.6
+   },
+   "Q_team": 85.26180635585821,
+   "Q_geometric": 83.23534480423952,
+   "Q_roc_geometric": 87.53052591366685,
+   "practices": {
+    "dry": 71.7,
+    "simple_units": 75.3,
+    "small_units": 56.0,
+    "small_interfaces": 86.0,
+    "cohesion": 80.9,
+    "coupling": 80.4,
+    "dead_code": 99.8,
+    "magic_numbers": 96.3,
+    "encapsulation": 91.9,
+    "documentation": 20.1,
+    "naming": 92.6,
+    "consistency": 92.6,
+    "error_handling": 98.4
+   }
+  },
+  "2283": {
+   "dimensions": {
+    "security": 100.0,
+    "reliability": 96.7,
+    "tests": 56.435557107928744,
+    "maintainability": 70.4,
+    "consistency": 92.6
+   },
+   "Q_team": 85.28211142158575,
+   "Q_geometric": 83.26532458820361,
+   "Q_roc_geometric": 87.5552209641092,
+   "practices": {
+    "dry": 71.7,
+    "simple_units": 75.3,
+    "small_units": 56.1,
+    "small_interfaces": 86.0,
+    "cohesion": 80.9,
+    "coupling": 80.5,
+    "dead_code": 99.8,
+    "magic_numbers": 96.3,
+    "encapsulation": 91.9,
+    "documentation": 20.1,
+    "naming": 92.6,
+    "consistency": 92.6,
+    "error_handling": 98.4
+   }
+  },
+  "2297": {
+   "dimensions": {
+    "security": 100.0,
+    "reliability": 96.7,
+    "tests": 56.32837332774461,
+    "maintainability": 70.4,
+    "consistency": 92.6
+   },
+   "Q_team": 85.26067466554892,
+   "Q_geometric": 83.23367262820351,
+   "Q_roc_geometric": 87.52914844635069,
+   "practices": {
+    "dry": 71.7,
+    "simple_units": 75.3,
+    "small_units": 56.1,
+    "small_interfaces": 86.0,
+    "cohesion": 80.8,
+    "coupling": 80.5,
+    "dead_code": 99.8,
+    "magic_numbers": 96.3,
+    "encapsulation": 91.9,
+    "documentation": 20.1,
+    "naming": 92.6,
+    "consistency": 92.6,
+    "error_handling": 98.4
+   }
+  }
+ }
+}

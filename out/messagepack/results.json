@@ -1,0 +1,824 @@
+{
+ "scores": {
+  "practices": {
+   "dry": {
+    "name": "Write code once (DRY)",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.7173974489056385,
+     "lo": 0.6511283280501761,
+     "hi": 0.7765824580275937,
+     "files": 170,
+     "weight": 27596.0,
+     "violation_mass": 7798.700000000001
+    },
+    "tau": 0.9,
+    "verdict": "NOT CERTIFIED",
+    "score": 71.7
+   },
+   "simple_units": {
+    "name": "Keep units simple (KISS)",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.7534169619202655,
+     "lo": 0.6624383469828842,
+     "hi": 0.8374296152458534,
+     "files": 153,
+     "weight": 20886.0,
+     "violation_mass": 5150.133333333333
+    },
+    "tau": 0.9,
+    "verdict": "NOT CERTIFIED",
+    "score": 75.3
+   },
+   "small_units": {
+    "name": "Keep units small",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.5608488407971316,
+     "lo": 0.475133083800452,
+     "hi": 0.6440538779530357,
+     "files": 153,
+     "weight": 20886.0,
+     "violation_mass": 9172.11111111111
+    },
+    "tau": 0.9,
+    "verdict": "NOT CERTIFIED",
+    "score": 56.1
+   },
+   "small_interfaces": {
+    "name": "Keep unit interfaces small",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.8596859140093843,
+     "lo": 0.7874167795072206,
+     "hi": 0.917993226246241,
+     "files": 153,
+     "weight": 20886.0,
+     "violation_mass": 2930.6
+    },
+    "tau": 0.9,
+    "verdict": "INCONCLUSIVE",
+    "score": 86.0
+   },
+   "cohesion": {
+    "name": "Single responsibility / high cohesion",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.8082522938300094,
+     "lo": 0.6458279925931453,
+     "hi": 0.9174801721943158,
+     "files": 46,
+     "weight": 6067.0,
+     "violation_mass": 1163.3333333333333
+    },
+    "tau": 0.9,
+    "verdict": "INCONCLUSIVE",
+    "score": 80.8
+   },
+   "coupling": {
+    "name": "Loose coupling",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.8049545001841822,
+     "lo": 0.67394365686328,
+     "hi": 0.9174661943310055,
+     "files": 153,
+     "weight": 20942.0,
+     "violation_mass": 4084.642857142857
+    },
+    "tau": 0.9,
+    "verdict": "INCONCLUSIVE",
+    "score": 80.5
+   },
+   "dead_code": {
+    "name": "No dead code (YAGNI)",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.9982981496904081,
+     "lo": 0.9972667968128086,
+     "hi": 0.9992576220230034,
+     "files": 170,
+     "weight": 27617.0,
+     "violation_mass": 47.0
+    },
+    "tau": 0.9,
+    "verdict": "CERTIFIED",
+    "score": 99.8
+   },
+   "magic_numbers": {
+    "name": "No magic numbers",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.9628931729236121,
+     "lo": 0.9400138641331484,
+     "hi": 0.978691216848428,
+     "files": 170,
+     "weight": 27596.0,
+     "violation_mass": 1024.0
+    },
+    "tau": 0.9,
+    "verdict": "CERTIFIED",
+    "score": 96.3
+   },
+   "encapsulation": {
+    "name": "Encapsulation",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.9192708333333334,
+     "lo": 0.7978249712112059,
+     "hi": 1.0,
+     "files": 104,
+     "weight": 576.0,
+     "violation_mass": 46.5
+    },
+    "tau": 0.9,
+    "verdict": "INCONCLUSIVE",
+    "score": 91.9
+   },
+   "documentation": {
+    "name": "Document the public API",
+    "dimension": "maintainability",
+    "ci": {
+     "point": 0.20118694362017808,
+     "lo": 0.12163271751805223,
+     "hi": 0.31258534803945703,
+     "files": 126,
+     "weight": 1685.0,
+     "violation_mass": 1346.0
+    },
+    "tau": 0.9,
+    "verdict": "NOT CERTIFIED",
+    "score": 20.1
+   },
+   "naming": {
+    "name": "Meaningful, conventional names",
+    "dimension": "consistency",
+    "ci": {
+     "point": 0.9259431455897981,
+     "lo": 0.8826795926966663,
+     "hi": 0.9599955353482293,
+     "files": 162,
+     "weight": 7528.0,
+     "violation_mass": 557.5
+    },
+    "tau": 0.9,
+    "verdict": "INCONCLUSIVE",
+    "score": 92.6
+   },
+   "consistency": {
+    "name": "Consistent style",
+    "dimension": "consistency",
+    "ci": {
+     "point": 0.9259098675309313,
+     "lo": 0.9075993112858173,
+     "hi": 0.9402756268227421,
+     "files": 170,
+     "weight": 6.999999999999999,
+     "violation_mass": 0.5186309272834806
+    },
+    "tau": 0.9,
+    "verdict": "CERTIFIED",
+    "score": 92.6
+   },
+   "error_handling": {
+    "name": "Handle errors properly",
+    "dimension": "reliability",
+    "ci": {
+     "point": 0.9836734693877551,
+     "lo": 0.9704044117647059,
+     "hi": 0.9947349795533187,
+     "files": 63,
+     "weight": 245.0,
+     "violation_mass": 4.0
+    },
+    "tau": 0.9,
+    "verdict": "CERTIFIED",
+    "score": 98.4
+   }
+  },
+  "dimensions": {
+   "security": 100.0,
+   "reliability": 96.7,
+   "tests": null,
+   "maintainability": 70.4,
+   "consistency": 92.6
+  },
+  "sig": {
+   "small_units": {
+    "bands": [
+     15,
+     30,
+     60
+    ],
+    "shares": [
+     0.6664272718567461,
+     0.47792779852532796,
+     0.2832998180599445
+    ],
+    "caps": [
+     0.48,
+     0.242,
+     0.091
+    ],
+    "passes_4star": false
+   },
+   "simple_units": {
+    "bands": [
+     5,
+     10,
+     25
+    ],
+    "shares": [
+     0.4578665134539883,
+     0.23858086756679114,
+     0.11826103610073734
+    ],
+    "caps": [
+     0.207,
+     0.075,
+     0.011
+    ],
+    "passes_4star": false
+   },
+   "small_interfaces": {
+    "bands": [
+     2,
+     4,
+     6
+    ],
+    "shares": [
+     0.38264866417696064,
+     0.1076319065402662,
+     0.02322129656229053
+    ],
+    "caps": [
+     0.154,
+     0.034,
+     0.009
+    ],
+    "passes_4star": false
+   },
+   "duplication_type1": {
+    "density": 0.06490071024786201,
+    "cap": 0.058,
+    "passes_4star": false
+   }
+  },
+  "Q_team": {
+   "value": null,
+   "state": "INCOMPLETE",
+   "missing": [
+    "tests"
+   ]
+  }
+ },
+ "repo_metrics": {
+  "files": 170,
+  "code_lines": 27596,
+  "units": 1617,
+  "parse_error_fraction": 0.00253684937152409,
+  "masked_lines": 200,
+  "dry": {
+   "type1_density": 0.06490071024786201,
+   "type2_density": 0.34541237860559504,
+   "near_miss_pairs": 367,
+   "micro_clones": 127,
+   "type1_classes": 31,
+   "type2_classes": 119,
+   "class_sizes": {
+    "2": 64,
+    "3": 17,
+    "5": 2,
+    "21": 1,
+    "1": 18,
+    "6": 4,
+    "7": 2,
+    "12": 1,
+    "4": 4,
+    "13": 1,
+    "15": 2,
+    "8": 1,
+    "28": 1,
+    "11": 1
+   },
+   "params": {
+    "type1": {
+     "W": 100,
+     "exact": true,
+     "min_lines": 6,
+     "diversity": 0.25,
+     "near_min_tokens": 40,
+     "near_tau": 0.7,
+     "micro_min_tokens": 10
+    },
+    "type2": {
+     "W": 50,
+     "exact": false,
+     "min_lines": 6,
+     "diversity": 0.25,
+     "near_min_tokens": 40,
+     "near_tau": 0.7,
+     "micro_min_tokens": 10
+    }
+   }
+  },
+  "design": {
+   "namespace_cycles": 1,
+   "largest_namespace_cycle": 11,
+   "namespace_cycle_members": [
+    [
+     "MessagePack",
+     "MessagePack.Formatters",
+     "MessagePack.ImmutableCollection",
+     "MessagePack.Internal",
+     "MessagePack.LZ4",
+     "MessagePack.Resolvers",
+     "MessagePack.SourceGenerator",
+     "MessagePack.SourceGenerator.Analyzers",
+     "MessagePack.SourceGenerator.CodeAnalysis",
+     "MessagePack.SourceGenerator.Transforms",
+     "MessagePack.Unity"
+    ]
+   ],
+   "type_cycles": 5,
+   "largest_type_cycle": 127,
+   "propagation_cost": 0.23339903111127486,
+   "martin": {
+    "MessagePack.Analyzers.CodeFixes": {
+     "Ca": 0,
+     "Ce": 1,
+     "I": 1.0,
+     "A": 0.0,
+     "D": 0.0,
+     "types": 3
+    },
+    "MessagePack": {
+     "Ca": 12,
+     "Ce": 6,
+     "I": 0.3333333333333333,
+     "A": 0.07042253521126761,
+     "D": 0.596244131455399,
+     "types": 71
+    },
+    "MessagePack.AspNetCoreMvcFormatter": {
+     "Ca": 0,
+     "Ce": 1,
+     "I": 1.0,
+     "A": 0.0,
+     "D": 0.0,
+     "types": 2
+    },
+    "MessagePack.Formatters": {
+     "Ca": 7,
+     "Ce": 5,
+     "I": 0.4166666666666667,
+     "A": 0.026785714285714284,
+     "D": 0.5565476190476191,
+     "types": 112
+    },
+    "MessagePack.Resolvers": {
+     "Ca": 3,
+     "Ce": 3,
+     "I": 0.5,
+     "A": 0.01694915254237288,
+     "D": 0.48305084745762716,
+     "types": 59
+    },
+    "MessagePack.ReactivePropertyExtension": {
+     "Ca": 0,
+     "Ce": 2,
+     "I": 1.0,
+     "A": 0.0,
+     "D": 0.0,
+     "types": 11
+    },
+    "MessagePack.SourceGenerator": {
+     "Ca": 5,
+     "Ce": 2,
+     "I": 0.2857142857142857,
+     "A": 0.07692307692307693,
+     "D": 0.6373626373626373,
+     "types": 13
+    },
+    "MessagePack.SourceGenerator.Analyzers": {
+     "Ca": 2,
+     "Ce": 3,
+     "I": 0.6,
+     "A": 0.0,
+     "D": 0.4,
+     "types": 3
+    },
+    "MessagePack.SourceGenerator.CodeAnalysis": {
+     "Ca": 4,
+     "Ce": 3,
+     "I": 0.42857142857142855,
+     "A": 0.06451612903225806,
+     "D": 0.5069124423963134,
+     "types": 31
+    },
+    "System.CodeDom.Compiler": {
+     "Ca": 0,
+     "Ce": 0,
+     "I": 0.0,
+     "A": 0.0,
+     "D": 1.0,
+     "types": 2
+    },
+    "MessagePack.SourceGenerator.Transforms": {
+     "Ca": 1,
+     "Ce": 3,
+     "I": 0.75,
+     "A": 0.07692307692307693,
+     "D": 0.17307692307692313,
+     "types": 13
+    },
+    "": {
+     "Ca": 0,
+     "Ce": 1,
+     "I": 1.0,
+     "A": 0.0,
+     "D": 0.0,
+     "types": 4
+    },
+    "MessagePack.Unity.Extension": {
+     "Ca": 0,
+     "Ce": 3,
+     "I": 1.0,
+     "A": 0.1,
+     "D": 0.10000000000000009,
+     "types": 20
+    },
+    "MessagePack.Unity": {
+     "Ca": 1,
+     "Ce": 4,
+     "I": 0.8,
+     "A": 0.0,
+     "D": 0.19999999999999996,
+     "types": 29
+    },
+    "UnityEngine": {
+     "Ca": 4,
+     "Ce": 0,
+     "I": 0.0,
+     "A": 0.0,
+     "D": 1.0,
+     "types": 23
+    },
+    "MessagePack.ImmutableCollection": {
+     "Ca": 1,
+     "Ce": 3,
+     "I": 0.75,
+     "A": 0.0,
+     "D": 0.25,
+     "types": 20
+    },
+    "MessagePack.Internal": {
+     "Ca": 4,
+     "Ce": 6,
+     "I": 0.6,
+     "A": 0.022727272727272728,
+     "D": 0.3772727272727273,
+     "types": 44
+    },
+    "Nerdbank.Streams": {
+     "Ca": 2,
+     "Ce": 0,
+     "I": 0.0,
+     "A": 0.0,
+     "D": 1.0,
+     "types": 4
+    },
+    "MessagePack.LZ4": {
+     "Ca": 1,
+     "Ce": 1,
+     "I": 0.5,
+     "A": 0.0,
+     "D": 0.5,
+     "types": 2
+    }
+   },
+   "types": 466
+  },
+  "naming_field_style": "camel",
+  "consistency": {
+   "trailing_whitespace": {
+    "majority": "no",
+    "share": 1.0,
+    "entropy": -0.0,
+    "norm_entropy": 0.0,
+    "counts": {
+     "no": 27596
+    },
+    "total": 27596
+   },
+   "indent_char": {
+    "majority": "space",
+    "share": 1.0,
+    "entropy": -0.0,
+    "norm_entropy": 0.0,
+    "counts": {
+     "space": 26312
+    },
+    "total": 26312
+   },
+   "indent_multiple_of_4": {
+    "majority": "yes",
+    "share": 0.9968455457585892,
+    "entropy": 0.030752178359839424,
+    "norm_entropy": 0.030752178359839424,
+    "counts": {
+     "yes": 26229,
+     "no": 83
+    },
+    "total": 26312
+   },
+   "brace_style": {
+    "majority": "own_line",
+    "share": 0.9997869166844237,
+    "entropy": 0.0029062084099460784,
+    "norm_entropy": 0.0029062084099460784,
+    "counts": {
+     "own_line": 4692,
+     "end_of_line": 1
+    },
+    "total": 4693
+   },
+   "if_braces": {
+    "majority": "braced",
+    "share": 1.0,
+    "entropy": -0.0,
+    "norm_entropy": 0.0,
+    "counts": {
+     "braced": 1467
+    },
+    "total": 1467
+   },
+   "builtin_alias": {
+    "majority": "alias",
+    "share": 0.9749886311959982,
+    "entropy": 0.16872101637414927,
+    "norm_entropy": 0.16872101637414927,
+    "counts": {
+     "alias": 2144,
+     "framework_name": 55
+    },
+    "total": 2199
+   },
+   "var_usage": {
+    "majority": "var",
+    "share": 0.5097479790775084,
+    "entropy": 0.9997258039294723,
+    "norm_entropy": 0.9997258039294723,
+    "counts": {
+     "explicit": 1031,
+     "var": 1072
+    },
+    "total": 2103
+   }
+  },
+  "security": {
+   "weighted_findings": 0.0,
+   "per_kloc": 0.0,
+   "packages": [
+    [
+     "Ceras",
+     "4.1.7",
+     "Directory.Packages.props"
+    ],
+    [
+     "ConsoleAppFramework",
+     "4.2.4",
+     "Directory.Packages.props"
+    ],
+    [
+     "FluentAssertions",
+     "7.0.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "FsPickler",
+     "5.3.2",
+     "Directory.Packages.props"
+    ],
+    [
+     "Hyperion",
+     "0.12.2",
+     "Directory.Packages.props"
+    ],
+    [
+     "IsExternalInit",
+     "1.0.3",
+     "Directory.Packages.props"
+    ],
+    [
+     "Jil",
+     "2.17.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "Microsoft.AspNetCore.Mvc.Core",
+     "2.2.5",
+     "Directory.Packages.props"
+    ],
+    [
+     "Microsoft.Bcl.AsyncInterfaces",
+     "8.0.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "Microsoft.CodeAnalysis.Analyzers",
+     "3.3.4",
+     "Directory.Packages.props"
+    ],
+    [
+     "Microsoft.CodeAnalysis.PublicApiAnalyzers",
+     "3.3.4",
+     "Directory.Packages.props"
+    ],
+    [
+     "Microsoft.CodeAnalysis.ResxSourceGenerator",
+     "3.11.0-beta1.24415.1",
+     "Directory.Packages.props"
+    ],
+    [
+     "Microsoft.NET.StringTools",
+     "17.11.4",
+     "Directory.Packages.props"
+    ],
+    [
+     "Microsoft.NET.Test.Sdk",
+     "17.12.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "Microsoft.NETCore.Portable.Compatibility",
+     "1.0.1",
+     "Directory.Packages.props"
+    ],
+    [
+     "Moq",
+     "4.20.70",
+     "Directory.Packages.props"
+    ],
+    [
+     "MsgPack.Cli",
+     "1.0.1",
+     "Directory.Packages.props"
+    ],
+    [
+     "NUnit3TestAdapter",
+     "4.5.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "Nerdbank.Streams",
+     "2.11.79",
+     "Directory.Packages.props"
+    ],
+    [
+     "Newtonsoft.Json",
+     "13.0.3",
+     "Directory.Packages.props"
+    ],
+    [
+     "Newtonsoft.Json.Bson",
+     "1.0.3",
+     "Directory.Packages.props"
+    ],
+    [
+     "NuGet.Protocol",
+     "6.8.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "PolySharp",
+     "1.15.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "RandomFixtureKit",
+     "1.0.1",
+     "Directory.Packages.props"
+    ],
+    [
+     "ReactiveProperty",
+     "9.6.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "Required",
+     "1.0.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "Sigil",
+     "5.0.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "SpanJson",
+     "4.2.1",
+     "Directory.Packages.props"
+    ],
+    [
+     "System.Collections.Immutable",
+     "8.0.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "System.Memory",
+     "4.5.5",
+     "Directory.Packages.props"
+    ],
+    [
+     "System.Reflection.Emit",
+     "4.7.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "System.Reflection.Emit.Lightweight",
+     "4.7.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "System.Reflection.Metadata",
+     "8.0.1",
+     "Directory.Packages.props"
+    ],
+    [
+     "System.Runtime.CompilerServices.Unsafe",
+     "6.0.0",
+     "Directory.Packages.props"
+    ],
+    [
+     "System.Text.Json",
+     "8.0.5",
+     "Directory.Packages.props"
+    ],
+    [
+     "System.Threading.Tasks.Extensions",
+     "4.5.4",
+     "Directory.Packages.props"
+    ],
+    [
+     "Utf8Json",
+     "1.3.7",
+     "Directory.Packages.props"
+    ],
+    [
+     "Xunit.Combinatorial",
+     "1.6.24",
+     "Directory.Packages.props"
+    ],
+    [
+     "Xunit.SkippableFact",
+     "1.5.23",
+     "Directory.Packages.props"
+    ],
+    [
+     "ZeroFormatter",
+     "1.6.4",
+     "Directory.Packages.props"
+    ],
+    [
+     "nunit",
+     "4.3.2",
+     "Directory.Packages.props"
+    ],
+    [
+     "protobuf-net",
+     "3.2.30",
+     "Directory.Packages.props"
+    ],
+    [
+     "xunit",
+     "2.9.2",
+     "Directory.Packages.props"
+    ],
+    [
+     "xunit.runner.console",
+     "2.9.2",
+     "Directory.Packages.props"
+    ],
+    [
+     "xunit.runner.visualstudio",
+     "2.8.2",
+     "Directory.Packages.props"
+    ]
+   ]
+  },
+  "reliability": {
+   "weighted_findings": 1.0,
+   "per_kloc": 0.03623713581678504
+  }
+ },
+ "timings": {
+  "parse+units": 29.42380714416504,
+  "dry": 23.62539505958557,
+  "design": 0.5670456886291504,
+  "hygiene": 1.9696388244628906,
+  "security": 0.5461807250976562,
+  "total": 56.550984144210815
+ }
+}

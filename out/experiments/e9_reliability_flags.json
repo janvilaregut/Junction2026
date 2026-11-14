@@ -1,0 +1,192 @@
+{
+ "reliability": {
+  "dry": {
+   "split_half_r": 0.7832289299548342,
+   "spearman_brown": 0.8784390122861812
+  },
+  "simple_units": {
+   "split_half_r": 0.625861906846727,
+   "spearman_brown": 0.7698832283493904
+  },
+  "small_units": {
+   "split_half_r": 0.5775409917272317,
+   "spearman_brown": 0.7322041008834751
+  },
+  "small_interfaces": {
+   "split_half_r": 0.648560973189741,
+   "spearman_brown": 0.7868207287897443
+  },
+  "cohesion": {
+   "split_half_r": 0.4404703562873682,
+   "spearman_brown": 0.611564624519765
+  },
+  "coupling": {
+   "split_half_r": 0.44949901340536247,
+   "spearman_brown": 0.6202129277057423
+  },
+  "dead_code": {
+   "split_half_r": 0.7966145885934885,
+   "spearman_brown": 0.8867951909676213
+  },
+  "magic_numbers": {
+   "split_half_r": 0.8080470275898901,
+   "spearman_brown": 0.8938340820338166
+  },
+  "encapsulation": {
+   "split_half_r": 0.698311085291837,
+   "spearman_brown": 0.82235945032631
+  },
+  "documentation": {
+   "split_half_r": 0.9187416786944875,
+   "spearman_brown": 0.9576502026261291
+  },
+  "naming": {
+   "split_half_r": 0.6575335281158742,
+   "spearman_brown": 0.793387906745145
+  },
+  "consistency": {
+   "split_half_r": 0.8976132269609829,
+   "spearman_brown": 0.946044445946981
+  },
+  "error_handling": {
+   "split_half_r": 0.6457824938107483,
+   "spearman_brown": 0.784772588406215
+  }
+ },
+ "flags": {
+  "n_flag_methods": 969,
+  "n_other": 36014,
+  "share_flag": 0.02620122759105535,
+  "cog_density_median_flag": 0.2631578947368421,
+  "cog_density_median_other": 0.0,
+  "mannwhitney_p": 1.5443566880916435e-282,
+  "cliffs_delta": 0.5411324389404885,
+  "sloc_median_flag": 18.0,
+  "sloc_median_other": 8.0,
+  "repos_flag_more_complex": 24,
+  "repos": 24,
+  "sign_test_p": 5.960464477539063e-08,
+  "per_repo": [
+   [
+    "AArnott_Nerdbank.MessagePack",
+    0.14166990744341607,
+    10
+   ],
+   [
+    "App-vNext_Polly",
+    0.031042128603104208,
+    9
+   ],
+   [
+    "Cysharp_MemoryPack",
+    0.1746031746031746,
+    13
+   ],
+   [
+    "DapperLib_Dapper",
+    0.08333333333333334,
+    39
+   ],
+   [
+    "FluentValidation_FluentValidation",
+    0.3333333333333333,
+    9
+   ],
+   [
+    "Humanizr_Humanizer",
+    0.12279025322503584,
+    119
+   ],
+   [
+    "JamesNK_Newtonsoft.Json",
+    0.1477272727272727,
+    53
+   ],
+   [
+    "JoshClose_CsvHelper",
+    0.16666666666666666,
+    50
+   ],
+   [
+    "StackExchange_StackExchange.Redis",
+    0.11666666666666667,
+    112
+   ],
+   [
+    "autofac_Autofac",
+    0.13076923076923078,
+    27
+   ],
+   [
+    "bchavez_Bogus",
+    0.15833333333333333,
+    28
+   ],
+   [
+    "dotnet_BenchmarkDotNet",
+    0.10714285714285715,
+    44
+   ],
+   [
+    "dotnet_command-line-api",
+    0.25,
+    11
+   ],
+   [
+    "microsoft_vs-streamjsonrpc",
+    0.10869565217391303,
+    22
+   ],
+   [
+    "microsoft_vs-threading",
+    0.10714285714285715,
+    41
+   ],
+   [
+    "nodatime_nodatime",
+    0.11052631578947367,
+    13
+   ],
+   [
+    "npgsql_npgsql",
+    0.146503884572697,
+    83
+   ],
+   [
+    "nunit_nunit",
+    0.35416666666666663,
+    28
+   ],
+   [
+    "protobuf-net_protobuf-net",
+    0.3125,
+    117
+   ],
+   [
+    "restsharp_RestSharp",
+    0.20833333333333334,
+    9
+   ],
+   [
+    "serilog_serilog",
+    0.28409090909090906,
+    8
+   ],
+   [
+    "spectreconsole_spectre.console",
+    0.23904761904761904,
+    32
+   ],
+   [
+    "xunit_xunit",
+    0.2222222222222222,
+    61
+   ],
+   [
+    "messagepack-csharp",
+    0.042857142857142844,
+    28
+   ]
+  ]
+ }
+}

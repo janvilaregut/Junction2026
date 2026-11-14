@@ -504,4 +504,4 @@ GitHub code scanning [28]:
 48. py-tree-sitter on PyPI. https://pypi.org/project/tree-sitter/
 49. MLH organiser guide, judging plan. https://guide.mlh.com/general-information/judging-and-submissions/judging-plan
 
-**Local experiment scripts** (scratchpad, not part of the repo): `ts_smoke.py`, `ts_corpus.py`, `ts_err.py`, `ts_pp.py`, `lizard_cs.py` under `/private/tmp/claude-501/-Users-meulencv--claude-spares-spare-xg9XFS/df5376e9-0494-49c9-aebe-d3dd39b1dad1/scratchpad/scripts/`. They were run with `.venv/bin/python -I` against `corpus/messagepack-csharp`.
+**Local experiment scripts** (scratchpad, not part of the repo): `ts_smoke.py`, `ts_corpus.py`, `ts_err.py`, `ts_pp.py`, `lizard_cs.py` under `<scratchpad>`. They were run with `.venv/bin/python -I` against `corpus/messagepack-csharp`.

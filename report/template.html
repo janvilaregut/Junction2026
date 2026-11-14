@@ -1,0 +1,542 @@
+<title>Quality Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: lab notebook. One reading column for the paper, a three-pane instrument view for the heatmap. */
+:root{
+  --bg:#f3f6f7; --surface:#ffffff; --ink:#111a21; --muted:#56636e; --line:#d6dee3; --soft:#e8eef1;
+  --accent:#0d6b88; --accent-ink:#ffffff;
+  --good:#2e7a4d; --warn:#a86b12; --bad:#b3342b; --info:#4d5d6b;
+  --heat-lo:#f6e3a1; --heat-mid:#f0a35a; --heat-hi:#d4473a; --heat-text:#111a21;
+  --dim-security:#b3342b; --dim-reliability:#c46a1c; --dim-tests:#6b4fa3; --dim-maintainability:#0d6b88; --dim-consistency:#6b7a86;
+  --f-display:"Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d1317; --surface:#141c22; --ink:#e4ecf1; --muted:#93a2ae; --line:#26323b; --soft:#1b252c;
+  --accent:#53b6d4; --accent-ink:#06141a;
+  --good:#5cc28a; --warn:#e2a748; --bad:#f06a5f; --info:#9fb0bd;
+  --heat-lo:#4a3c12; --heat-mid:#8a4b17; --heat-hi:#c8372c; --heat-text:#f2f5f7;
+  --dim-security:#f06a5f; --dim-reliability:#eb9a4e; --dim-tests:#b39ae6; --dim-maintainability:#53b6d4; --dim-consistency:#9fb0bd;
+  color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#0d1317; --surface:#141c22; --ink:#e4ecf1; --muted:#93a2ae; --line:#26323b; --soft:#1b252c;
+  --accent:#53b6d4; --accent-ink:#06141a;
+  --good:#5cc28a; --warn:#e2a748; --bad:#f06a5f; --info:#9fb0bd;
+  --heat-lo:#4a3c12; --heat-mid:#8a4b17; --heat-hi:#c8372c; --heat-text:#f2f5f7;
+  --dim-security:#f06a5f; --dim-reliability:#eb9a4e; --dim-tests:#b39ae6; --dim-maintainability:#53b6d4; --dim-consistency:#9fb0bd;
+  color-scheme:dark; }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15.5px;line-height:1.6;margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+a{color:var(--accent)}
+h1,h2,h3,h4{font-family:var(--f-display);line-height:1.2;text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,4.4vw,40px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:24px;font-weight:600;margin-top:8px}
+h3{font-size:18px;font-weight:600}
+h4{font-size:15px;font-weight:600}
+p{margin:0}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+.num{font-variant-numeric:tabular-nums}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-inner{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1400px;margin:0 auto}
+.brand{font-family:var(--f-display);font-weight:700;font-size:17px;display:flex;align-items:center;gap:8px}
+.brand-mark{width:18px;height:18px;border-radius:4px;background:linear-gradient(90deg,var(--heat-lo),var(--heat-mid),var(--heat-hi))}
+nav.tabs{display:flex;gap:4px;margin-left:auto}
+nav.tabs a{padding:6px 12px;border-radius:6px;text-decoration:none;color:var(--muted);font-weight:500;font-size:14px}
+nav.tabs a[aria-current="page"]{background:var(--soft);color:var(--ink)}
+nav.tabs a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,.file-item:focus-visible,.line:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+.paper{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:44px}
+section.s{display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.lede{font-size:17px;color:var(--ink);max-width:68ch}
+.prose{display:flex;flex-direction:column;gap:12px;max-width:72ch}
+.prose ul,.prose ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+.meta-row{display:flex;flex-wrap:wrap;gap:8px 18px;color:var(--muted);font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi b{font-family:var(--f-display);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:13px;line-height:1.4}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;background:var(--soft);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:600;letter-spacing:.02em;white-space:nowrap;border:1px solid currentColor}
+.pill.ok{color:var(--good)} .pill.no{color:var(--bad)} .pill.mid{color:var(--warn)} .pill.na{color:var(--info)}
+.tier{font-family:var(--f-mono);font-size:11px;padding:2px 6px;border-radius:4px;background:var(--soft);color:var(--muted)}
+.callout{border-left:3px solid var(--accent);background:var(--surface);padding:12px 16px;border-radius:0 8px 8px 0;max-width:72ch}
+.formula{font-family:var(--f-mono);font-size:13.5px;background:var(--soft);border-radius:8px;padding:10px 14px;overflow-x:auto;white-space:pre}
+.algos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:12px}
+.algo{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.algo .formula{font-size:12.5px;white-space:pre-wrap}
+.algo .src{font-size:12px;color:var(--muted)}
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto}
+.chart svg{display:block;width:100%;height:auto;min-width:560px}
+.chart text{fill:var(--ink);font-family:var(--f-body);font-size:11px}
+.chart .muted{fill:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:14px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+details summary{cursor:pointer;font-weight:600}
+details>div{margin-top:10px}
+footer.refs ol{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px;padding-left:22px;margin:0}
+/* ---------------- heatmap view ---------------- */
+.hm{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:300px minmax(0,1fr) 320px;gap:14px;align-items:start}
+.hm-side,.hm-detail{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 64px);max-height:calc(100vh - 90px);overflow:auto}
+.hm-code{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0;overflow:hidden}
+.hm-codehead{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.hm-codehead b{font-family:var(--f-mono);font-size:13px;word-break:break-all}
+.code{font-family:var(--f-mono);font-size:12.5px;line-height:1.55;overflow-x:auto}
+.line{display:grid;grid-template-columns:52px 44px max-content;cursor:pointer;min-width:100%}
+.line .ln{color:var(--muted);text-align:right;padding-right:8px;user-select:none}
+.line .gut{display:flex;gap:2px;align-items:center;padding:0 4px}
+.line .gut i{width:6px;height:10px;border-radius:1px;display:block}
+.line .tx{white-space:pre;padding-right:16px;color:var(--ink)}
+.line.sel{outline:1px solid var(--accent);outline-offset:-1px}
+.line.unit .ln{color:var(--accent);font-weight:600}
+.file-list{display:flex;flex-direction:column;gap:2px}
+.file-item{display:grid;grid-template-columns:minmax(0,1fr) 54px;gap:8px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12.5px;background:none;border:0;color:var(--ink);text-align:left;font-family:var(--f-body)}
+.file-item:hover,.file-item.on{background:var(--soft)}
+.file-item .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{height:6px;border-radius:3px;background:var(--soft);position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--heat-hi);border-radius:3px}
+.ctrl{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+select,input[type=search]{font:inherit;font-size:13px;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+.why{display:flex;flex-direction:column;gap:8px;font-size:13px}
+.why-item{border-left:3px solid var(--line);padding-left:8px;overflow-wrap:anywhere}
+.hm-detail .mono{overflow-wrap:anywhere}
+.why-item b{font-weight:600}
+.scale{height:10px;border-radius:5px;background:linear-gradient(90deg,var(--surface),var(--heat-lo),var(--heat-mid),var(--heat-hi));border:1px solid var(--line)}
+.empty{color:var(--muted);font-size:13px}
+@media (max-width:1100px){ .hm{grid-template-columns:260px minmax(0,1fr)} .hm-detail{grid-column:1/-1;position:static;max-height:none} }
+@media (max-width:720px){ .hm{grid-template-columns:minmax(0,1fr)} .hm-side{position:static;max-height:320px} .line{grid-template-columns:40px 30px max-content} }
+@media (prefers-reduced-motion:reduce){ *{scroll-behavior:auto!important;transition:none!important} }
+</style>
+
+<header class="top"><div class="top-inner">
+  <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Quality Lab</div>
+  <span class="meta-row" style="font-size:12.5px">MessagePack-CSharp · 4 PRs de agentes · 25 repos de referencia</span>
+  <nav class="tabs" aria-label="Vistas">
+    <a href="#informe" id="tab-informe">Informe</a>
+    <a href="#heatmap" id="tab-heatmap">Heatmap del código</a>
+  </nav>
+</div></header>
+
+<main>
+<div id="view-informe" class="paper">
+
+<section class="s">
+  <span class="eyebrow">Junction 2026 · reto Tieto «Earned Trust in AI Code» · rama <code>quality-lab</code></span>
+  <h1>¿Se puede certificar matemáticamente que un código cumple las buenas prácticas?</h1>
+  <p class="lede">Sí, para lo que se puede medir y con una frase muy concreta. Construí un analizador sin IA (tree-sitter + estadística) que puntúa 13 prácticas, colorea cada línea del código con el motivo y emite un veredicto de tres estados con intervalo de confianza. Después lo sometí a 11 experimentos sobre el repo del reto, sus 4 PRs escritas por agentes y 25 librerías C# de referencia. Esta página recoge qué hice, qué salió y qué recomiendo mirar primero.</p>
+  <div class="meta-row"><span>14 nov 2026</span><span>16 agentes de investigación y experimentación</span><span>~1,0 M líneas analizadas</span><span>todo reproducible desde la rama</span></div>
+</section>
+
+<section class="s">
+  <div class="kpis" id="kpis"></div>
+</section>
+
+<section class="s">
+  <h2>La respuesta corta</h2>
+  <div class="prose">
+    <p>Una «certificación matemática» honesta no dice «este código es bueno». Dice esto:</p>
+    <div class="callout">«Con un 95 % de confianza, la proporción de código que viola la práctica <i>P</i>, medida con el algoritmo <i>A</i> (validado con un recall ≥ 94 % en violaciones inyectadas y 100 % invariante a cambios de formato), está por debajo del umbral <i>τ</i> calibrado en 25 librerías C# de referencia.»</div>
+    <p>Todo lo que hay en esa frase lo he medido: el algoritmo, su validez, la incertidumbre y el umbral. Lo que <b>no</b> se puede certificar sin IA ni personas es si un nombre es bueno, si una abstracción es la correcta o si el código hace lo que pide el requisito. Para eso Katse sigue necesitando reproducción y una firma humana.</p>
+    <p>Tres hallazgos cambian lo que proponíais:</p>
+    <ol>
+      <li><b>La nota global no sirve para revisar PRs.</b> La Q de vuestra fórmula se mueve 0,06 puntos entre la base y la PR más grande (#2129, +321 líneas), mientras que la puerta de calidad sí las separa. Hay que puntuar el código nuevo.</li>
+      <li><b>Los pesos declarados no son los pesos reales.</b> Mantenibilidad pesa un 18,75 % en la fórmula, pero explica el 5,6 % de la varianza de Q en 26 repos. Una vulnerabilidad crítica con penalización de 25 puntos deja Q en 92,5. La decisión tiene que ir separada de la nota.</li>
+      <li><b>La regla «cobertura ≥ 80 %» rechaza PRs que la estadística no puede rechazar.</b> #2129 (76,6 % de 278 líneas) y #2234 (72,2 % de 18 líneas) fallan la regla ingenua, pero su intervalo de Wilson incluye el 80 %. El veredicto correcto es «evidencia insuficiente», no «rechazado».</li>
+    </ol>
+  </div>
+</section>
+
+<section class="s" id="ranking">
+  <span class="eyebrow">Qué mirar primero</span>
+  <h2>Ranking de comprobaciones</h2>
+  <div class="prose">
+    <p>Ordené 18 comprobaciones por cuatro criterios de 1 a 5: <b>consecuencia</b> (qué pasa si falla), <b>evidencia</b> (papers y mis experimentos), <b>prevalencia</b> (cuánto aparece en code reviews y en código de IA) y <b>medibilidad</b> (qué tal lo mide un algoritmo, según E1–E3 y E9). La importancia es el producto. Las cuatro primeras no entran en la nota: bloquean.</p>
+  </div>
+  <div class="tbl"><table id="rank-table"></table></div>
+  <p class="empty">Excluidos a propósito: PageRank y grado de entrada (correlación con bugs futuros r = 0,00 en 2.937 ficheros, E4), Maintainability Index (criticado en la literatura) y recuentos brutos de reglas de Sonar (AUC 0,509 según la literatura).</p>
+</section>
+
+<section class="s" id="algoritmos">
+  <span class="eyebrow">Cómo mirar cada una</span>
+  <h2>Algoritmos</h2>
+  <div class="prose"><p>Cada práctica es una función determinista sobre el árbol sintáctico. Asigna a cada entidad (línea, método, clase) una severidad <code>v ∈ [0,1]</code> y explica el motivo. El cumplimiento de la práctica es la media ponderada por líneas de código, como en el modelo SIG.</p></div>
+  <div class="formula">C_p = 1 − Σ_e w_e · v_e / Σ_e w_e          v(x) = clamp((x − bajo) / (muy_alto − bajo), 0, 1)
+IC 95 %: bootstrap por ficheros (B = 1000)   veredicto: CERTIFICADO si IC_inf ≥ τ · NO CERTIFICADO si IC_sup &lt; τ · si no, NO CONCLUYENTE</div>
+  <div class="algos" id="algos"></div>
+</section>
+
+<section class="s" id="certificacion">
+  <span class="eyebrow">De la medida al certificado</span>
+  <h2>Método de certificación</h2>
+  <div class="prose">
+    <p>Usé dos niveles complementarios, los dos sin IA:</p>
+    <ol>
+      <li><b>Perfil de riesgo tipo SIG/TÜV NORD.</b> Para tamaño, complejidad y parámetros, calculo qué porcentaje del código está en métodos por encima de cada banda de riesgo. Lo comparo con unas cotas máximas. El test de cotas unilaterales con bootstrap es de intersección-unión (Berger 1982): exige pasar todas las bandas, así que el riesgo de certificar por error queda en ≤ 5 % sin corregir por comparaciones múltiples.</li>
+      <li><b>Cumplimiento por práctica con intervalo</b>, comparado con la mediana de las 25 librerías de referencia: «al menos tan bueno como la librería típica bien considerada».</li>
+    </ol>
+    <p>Las cotas SIG oficiales no se pueden aplicar tal cual: con mis definiciones solo 2–5 de los 25 repos de referencia pasan las de 4★. Así que recalibré las bandas con el método de Alves et al. (2010) sobre el propio corpus:</p>
+  </div>
+  <div class="tbl"><table id="alves-table"></table></div>
+  <div class="callout">Las bandas de tamaño de método que salen de 25 librerías C# (32 / 47 / 75 líneas) reproducen casi exactamente las publicadas por Alves et al. para 100 sistemas Java (30 / 44 / 74). Es una validación independiente de la medida de tamaño.</div>
+</section>
+
+<section class="s" id="messagepack">
+  <span class="eyebrow">Resultado sobre el repo del reto</span>
+  <h2>MessagePack-CSharp frente a 25 librerías de referencia</h2>
+  <div class="prose"><p>27.609 líneas de código de producción, 170 ficheros y 1.617 métodos (se excluye el código generado por T4 y los tests). τ es la mediana del corpus de referencia. El percentil indica cuántas librerías de referencia quedan por debajo de MessagePack.</p></div>
+  <div class="tbl"><table id="mp-table"></table></div>
+  <div class="chart" id="chart-pct"></div>
+  <div class="prose"><p>Lectura: es un serializador de alto rendimiento con un port de LZ4 en C y mucho código <code>unsafe</code>. Por eso tiene métodos largos (percentil 0), números mágicos (bytes de protocolo) y nombres al estilo C. En cambio, su cohesión (percentil 88) y su manejo de errores (percentil 80) están entre los mejores del corpus. La documentación (20 %) es baja porque el propio repo desactiva la regla SA1600.</p></div>
+</section>
+
+<section class="s" id="prs">
+  <span class="eyebrow">Las 4 PRs escritas por agentes</span>
+  <h2>Revisión determinista de las PRs</h2>
+  <div class="prose"><p>Para cada rama: líneas nuevas, hallazgos introducidos por el diff, grafo de impacto (símbolos cambiados, API pública, condiciones nuevas, tipos afectados por BFS inverso, tests que alcanzan el cambio por dependencias transitivas) y la puerta de calidad con datos reales de compilación, tests y cobertura en .NET 8.</p></div>
+  <div class="tbl"><table id="pr-table"></table></div>
+  <div class="prose">
+    <p><b>#2234</b> es el caso de manual. El agente añadió el mismo guard <code>if (!x.ContainsKey(k))</code> en 4 sitios, dentro de dos métodos que ya eran clones. 10 de sus 18 líneas nuevas quedan en clones: la puerta de duplicación falla con confianza estadística, porque la cota inferior de Wilson ya supera el 3 %. Además, 5 de sus 18 líneas nuevas no las cubre ningún test.</p>
+    <p><b>#2129</b> añade superficie pública (un atributo, 4 diagnósticos y 12 elementos de API) y 57 condiciones nuevas, e introduce 22 hallazgos (8 docs, 4 métodos largos, 3 de complejidad, 3 de parámetros y 1 clon). Es la PR donde una persona tiene que leer el diseño.</p>
+    <p><b>#2297</b>: casi todo el diff es código generado (plantillas T4) y snapshots de tests. Solo 1 línea de producción escrita a mano, así que pasa.</p>
+  </div>
+</section>
+
+<section class="s" id="experimentos">
+  <span class="eyebrow">Evidencia</span>
+  <h2>Experimentos y resultados</h2>
+  <div class="prose"><p>Seguí el protocolo de validación de métricas de IEEE 1061 y Briand, Morasca & Basili: sensibilidad, invariancia, concordancia con otra herramienta, fiabilidad, seguimiento y validez predictiva. Cada experimento es un script en <code>experiments/</code> con su JSON en <code>out/experiments/</code>.</p></div>
+
+  <h3>E1 · Sensibilidad: inyecto la violación y miro si la detecta</h3>
+  <div class="prose"><p>17 operadores de mutación y 60 casos por operador, en métodos y clases elegidos al azar (semilla fija). Detectado = aparece el hallazgo esperado en las líneas inyectadas. Para DRY y longitud cuento solo los casos que la definición dice que deben detectarse (por ejemplo, una copia de menos de 100 tokens no es un clon Tipo-1). En todos los operadores, la detección fuera de esos casos fue 0.</p></div>
+  <div class="chart" id="chart-e1"></div>
+  <div class="tbl"><table id="e1-table"></table></div>
+
+  <h3>E2 · Invariancia: transformaciones que no cambian el significado</h3>
+  <div class="tbl"><table id="e2-table"></table></div>
+  <div class="prose"><p>En los ficheros que se parsean limpios, 664 de 664 pares son exactamente invariantes (cota inferior unilateral 0,996 ≥ 0,99, el criterio que fijé). Hay dos límites: el 0,4 % del código con huecos de la gramática de tree-sitter (aritmética de punteros) depende del formato, y las líneas de código cambian un −19 % al pasar las llaves a estilo K&R. Ese último efecto es del propio concepto «líneas de código», no del analizador.</p></div>
+
+  <h3>E3 · Concordancia con una herramienta independiente (lizard)</h3>
+  <div class="tbl"><table id="e3-table"></table></div>
+  <div class="prose"><p>Los desacuerdos se explican por fallos conocidos de lizard en C#: ignora <code>foreach</code> y los brazos de <code>switch</code>, y cuenta los <code>?</code> de tipos anulables.</p></div>
+
+  <h3>E4 · Validez predictiva: ¿predicen bugs futuros?</h3>
+  <div class="prose"><p>Foto del código 36 meses atrás, en 12 repos con historial completo (2.937 ficheros, 948 con algún bug-fix después). Correlación parcial con los bug-fixes futuros controlando el tamaño (meta-análisis de efectos aleatorios, corrección BH). Los bug-fixes se etiquetan por palabras clave del commit, que son ruidosas, así que esto es indicativo.</p></div>
+  <div class="chart" id="chart-e4"></div>
+  <div class="prose"><ul>
+    <li><b>El tamaño es el mejor predictor</b> (r = 0,33, positivo en 12/12 repos), seguido del historial de cambios (r parcial 0,18).</li>
+    <li><b>La complejidad ciclomática y la cognitiva no aportan nada más allá del tamaño</b> (r parcial ≈ 0, aunque en bruto r ≈ 0,2–0,26). Hay que mostrarlas como «complejo para su tamaño», no venderlas como predictor independiente de bugs.</li>
+    <li><b>PageRank no predice nada</b> (r = −0,006 en bruto y 0,00 ajustado), igual que el grado de entrada. Vuestra propuesta de Katse acierta al descartarlo. En cambio, el acoplamiento saliente (CBO, grado de salida) y la intermediación sí dan una señal pequeña más allá del tamaño (r 0,05–0,10, positivo en 9/9 repos para CBO en la ventana de 24 meses).</li>
+  </ul></div>
+
+  <h3>E5 · Seguimiento: ¿mejoran las métricas cuando alguien refactoriza?</h3>
+  <div class="tbl"><table id="e5-table"></table></div>
+  <div class="prose"><p>997 commits de refactorización en 13 repos. Tamaño, complejidad y anidamiento mejoran de forma significativa (Wilcoxon pareado, corrección de Holm). Duplicación intra-fichero, números mágicos y nombres no se mueven, así que esta prueba solo valida las primeras.</p></div>
+
+  <h3>E7 · ¿DRY es conocimiento? Co-cambio de clones y regla de tres</h3>
+  <div class="tbl"><table id="e7-table"></table></div>
+  <div class="prose"><ul>
+    <li>Los clones que detecta el algoritmo cambian juntos 5,2 veces más (odds) que pares de código vecino del mismo tamaño, en 13 de 13 repos. La duplicación textual sí es una buena aproximación a la «duplicación de conocimiento» de Hunt y Thomas.</li>
+    <li>Los grupos de 3 o más copias reciben actualizaciones incompletas el doble de veces que las parejas (0,86 frente a 0,45, p ≈ 10⁻¹³): la regla de tres tiene soporte. Ojo: controlando el tamaño, no encontré que el código clonado acumule más bug-fixes (el signo cambia según el filtro). El riesgo robusto es el cambio inconsistente.</li>
+  </ul></div>
+
+  <h3>E8 · La fórmula Q = 0,30S + 0,25F + 0,20P + 0,15M + 0,10C</h3>
+  <div class="chart" id="chart-e8"></div>
+  <div class="tbl"><table id="e8-table"></table></div>
+
+  <h3>E9 · Fiabilidad de cada puntuación (mitades de ficheros, Spearman–Brown)</h3>
+  <div class="tbl"><table id="e9-table"></table></div>
+
+  <h3>E10 · DRY frente a KISS: argumentos flag</h3>
+  <div class="prose" id="e10-text"></div>
+
+  <h3>E11 · Catálogo de herramientas con defectos sembrados y vulnerabilidades reales</h3>
+  <div class="prose" id="tools-text"></div>
+  <div class="tbl" id="tools-table-wrap"><table id="tools-table"></table></div>
+
+  <h3>Datos reales de .NET: compilación, tests, cobertura y analizadores Roslyn</h3>
+  <div class="tbl"><table id="dotnet-table"></table></div>
+  <div class="prose"><p>Los 8 proyectos de tests compilan y pasan en las 5 versiones. El proyecto que «no compilaba» necesitaba el compilador Roslyn 4.12, no un cambio de código. MessagePack tiene un 77,0 % de cobertura de líneas y un 67,7 % de ramas. Ninguna PR introduce hallazgos de seguridad de los analizadores.</p></div>
+</section>
+
+<section class="s" id="propuestas">
+  <span class="eyebrow">Lo que me habéis pasado</span>
+  <h2>Qué se sostiene de cada propuesta</h2>
+  <div class="two">
+    <div class="algo"><h4>Sistema de evaluación (5 dimensiones, Q, puerta)</h4>
+      <p><span class="pill ok">Se sostiene</span> Separar nota y decisión es matemáticamente necesario, no solo prudente. Los tres estados (aprobado, rechazado, incompleto) y «un analizador que no corrió nunca es cero problemas» quedan implementados con lógica de Kleene.</p>
+      <p><span class="pill mid">Cambiar</span> Q como media aritmética compensa sin límite (1 punto de S compra 3 de C) y sus pesos reales no son los declarados (E8). Propongo media geométrica con pesos ROC, Q como intervalo cuando falta evidencia, y las condiciones de cobertura y duplicación decididas con intervalos de Wilson. El «≤ 3 % de duplicación» debe fijar el algoritmo: la misma base da del 3 % al 51 % según ventana y normalización.</p></div>
+    <div class="algo"><h4>Catálogo de más de 70 herramientas</h4>
+      <p><span class="pill ok">Se sostiene</span> Núcleo independiente del lenguaje, adaptadores, SARIF 2.1.0 como formato de intercambio y comparación con la base.</p>
+      <p><span class="pill mid">Cambiar</span> Más herramientas no da más certeza: se solapan poco y fallan en lo mismo. Lizard cuenta mal la complejidad en C# (E3), OSV-Scanner no lee <code>Directory.Packages.props</code>, Semgrep tiene 27 reglas de C# y ninguna regla SAST cubre los CWE de las vulnerabilidades reales de MessagePack (674, 407, 770). Recomiendo un núcleo pequeño y validado: métricas propias con tree-sitter, analizadores Roslyn con SARIF, detección de secretos, consulta directa a OSV y cobertura.</p></div>
+    <div class="algo"><h4>DRY y KISS de un vistazo</h4>
+      <p><span class="pill ok">Se sostiene</span> «DRY es conocimiento» (verificado en el original y apoyado por E7), la regla de tres (Don Roberts, popularizada por Fowler; E7 la respalda) y «son alarmas, no notas», que coincide con el veredicto de tres estados.</p>
+      <p><span class="pill mid">Matizar</span> Rahman (2010) encontró menos densidad de defectos en grupos de más de 3 copias. En mis datos, el riesgo robusto es el cambio inconsistente, no los bugs. KISS «se atribuye» a Kelly Johnson; YAGNI viene de Kent Beck en el proyecto C3.</p></div>
+    <div class="algo"><h4>Katse con grafo de impacto</h4>
+      <p><span class="pill ok">Se sostiene</span> «PageRank no como criterio principal de riesgo»: confirmado (E4). El grafo de impacto sin IA funciona: E6 obtiene símbolos cambiados, API pública, condiciones nuevas, tipos afectados y tests alcanzados por dependencias transitivas en segundos.</p>
+      <p><span class="pill mid">Añadir</span> Usad el acoplamiento saliente y el tamaño del cambio para ordenar (E4), no la centralidad. La prioridad <code>P_i = I(1+U+D) / (t̂(1+n))</code> es un criterio beneficio/coste: ordenar por esa razón es óptimo en la mochila fraccionaria (Dantzig 1957) si los elementos son independientes, y el término (1+n) da rendimientos decrecientes. Como I, U y D tienen escalas distintas, la razón depende de cómo se codifiquen: fijad escalas ordinales explícitas.</p></div>
+  </div>
+</section>
+
+<section class="s" id="limites">
+  <span class="eyebrow">Límites</span>
+  <h2>Qué no demuestra esto</h2>
+  <div class="prose"><ul>
+    <li><b>Solo sintaxis.</b> No hay modelo semántico (tipos de <code>var</code>, métodos de extensión, sobrecargas): el acoplamiento sale aproximado, aunque de forma consistente entre base y PR.</li>
+    <li><b>Huecos de tree-sitter.</b> El 0,4 % del código de MessagePack (aritmética de punteros) se contiene enmascarando sentencias y se marca como no medido.</li>
+    <li><b>Recall sí, precisión natural no.</b> Medí detección con violaciones inyectadas y concordancia con otras herramientas, pero no la precisión sobre hallazgos naturales, que requeriría etiquetado humano.</li>
+    <li><b>Etiquetas de bug ruidosas.</b> Las palabras clave del commit fallan en ~50 % de los casos según la literatura; E4 es indicativo.</li>
+    <li><b>Corpus de librerías.</b> Las 25 referencias son librerías open source, no aplicaciones. Los umbrales cambian con el corpus y quedan versionados con él.</li>
+    <li><b>Algunas referencias sin verificar.</b> El cupo de búsquedas web se agotó durante la investigación, y lo no verificado está marcado <code>[unverified]</code> en <code>research/*.md</code>.</li>
+    <li><b>Goodhart.</b> Cualquier métrica que se convierte en objetivo se puede trampear (por ejemplo, partir métodos sin simplificarlos). Por eso el veredicto acompaña a la revisión humana, no la sustituye.</li>
+  </ul></div>
+</section>
+
+<section class="s" id="repro">
+  <span class="eyebrow">Reproducir</span>
+  <h2>Cómo repetirlo</h2>
+  <div class="formula">git worktree add .claude/worktrees/quality-lab quality-lab     # rama huérfana, sin vuestro código
+python3 -m venv .venv &amp;&amp; .venv/bin/pip install tree-sitter tree-sitter-c-sharp numpy scipy lizard
+.venv/bin/python -m qlab.cli analyze &lt;repo&gt; --out out/&lt;nombre&gt;      # results.json · qlab.sarif · heat.json
+.venv/bin/python experiments/e1_injection.py 60                         # y así e0…e10</div>
+  <details><summary>Inventario de la investigación (17 informes con referencias)</summary><div class="prose" id="research-list"></div></details>
+</section>
+
+<footer class="s refs">
+  <h3>Referencias clave</h3>
+  <ol>
+    <li>Mäntylä & Lassenius (2009) What types of defects are really discovered in code reviews? IEEE TSE. doi:10.1109/TSE.2008.71</li>
+    <li>Beller et al. (2014) Modern code reviews in open-source projects: which problems do they fix? MSR. doi:10.1145/2597073.2597082</li>
+    <li>Heitlager, Kuipers & Visser (2007) A practical model for measuring maintainability. QUATIC.</li>
+    <li>Alves, Ypma & Visser (2010) Deriving metric thresholds from benchmark data. ICSM.</li>
+    <li>Campbell (2018) Cognitive Complexity. SonarSource white paper.</li>
+    <li>Muñoz Barón, Wyrich & Wagner (2020) An empirical validation of cognitive complexity as a measure of source code understandability. ESEM.</li>
+    <li>El Emam et al. (2001) The confounding effect of class size on the validity of object-oriented metrics. IEEE TSE.</li>
+    <li>Juergens et al. (2009) Do code clones matter? ICSE.</li>
+    <li>Roy, Cordy & Koschke (2009) Comparison and evaluation of code clone detection techniques and tools. SCP.</li>
+    <li>Radjenović et al. (2013) Software fault prediction metrics: a systematic literature review. IST.</li>
+    <li>Briand, Morasca & Basili (1996) Property-based software engineering measurement. IEEE TSE.</li>
+    <li>Berger (1982) Multiparameter hypothesis testing and acceptance sampling. Technometrics.</li>
+    <li>Wagner et al. (2015) Operationalised product quality models and assessment: the Quamoco approach. IST.</li>
+    <li>Ivanković et al. (2019) Code coverage at Google. ESEC/FSE.</li>
+    <li>Just et al. (2014) Are mutants a valid substitute for real faults in software testing? FSE.</li>
+    <li>Arnaoudova et al. (2016) Linguistic antipatterns: what they are and how developers perceive them. EMSE.</li>
+    <li>Hofmeister, Siegmund & Holt (2017) Shorter identifier names take longer to comprehend. SANER.</li>
+    <li>Tornhill & Borg (2022) Code Red: the business impact of code quality. TechDebt.</li>
+    <li>GitClear (2024, 2025) AI Copilot code quality reports.</li>
+  </ol>
+</footer>
+</div>
+
+<div id="view-heatmap" class="hm" hidden>
+  <aside class="hm-side" aria-label="Ficheros">
+    <div class="ctrl"><label for="hm-practice">Qué colorear</label><select id="hm-practice"></select></div>
+    <div class="ctrl"><label for="hm-search">Buscar fichero</label><input id="hm-search" type="search" placeholder="p. ej. TypeCollector"></div>
+    <div class="ctrl"><span>Calor por línea</span><div class="scale" aria-hidden="true"></div><div class="legend"><span>0 · sin problemas</span><span style="margin-left:auto">1 · grave</span></div></div>
+    <div class="file-list" id="hm-files"><p class="empty">Cargando el heatmap…</p></div>
+  </aside>
+  <section class="hm-code" aria-label="Código">
+    <div class="hm-codehead" id="hm-head"><span class="empty">Elige un fichero</span></div>
+    <div class="code" id="hm-code"></div>
+  </section>
+  <aside class="hm-detail" aria-label="Detalle de la línea">
+    <h4>Por qué</h4>
+    <div class="why" id="hm-why"><p class="empty">Pulsa una línea para ver qué prácticas incumple y por qué. En la primera línea de cada método aparece también lo que sí cumple.</p></div>
+    <div class="legend" id="hm-legend"></div>
+  </aside>
+</div>
+</main>
+
+<script>
+window.QDATA = __QDATA__;
+</script>
+<script>
+(function(){
+const D = window.QDATA;
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = (x, d=1) => x == null ? '—' : (100*x).toFixed(d) + ' %';
+const fx = (x, d=2) => x == null ? '—' : Number(x).toFixed(d);
+const pill = v => { const m = {CERTIFIED:['ok','CERTIFICADO'],'NOT CERTIFIED':['no','NO CERTIFICADO'],INCONCLUSIVE:['mid','NO CONCLUYENTE'],INCOMPLETE:['na','INCOMPLETO'],PASS:['ok','PASA'],FAIL:['no','FALLA']}[v] || ['na', v]; return `<span class="pill ${m[0]}">${m[1]}</span>`; };
+function table(id, head, rows, numeric=[]){
+  const el = document.getElementById(id); if(!el) return;
+  el.innerHTML = '<thead><tr>' + head.map((h,i)=>`<th class="${numeric.includes(i)?'n':''}">${h}</th>`).join('') + '</tr></thead><tbody>' +
+    rows.map(r => '<tr>' + r.map((c,i)=>`<td class="${numeric.includes(i)?'n':''}">${c}</td>`).join('') + '</tr>').join('') + '</tbody>';
+}
+
+/* ---------- KPIs ---------- */
+const k = D.kpis;
+$('#kpis').innerHTML = k.map(x => `<div class="kpi"><b>${x[0]}</b><span>${x[1]}</span></div>`).join('');
+
+/* ---------- ranking ---------- */
+table('rank-table', ['#','Comprobación','Uso','C','E','P','M','Imp.','Algoritmo (resumen)','Por qué en este puesto'],
+  D.ranking.map((r,i)=>[i+1, `<b>${r.name}</b>`, `<span class="tier">${r.tier}</span>`, r.C, r.E, r.P, r.M, `<b>${r.C*r.E*r.P*r.M}</b>`, r.algo, r.why]), [0,3,4,5,6,7]);
+
+/* ---------- algorithms ---------- */
+$('#algos').innerHTML = D.algorithms.map(a => `<div class="algo"><h4>${a.name}</h4><div class="formula">${esc(a.formula)}</div><p>${a.where}</p><p class="src">${a.src}</p></div>`).join('');
+
+/* ---------- Alves ---------- */
+table('alves-table', ['Métrica','Bandas nuestras (C#, 25 repos)','Alves 2010 (Java, 100 sistemas)','Cotas 3★ (% LOC sobre banda)','MessagePack (% LOC)','Veredicto 3★','Veredicto 4★'],
+  D.alves.map(r => [r.metric, r.bands, r.alves, r.caps3, r.mp, pill(r.v3), pill(r.v4)]));
+
+/* ---------- MessagePack ---------- */
+table('mp-table', ['Práctica','Dimensión','Puntuación','IC 95 %','τ (mediana ref.)','Percentil','Veredicto'],
+  D.mp.map(r => [r.name, r.dim, `<b>${fx(r.score,1)}</b>`, `${fx(r.lo,1)} – ${fx(r.hi,1)}`, fx(r.tau,1), fx(r.pct,0), pill(r.verdict)]), [2,3,4,5]);
+(function(){
+  const rows = D.mp, W = 760, rowH = 24, top = 26, left = 210, right = 40, H = top + rows.length*rowH + 30;
+  const x = v => left + (W-left-right) * v/100;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Percentil de MessagePack por práctica">`;
+  [0,25,50,75,100].forEach(t => { s += `<line x1="${x(t)}" x2="${x(t)}" y1="${top-6}" y2="${H-24}" stroke="var(--line)"/><text x="${x(t)}" y="${H-8}" text-anchor="middle" class="muted">${t}</text>`; });
+  s += `<text x="${left}" y="14" class="muted">Percentil de MessagePack entre las 25 librerías de referencia (más alto = mejor)</text>`;
+  rows.forEach((r,i) => { const y = top + i*rowH; const c = r.pct >= 50 ? 'var(--good)' : (r.pct >= 25 ? 'var(--warn)' : 'var(--bad)');
+    s += `<text x="${left-8}" y="${y+14}" text-anchor="end">${esc(r.name)}</text><rect x="${x(0)}" y="${y+5}" width="${x(r.pct)-x(0)}" height="12" rx="2" fill="${c}" opacity="0.85"/><text x="${x(r.pct)+5}" y="${y+15}" class="muted">${r.pct.toFixed(0)}</text>`; });
+  $('#chart-pct').innerHTML = s + '</svg>';
+})();
+
+/* ---------- PRs ---------- */
+table('pr-table', ['PR','Líneas nuevas (prod)','Hallazgos introducidos','API pública +','Condiciones nuevas','Tipos afectados (BFS)','Tests que alcanzan','Tests','Cobertura nueva (IC 95 %)','Duplicación nueva','Puerta ingenua','Puerta estadística'],
+  D.prs.map(r => [`<b>#${r.id}</b>`, r.lines, r.introduced, r.api, r.conds, r.impacted, r.tests_reach, r.tests, r.cov, r.dup, pill(r.gn), pill(r.gs)]), [1,2,3,4,5,6]);
+
+/* ---------- E1 ---------- */
+table('e1-table', ['Operador','Práctica','n esperados','Detección','IC 95 % (Wilson)','Exactitud metamórfica','Espurios'],
+  D.e1.map(r => [r.op, r.practice, r.n, `<b>${pct(r.recall,0)}</b>`, `${pct(r.lo,0)} – ${pct(r.hi,0)}`, r.exact || '—', r.spurious]), [2,3,4,6]);
+(function(){
+  const rows = D.e1, W = 760, rowH = 21, top = 26, left = 200, right = 30, H = top + rows.length*rowH + 30;
+  const x = v => left + (W-left-right) * v;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tasa de detección por operador con intervalo de Wilson">`;
+  [0,.25,.5,.75,1].forEach(t => { s += `<line x1="${x(t)}" x2="${x(t)}" y1="${top-6}" y2="${H-24}" stroke="var(--line)"/><text x="${x(t)}" y="${H-8}" text-anchor="middle" class="muted">${t*100}%</text>`; });
+  s += `<text x="${left}" y="14" class="muted">Detección de violaciones inyectadas (punto) e IC 95 % de Wilson (barra)</text>`;
+  rows.forEach((r,i) => { const y = top + i*rowH + 10;
+    s += `<text x="${left-8}" y="${y+4}" text-anchor="end">${esc(r.op)}</text><line x1="${x(r.lo)}" x2="${x(r.hi)}" y1="${y}" y2="${y}" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" opacity="0.5"/><circle cx="${x(r.recall)}" cy="${y}" r="4.5" fill="var(--accent)"/>`; });
+  $('#chart-e1').innerHTML = s + '</svg>';
+})();
+
+/* ---------- E2 / E3 ---------- */
+table('e2-table', ['Transformación','Pares','Invariantes','Tasa','Cota inf. 95 % (unilateral)','Qué cambió'], D.e2.map(r => [r.t, r.pairs, r.inv, pct(r.rate,1), fx(r.lo,3), r.diff]), [1,2,3,4]);
+table('e3-table', ['Medida','Pares','Spearman ρ','ICC(2,1)','Acuerdo exacto','Sesgo (Bland–Altman)'], D.e3.map(r => [r.m, r.n, fx(r.rho,3), fx(r.icc,3), r.exact, r.bias]), [1,2,3,4]);
+
+/* ---------- E4 forest ---------- */
+(function(){
+  const rows = D.e4, W = 760, rowH = 26, top = 30, left = 230, right = 40, H = top + rows.length*rowH + 30;
+  const lo = -0.15, hi = 0.45; const x = v => left + (W-left-right) * (v-lo)/(hi-lo);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Correlación con bugs futuros controlando tamaño">`;
+  [-0.1,0,0.1,0.2,0.3,0.4].forEach(t => { s += `<line x1="${x(t)}" x2="${x(t)}" y1="${top-8}" y2="${H-24}" stroke="${t===0?'var(--muted)':'var(--line)'}"/><text x="${x(t)}" y="${H-8}" text-anchor="middle" class="muted">${t.toFixed(1)}</text>`; });
+  s += `<text x="${left}" y="14" class="muted">r con bug-fixes futuros (36 meses, 12 repos); tamaño en bruto, el resto controlando tamaño</text>`;
+  rows.forEach((r,i) => { const y = top + i*rowH + 10; const c = r.sig ? 'var(--accent)' : 'var(--muted)';
+    s += `<text x="${left-8}" y="${y+4}" text-anchor="end">${esc(r.name)}</text><line x1="${x(r.lo)}" x2="${x(r.hi)}" y1="${y}" y2="${y}" stroke="${c}" stroke-width="2.5"/><rect x="${x(r.r)-4}" y="${y-4}" width="8" height="8" fill="${c}"/><text x="${x(r.hi)+6}" y="${y+4}" class="muted">${r.r.toFixed(2)}</text>`; });
+  $('#chart-e4').innerHTML = s + '</svg>';
+})();
+table('e5-table', ['Medida','Mejoran / empeoran / neutros','p (Holm)','Efecto (rank-biserial)'], D.e5.map(r => r), [2,3]);
+table('e7-table', ['', 'Todos los commits', 'Commits enfocados (≤ 10 ficheros)'], D.e7.map(r => r));
+
+/* ---------- E8 ---------- */
+(function(){
+  const rows = D.e8.weights, W = 760, H = 210, left = 150, right = 30, top = 30, rowH = 40;
+  const x = v => left + (W-left-right) * v/0.6;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Peso declarado frente a peso efectivo">`;
+  [0,0.1,0.2,0.3,0.4,0.5,0.6].forEach(t => { s += `<line x1="${x(t)}" x2="${x(t)}" y1="${top-8}" y2="${H-24}" stroke="var(--line)"/><text x="${x(t)}" y="${H-8}" text-anchor="middle" class="muted">${Math.round(t*100)}%</text>`; });
+  s += `<text x="${left}" y="14" class="muted">Peso declarado (claro) frente a parte de la varianza de Q que explica cada dimensión (oscuro)</text>`;
+  rows.forEach((r,i) => { const y = top + i*rowH;
+    s += `<text x="${left-8}" y="${y+18}" text-anchor="end">${esc(r.dim)}</text><rect x="${x(0)}" y="${y+4}" width="${x(r.stated)-x(0)}" height="12" fill="var(--accent)" opacity="0.35"/><rect x="${x(0)}" y="${y+18}" width="${x(r.effective)-x(0)}" height="12" fill="var(--accent)"/><text x="${x(r.stated)+5}" y="${y+14}" class="muted">${(100*r.stated).toFixed(1)}%</text><text x="${x(r.effective)+5}" y="${y+28}" class="muted">${(100*r.effective).toFixed(1)}%</text>`; });
+  $('#chart-e8').innerHTML = s + '</svg>';
+})();
+table('e8-table', ['Prueba','Resultado'], D.e8.rows);
+table('e9-table', ['Práctica','r entre mitades','Fiabilidad (Spearman–Brown)'], D.e9.map(r => [r[0], fx(r[1],3), `<b>${fx(r[2],3)}</b>`]), [1,2]);
+$('#e10-text').innerHTML = D.e10;
+$('#tools-text').innerHTML = D.tools.text;
+if (D.tools.rows && D.tools.rows.length) table('tools-table', D.tools.head, D.tools.rows); else $('#tools-table-wrap').hidden = true;
+table('dotnet-table', ['Versión','Tests (pasan / fallan / omitidos)','Cobertura de líneas nuevas','IC 95 % Wilson','Hallazgos nuevos de analizadores (seguridad)'], D.dotnet, [1,2]);
+$('#research-list').innerHTML = '<ul>' + D.research.map(r => `<li><code>${esc(r)}</code></li>`).join('') + '</ul>';
+
+/* ---------- views ---------- */
+function route(){
+  const h = (location.hash || '#informe').slice(1);
+  const hm = h === 'heatmap';
+  $('#view-informe').hidden = hm; $('#view-heatmap').hidden = !hm;
+  $('#tab-informe').setAttribute('aria-current', hm ? 'false' : 'page');
+  $('#tab-heatmap').setAttribute('aria-current', hm ? 'page' : 'false');
+  if (hm) loadHeat();
+  else if (h && h !== 'informe') { const el = document.getElementById(h); if (el) el.scrollIntoView(); }
+}
+window.addEventListener('hashchange', route);
+
+/* ---------- heatmap ---------- */
+let H = null, cur = null, mode = 'all';
+const DIMCOLOR = {security:'var(--dim-security)', reliability:'var(--dim-reliability)', tests:'var(--dim-tests)', maintainability:'var(--dim-maintainability)', consistency:'var(--dim-consistency)'};
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function hex2rgb(h){ h = h.replace('#',''); if(h.length===3) h = h.split('').map(c=>c+c).join(''); const n = parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function heatColor(v){
+  if (!v || v <= 0.01) return 'transparent';
+  const stops = [cssVar('--heat-lo'), cssVar('--heat-mid'), cssVar('--heat-hi')].map(hex2rgb);
+  const t = Math.min(1, v) * 2; const i = t < 1 ? 0 : 1; const f = t < 1 ? t : t-1;
+  const a = stops[i], b = stops[i+1]; const c = a.map((x,j) => Math.round(x + (b[j]-x)*f));
+  return `rgba(${c[0]},${c[1]},${c[2]},${0.35 + 0.5*Math.min(1,v)})`;
+}
+async function loadHeat(){
+  if (H) return;
+  try { const r = await fetch('heat.json'); H = await r.json(); }
+  catch(e){ $('#hm-files').innerHTML = '<p class="empty">No se pudo cargar heat.json. Recarga la página.</p>'; return; }
+  const sel = $('#hm-practice');
+  sel.innerHTML = '<option value="all">Todas las prácticas (calor combinado)</option>' +
+    Object.entries(H.practices).map(([k,p]) => `<option value="${k}">${esc(p.name)}</option>`).join('');
+  sel.addEventListener('change', () => { mode = sel.value; renderFiles(); if (cur) openFile(cur.path, true); });
+  $('#hm-search').addEventListener('input', renderFiles);
+  $('#hm-legend').innerHTML = Object.entries(DIMCOLOR).filter(([d]) => d !== 'tests').map(([d,c]) => `<span><i style="background:${c}"></i>${({security:'Seguridad',reliability:'Fiabilidad',maintainability:'Mantenibilidad',consistency:'Consistencia'})[d]}</span>`).join('');
+  renderFiles();
+  openFile(H.files[0].path);
+}
+function fileScore(f){
+  if (mode === 'all') return f.heat_density;
+  let s = 0, n = 0; for (const r of f.rows){ if (r.length > 2 && r[2][mode]) s += r[2][mode]; n++; } return n ? s/Math.max(1,f.code_lines) : 0;
+}
+function renderFiles(){
+  const q = $('#hm-search').value.toLowerCase();
+  const fs = H.files.filter(f => f.path.toLowerCase().includes(q)).map(f => [f, fileScore(f)]).sort((a,b) => b[1]-a[1]).slice(0, 400);
+  const max = Math.max(0.01, ...fs.map(x => x[1]));
+  $('#hm-files').innerHTML = fs.map(([f,s]) => `<button class="file-item${cur && cur.path===f.path?' on':''}" data-p="${esc(f.path)}" title="${esc(f.path)}"><span class="fn">${esc(f.path.split('/').pop())}</span><span class="bar"><i style="width:${(100*s/max).toFixed(1)}%"></i></span></button>`).join('') || '<p class="empty">Ningún fichero coincide.</p>';
+  document.querySelectorAll('.file-item').forEach(b => b.addEventListener('click', () => openFile(b.dataset.p)));
+}
+function openFile(path, keep){
+  cur = H.files.find(f => f.path === path); if (!cur) return;
+  document.querySelectorAll('.file-item').forEach(b => b.classList.toggle('on', b.dataset.p === path));
+  $('#hm-head').innerHTML = `<b>${esc(cur.path)}</b><span class="meta-row"><span>${cur.code_lines} líneas de código</span><span>${cur.findings} hallazgos</span><span>calor medio ${cur.heat_density.toFixed(2)}</span></span>`;
+  const out = [];
+  cur.rows.forEach((r, i) => {
+    const has = r.length > 1; const hp = has ? r[2] : {};
+    const v = mode === 'all' ? (has ? r[1] : 0) : (hp[mode] || 0);
+    const chips = has ? Object.entries(hp).filter(([p,h]) => h > 0 && (mode==='all'||p===mode)).map(([p,h]) => `<i title="${esc((H.practices[p]||{name:p}).name)}" style="background:${DIMCOLOR[(H.practices[p]||{}).dimension]||'var(--muted)'};opacity:${0.35+0.65*h}"></i>`).join('') : '';
+    const unit = has && r[4] && r[4].length;
+    out.push(`<div class="line${unit?' unit':''}" data-i="${i}" tabindex="-1" style="background:${heatColor(v)}"><span class="ln">${i+1}</span><span class="gut">${chips}</span><span class="tx">${esc(r[0]) || ' '}</span></div>`);
+  });
+  $('#hm-code').innerHTML = out.join('');
+  $('#hm-code').onclick = e => { const l = e.target.closest('.line'); if (l) showWhy(+l.dataset.i, l); };
+  if (!keep) $('#hm-why').innerHTML = '<p class="empty">Pulsa una línea para ver qué prácticas incumple y por qué.</p>';
+  const first = cur.rows.findIndex(r => r.length > 1 && r[3] && r[3].length);
+  if (first >= 0 && !keep) { const el = $(`.line[data-i="${first}"]`); if (el) { el.scrollIntoView({block:'center'}); showWhy(first, el); } }
+}
+function showWhy(i, el){
+  document.querySelectorAll('.line.sel').forEach(x => x.classList.remove('sel')); el.classList.add('sel');
+  const r = cur.rows[i]; let html = `<p class="mono">Línea ${i+1}</p>`;
+  if (r.length > 1){
+    const why = r[3] || [], good = r[4] || [];
+    if (why.length) html += why.map(([p,s,m]) => `<div class="why-item" style="border-color:${DIMCOLOR[(H.practices[p]||{}).dimension]||'var(--muted)'}"><b>${esc((H.practices[p]||{name:p}).name)}</b> · severidad ${s}<br>${esc(m)}</div>`).join('');
+    if (good.length) html += '<p class="eyebrow" style="margin-top:4px">Este método</p>' + good.map(([p,ok,m]) => `<div class="why-item" style="border-color:${ok?'var(--good)':'var(--bad)'}">${ok?'✓ Cumple':'✗ Incumple'} · <b>${esc((H.practices[p]||{name:p}).name)}</b><br>${esc(m)}</div>`).join('');
+    const hp = r[2]; const spread = Object.entries(hp).filter(([p]) => !why.some(w => w[0]===p));
+    if (spread.length) html += '<p class="empty">También dentro de: ' + spread.map(([p,h]) => `${esc((H.practices[p]||{name:p}).name)} (${h})`).join(', ') + '</p>';
+    if (!why.length && !good.length && !spread.length) html += '<p class="empty">Sin hallazgos en esta línea.</p>';
+  } else html += '<p class="empty">Sin hallazgos en esta línea.</p>';
+  $('#hm-why').innerHTML = html;
+}
+route();
+})();
+</script>

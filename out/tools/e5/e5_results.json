@@ -1,0 +1,631 @@
+{
+  "tolerance_lines": 5,
+  "advisories_with_locations": 15,
+  "per_tool": {
+    "semgrep-csharp-all": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "semgrep-default-all": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "semgrep-security-audit-all": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "codeql-security": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "codeql-all": {
+      "hit": 2,
+      "n": 15,
+      "recall": 0.1333,
+      "wilson95": [
+        0.0374,
+        0.3788
+      ],
+      "expected_hits_by_chance": 2.21
+    },
+    "trivy-misconfig": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "gitleaks": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "betterleaks": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "trufflehog": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "detect-secrets": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "trivy-secret": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "semgrep-secrets-all": {
+      "hit": 0,
+      "n": 15,
+      "recall": 0.0,
+      "wilson95": [
+        0.0,
+        0.2039
+      ],
+      "expected_hits_by_chance": 0.0
+    },
+    "lizard": {
+      "hit": 4,
+      "n": 15,
+      "recall": 0.2667,
+      "wilson95": [
+        0.109,
+        0.5195
+      ],
+      "expected_hits_by_chance": 2.42
+    },
+    "cpd-100": {
+      "hit": 2,
+      "n": 15,
+      "recall": 0.1333,
+      "wilson95": [
+        0.0374,
+        0.3788
+      ],
+      "expected_hits_by_chance": 2.8
+    },
+    "jscpd-100": {
+      "hit": 2,
+      "n": 15,
+      "recall": 0.1333,
+      "wilson95": [
+        0.0374,
+        0.3788
+      ],
+      "expected_hits_by_chance": 2.37
+    },
+    "codeql-style": {
+      "hit": 2,
+      "n": 15,
+      "recall": 0.1333,
+      "wilson95": [
+        0.0374,
+        0.3788
+      ],
+      "expected_hits_by_chance": 2.26
+    }
+  },
+  "union_security_tools_incl_codeql_quality": {
+    "hit": 2,
+    "n": 15,
+    "wilson95": [
+      0.0374,
+      0.3788
+    ],
+    "ids": [
+      "GHSA-cj9g-3mj2-g8vv",
+      "GHSA-hv8m-jj95-wg3x"
+    ]
+  },
+  "union_security_rules_only": {
+    "hit": 0,
+    "n": 15,
+    "wilson95": [
+      0.0,
+      0.2039
+    ],
+    "ids": []
+  },
+  "union_quality_signals": {
+    "hit": 4,
+    "n": 15,
+    "wilson95": [
+      0.109,
+      0.5195
+    ],
+    "ids": [
+      "GHSA-7q36-4xx7-xcxf",
+      "GHSA-cj9g-3mj2-g8vv",
+      "GHSA-hv8m-jj95-wg3x",
+      "GHSA-vh6j-jc39-fggf"
+    ]
+  },
+  "cwe_coverage": {
+    "CWE-1188": {
+      "advisories": 2,
+      "hit_by_security_rules": 0
+    },
+    "CWE-121": {
+      "advisories": 1,
+      "hit_by_security_rules": 0
+    },
+    "CWE-125": {
+      "advisories": 1,
+      "hit_by_security_rules": 0
+    },
+    "CWE-1325": {
+      "advisories": 1,
+      "hit_by_security_rules": 0
+    },
+    "CWE-190": {
+      "advisories": 1,
+      "hit_by_security_rules": 0
+    },
+    "CWE-20": {
+      "advisories": 1,
+      "hit_by_security_rules": 0
+    },
+    "CWE-328": {
+      "advisories": 1,
+      "hit_by_security_rules": 0
+    },
+    "CWE-407": {
+      "advisories": 3,
+      "hit_by_security_rules": 0
+    },
+    "CWE-409": {
+      "advisories": 2,
+      "hit_by_security_rules": 0
+    },
+    "CWE-470": {
+      "advisories": 2,
+      "hit_by_security_rules": 0
+    },
+    "CWE-502": {
+      "advisories": 2,
+      "hit_by_security_rules": 0
+    },
+    "CWE-674": {
+      "advisories": 4,
+      "hit_by_security_rules": 0
+    },
+    "CWE-770": {
+      "advisories": 3,
+      "hit_by_security_rules": 0
+    },
+    "CWE-789": {
+      "advisories": 1,
+      "hit_by_security_rules": 0
+    }
+  },
+  "per_advisory": [
+    {
+      "id": "GHSA-2f33-pr97-265q",
+      "cwes": [
+        "CWE-1188"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack.AspNetCoreMvcFormatter/MessagePackInputFormatter.cs"
+      ],
+      "n_vulnerable_lines": 3,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-2x83-8g95-xh59",
+      "cwes": [
+        "CWE-407"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/Formatters/ExpandoObjectFormatter.cs",
+        "src/MessagePack/Resolvers/ExpandoObjectResolver.cs"
+      ],
+      "n_vulnerable_lines": 8,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-382j-8mxh-c7x2",
+      "cwes": [
+        "CWE-1188",
+        "CWE-125",
+        "CWE-190",
+        "CWE-407",
+        "CWE-409",
+        "CWE-470",
+        "CWE-502",
+        "CWE-674",
+        "CWE-789"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/MessagePackPrimitives.Readers.cs",
+        "src/MessagePack/MessagePackReader.cs"
+      ],
+      "n_vulnerable_lines": 3,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-4qm4-8hg2-g2xm",
+      "cwes": [
+        "CWE-328"
+      ],
+      "snapshot": "v3.0.208-rc.1-4-g9be35840",
+      "files": [
+        "src/MessagePack/MessagePackSecurity.cs"
+      ],
+      "n_vulnerable_lines": 135,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-7q36-4xx7-xcxf",
+      "cwes": [
+        "CWE-121"
+      ],
+      "snapshot": "v2.0.335-113-g7e5558fd",
+      "files": [
+        "src/MessagePack.GeneratorCore/Generator/FormatterTemplate.cs",
+        "src/MessagePack.GeneratorCore/Generator/UnionTemplate.cs",
+        "src/MessagePack.ImmutableCollection/Formatters.cs",
+        "src/MessagePack.ReactiveProperty/Formatters.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/CollectionFormatter.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/DictionaryFormatter.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/MultiDimensionalArrayFormatter.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/PrimitiveObjectFormatter.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/StandardClassLibraryFormatter.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackReader.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializerOptions.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Resolvers/DynamicObjectResolver.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ForceSizePrimitiveFormatter.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs",
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs",
+        "src/MessagePack/Formatters/ForceSizePrimitiveFormatter.cs",
+        "src/MessagePack/Formatters/TupleFormatter.cs",
+        "src/MessagePack/Formatters/ValueTupleFormatter.cs"
+      ],
+      "n_vulnerable_lines": 430,
+      "hits": {
+        "cpd-100": [
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:7",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:7",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:7",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:7",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ForceSizePrimitiveFormatter.cs:7",
+          "CPD-100@src/MessagePack/Formatters/ForceSizePrimitiveFormatter.cs:7",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:364",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:309",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:309",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:312",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:263",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:263",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:312",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:309",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:309",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:364",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:263",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:263",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:262",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:220",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:220",
+          "CPD-100@src/MessagePack.ReactiveProperty/Formatters.cs:159",
+          "CPD-100@src/MessagePack.ReactiveProperty/Formatters.cs:203",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:262",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:263",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:309",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:263",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:309",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:312",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:220",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:220",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:364",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:220",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:220",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:212",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:260",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:310",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:362",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:212",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:260",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:310",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:362",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:177",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:218",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:261",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:307",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:177",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:218",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:261",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:307",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:214",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:179",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:214",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:179",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:214",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:220",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:263",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:309",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:214",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:262",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:312",
+          "CPD-100@src/MessagePack/Formatters/TupleFormatter.cs:364",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:179",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:220",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:263",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:309",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:262",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:179",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:179",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:312",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:179",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:179",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:364",
+          "CPD-100@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:179",
+          "CPD-100@src/MessagePack/Formatters/ValueTupleFormatter.cs:179"
+        ],
+        "jscpd-100": [
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:218",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:177",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:158",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:261",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:177",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:158",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:307",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:177",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:214",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:179",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:260",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:212",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:310",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:212",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:362",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:212",
+          "jscpd-clone@src/MessagePack/Formatters/ValueTupleFormatter.cs:1",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ValueTupleFormatter.cs:1",
+          "jscpd-clone@src/MessagePack/Formatters/TupleFormatter.cs:1",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/TupleFormatter.cs:1",
+          "jscpd-clone@src/MessagePack/Formatters/ForceSizePrimitiveFormatter.cs:1",
+          "jscpd-clone@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/T4/ForceSizePrimitiveFormatter.cs:1",
+          "jscpd-clone@src/MessagePack.ReactiveProperty/Formatters.cs:203",
+          "jscpd-clone@src/MessagePack.ReactiveProperty/Formatters.cs:159"
+        ],
+        "lizard": [
+          "CCN>15@src/MessagePack.GeneratorCore/Generator/FormatterTemplate.cs:26",
+          "CCN>15@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Formatters/PrimitiveObjectFormatter.cs:205",
+          "CCN>15@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:181",
+          "CCN>15@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/MessagePackSerializer.Json.cs:268",
+          "CCN>15@src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Resolvers/DynamicObjectResolver.cs:849"
+        ]
+      }
+    },
+    {
+      "id": "GHSA-cj9g-3mj2-g8vv",
+      "cwes": [
+        "CWE-674"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/Internal/TinyJsonReader.cs",
+        "src/MessagePack/MessagePackSerializer.Json.cs"
+      ],
+      "n_vulnerable_lines": 93,
+      "hits": {
+        "lizard": [
+          "CCN>15@src/MessagePack/Internal/TinyJsonReader.cs:138",
+          "CCN>15@src/MessagePack/Internal/TinyJsonReader.cs:199",
+          "CCN>15@src/MessagePack/MessagePackSerializer.Json.cs:189",
+          "CCN>15@src/MessagePack/MessagePackSerializer.Json.cs:276"
+        ],
+        "codeql-all": [
+          "cs/useless-tostring-call@src/MessagePack/MessagePackSerializer.Json.cs:437",
+          "cs/local-not-disposed@src/MessagePack/MessagePackSerializer.Json.cs:402",
+          "cs/local-not-disposed@src/MessagePack/MessagePackSerializer.Json.cs:413"
+        ],
+        "codeql-style": [
+          "cs/useless-tostring-call@src/MessagePack/MessagePackSerializer.Json.cs:437",
+          "cs/local-not-disposed@src/MessagePack/MessagePackSerializer.Json.cs:402",
+          "cs/local-not-disposed@src/MessagePack/MessagePackSerializer.Json.cs:413"
+        ]
+      }
+    },
+    {
+      "id": "GHSA-cxmj-83gh-fp49",
+      "cwes": [
+        "CWE-770"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/Formatters/MultiDimensionalArrayFormatter.cs"
+      ],
+      "n_vulnerable_lines": 11,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-hv8m-jj95-wg3x",
+      "cwes": [
+        "CWE-20"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/LZ4/LZ4Codec.Unsafe.cs",
+        "src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs",
+        "src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs"
+      ],
+      "n_vulnerable_lines": 42,
+      "hits": {
+        "cpd-100": [
+          "CPD-100@src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs:566",
+          "CPD-100@src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs:579"
+        ],
+        "jscpd-100": [
+          "jscpd-clone@src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs:579",
+          "jscpd-clone@src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs:566"
+        ],
+        "lizard": [
+          "CCN>15@src/MessagePack/LZ4/LZ4Codec.Unsafe32.Dirty.cs:601",
+          "CCN>15@src/MessagePack/LZ4/LZ4Codec.Unsafe64.Dirty.cs:613"
+        ],
+        "codeql-all": [
+          "cs/missed-ternary-operator@src/MessagePack/LZ4/LZ4Codec.Unsafe.cs:100"
+        ],
+        "codeql-style": [
+          "cs/missed-ternary-operator@src/MessagePack/LZ4/LZ4Codec.Unsafe.cs:100"
+        ]
+      }
+    },
+    {
+      "id": "GHSA-q2h6-ghwm-5qm8",
+      "cwes": [
+        "CWE-407"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/Formatters/CollectionFormatter.cs"
+      ],
+      "n_vulnerable_lines": 1,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-qhmf-xw27-6rqr",
+      "cwes": [
+        "CWE-470",
+        "CWE-502"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/Formatters/StandardClassLibraryFormatter.cs",
+        "src/MessagePack/MessagePackSerializerOptions.cs"
+      ],
+      "n_vulnerable_lines": 12,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-qhrr-8q5h-9q3h",
+      "cwes": [
+        "CWE-1325"
+      ],
+      "snapshot": "v3.1.8-34-g14aabf68",
+      "files": [
+        "src/MessagePack/MessagePackReader.cs"
+      ],
+      "n_vulnerable_lines": 6,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-v72x-2h86-7f8m",
+      "cwes": [
+        "CWE-409",
+        "CWE-770"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/MessagePackSecurity.cs",
+        "src/MessagePack/MessagePackSerializer.Json.cs",
+        "src/MessagePack/MessagePackSerializer.cs"
+      ],
+      "n_vulnerable_lines": 23,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-vh6j-jc39-fggf",
+      "cwes": [
+        "CWE-674"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/MessagePackReader.cs"
+      ],
+      "n_vulnerable_lines": 73,
+      "hits": {
+        "lizard": [
+          "CCN>15@src/MessagePack/MessagePackReader.cs:154"
+        ]
+      }
+    },
+    {
+      "id": "GHSA-w567-gjr2-hm5j",
+      "cwes": [
+        "CWE-770"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack.UnityClient/Assets/Scripts/MessagePack/Extension/UnsafeBlitFormatter.cs"
+      ],
+      "n_vulnerable_lines": 5,
+      "hits": {}
+    },
+    {
+      "id": "GHSA-wfr3-xj75-pfwh",
+      "cwes": [
+        "CWE-674"
+      ],
+      "snapshot": "v3.1.4-20-g06ea2495",
+      "files": [
+        "src/MessagePack/Resolvers/DynamicUnionResolver.cs"
+      ],
+      "n_vulnerable_lines": 7,
+      "hits": {}
+    }
+  ],
+  "snapshots_missing_findings": [
+    "9be35840"
+  ]
+}
