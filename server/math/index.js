@@ -55,7 +55,7 @@ export const METHODS = [
   { id: 'graph', level: 'measure', name: 'Dependency graph', basis: 'Who uses whom, by name; rank by use relations (Inoue et al. 2003) and what can reach a function (after Chianti, Ren et al. 2004). Network measures on dependency graphs predict defect-prone code (Zimmermann & Nagappan 2008). An estimate: published call graphs miss 10 to 15% of targets (Feldthaus et al. 2013).' },
   { id: 'complexity', level: 'measure', name: 'Cyclomatic complexity', basis: 'Number of linearly independent paths through a function (McCabe 1976).' },
   { id: 'entropy', level: 'measure', name: 'Naturalness', basis: 'Cross-entropy under an n-gram model of this repository; buggy lines are on average more surprising (Hindle et al. 2012; Ray et al. 2016).' },
-  { id: 'clones', level: 'measure', name: 'Duplication', basis: 'Winnowing fingerprints guarantee every shared run above a length is found (Schleimer, Wilkerson & Aiken 2003).' },
+  { id: 'clones', level: 'measure', name: 'Duplication', basis: 'Winnowing fingerprints find every shared run of 40 or more normalised tokens (Schleimer, Wilkerson & Aiken 2003), unless the run is one short unit repeated or the search was cut short. Counted in tokens, against the base and against the other functions of the same pull request; runs that appear in ten or more places are house style and are not counted.' },
   { id: 'history', level: 'measure', name: 'Change history', basis: 'Size, spread and past fixes of a change predict defects (Kamei et al. 2013; Hassan 2009).' },
   { id: 'risk', level: 'policy', name: 'Risk = likelihood × impact', basis: 'Evidence added in log-odds (Good 1950); weights from the literature, not fitted to this repository.' },
 ];
@@ -264,6 +264,14 @@ export async function analyze(project, pr, { force = false, decisions = true } =
     if (!u) u = live.find((x) => x.file === f.file) || null;
     if (u) u.findings.push({ id: f.id, severity: f.severity, title: f.title, detail: f.detail, line: f.line, basis: f.basis });
   }
+  // The functions this pull request wrote, indexed among themselves: a block pasted twice in one pull request
+  // matches nothing in the base, which has never seen it. Tests are left out: tests repeat their scaffold by design.
+  const cloneable = (u) => u._h && u._H && !u.isTest && !u.proof?.proved && u._h.bodyB - u._h.bodyA >= 40;
+  const prClones = CloneIndex ? guard('clones', () => {
+    const ix = new CloneIndex({ commonAt: Infinity }), mine = live.filter(cloneable);
+    for (const u of mine) ix.add(u.id, u._H.tokens.slice(u._h.bodyA, u._h.bodyB), { file: u.file, name: u.qname, start: u.start, end: u.end, base: u._b?.id || null });
+    return mine.length > 1 ? ix : null;
+  }, null) : null;
   for (const u of live) {
     const H = u._H, s = u._h;
     if (s && H && models.model && models.baseline && !u.proof?.proved) guard('entropy', () => {
@@ -289,11 +297,19 @@ export async function analyze(project, pr, { force = false, decisions = true } =
     if (s && H && models.clones && !u.proof?.proved && s.bodyB - s.bodyA >= 40) guard('clones', () => {
       const q = (F, sym) => models.clones.query(F.tokens.slice(sym.bodyA, sym.bodyB), { exclude: new Set([u._b?.id, s.id].filter(Boolean)) });
       const now = q(H, s), was = u._b ? q(u._B, u._b) : [];
-      const top = now.find((m) => !m.meta?.test || u.isTest);
-      if (!top) return;
-      const before = was.find((m) => m.id === top.id)?.coverage || 0; // only what this pull request introduced
-      const coverage = Math.max(0, top.coverage - before);
-      if (coverage > 0) u.clones = { coverage, tokens: top.tokens, where: `${path.basename(top.meta.file)}:${top.spans?.[0]?.b?.start ?? top.meta.start}`, name: top.meta.name, idiom: (now.distinct ?? now.length) > 8 };
+      // Only the duplication this pull request introduced, counted in tokens (a ratio grows when a function
+      // merely gets shorter): tokens matched now, minus the ones matched against the same place before, minus
+      // house style (`common`: runs present in ten or more places of the base, the rule MOSS applies with -m).
+      if (u.isTest) return; // tests repeat their scaffold by design: duplication among tests is not a risk signal
+      const size = now.queryTokens || s.bodyB - s.bodyA, own = (m) => (m ? Math.max(0, m.tokens - (m.common || 0)) : 0), old = (id) => (id ? own(was.find((m) => m.id === id)) : 0);
+      const found = now.filter((m) => !m.meta?.test).map((m) => ({ m, tokens: own(m) - old(m.id) }));
+      if (prClones) { // copies of another function written in this same pull request
+        const near = new Set(live.filter((x) => x.file === u.file && x.start <= u.end && x.end >= u.start).map((x) => x.id)); // itself, and functions nested in it or around it
+        for (const m of prClones.query(H.tokens.slice(s.bodyA, s.bodyB), { exclude: near })) found.push({ m, inPr: true, tokens: m.tokens - (now.common || 0) - old(m.meta?.base) });
+      }
+      // What is left must itself reach the algorithm's noise threshold k: a shorter shared run is noise by its own definition.
+      const top = found.sort((a, b) => b.tokens - a.tokens)[0];
+      if (top && top.tokens >= models.clones.k) u.clones = { coverage: Math.min(1, top.tokens / size), tokens: top.tokens, where: `${path.basename(top.m.meta.file)}:${(!top.inPr && top.m.spans?.[0]?.b?.start) || top.m.meta.start}`, name: top.m.meta.name, inPr: !!top.inPr, sameText: top.m.sameText ?? null };
     });
     const c = cent?.get(u.id);
     if (c) { u.centrality = c; u.tests = { reachedBy: c.testedBy || 0, changed: changedTests.filter((t) => t.id !== u.id && reachOfTest.get(t.id)?.has(u.id)).length }; }

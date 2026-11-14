@@ -1,8 +1,8 @@
 // The agents, for one node. What the mathematics could not settle goes here, one function at a time:
 //   1. three agents rebuild the function from the requirement, blind: they see the file around it with the
 //      bodies of every changed function removed, never the pull request's version
-//   2. each rebuild is compared with the pull request's function by mathematics (token equality, renaming,
-//      shingle similarity): identical rebuilds need no judge
+//   2. each rebuild is compared with the pull request's function by mathematics: a rebuild proved equal
+//      (same tokens, or a renaming of locals) needs no judge; shingle similarity only orders the others
 //   3. a judge lists behavioural differences as concrete inputs, and for each one must QUOTE the sentence of
 //      the requirement that decides it. A quote that is not in the requirement is discarded by a string
 //      check, not by another model: an agent cannot win an argument with a rule it made up
@@ -136,7 +136,7 @@ export async function reviewNode(project, pr, id, { force = false, generate = { 
       Object.assign(a, r, { ok: true });
       // Mathematics first: a rebuild that is token-identical or a renaming of the pull request's function needs no judge.
       try { const p = proveEquivalent(src.head, r.code, src.lang); a.equivalent = !!p?.proved; a.level = p?.level || null; } catch { a.equivalent = false; }
-      try { const sim = similarity(tokenize(src.head, src.lang), tokenize(r.code, src.lang)); a.similarity = Math.round((sim.jaccard ?? 0) * 100) / 100; if (sim.identical) a.equivalent = true; } catch { a.similarity = null; }
+      try { const sim = similarity(tokenize(src.head, src.lang), tokenize(r.code, src.lang)); a.similarity = Math.round((sim.jaccard ?? 0) * 100) / 100; } catch { a.similarity = null; } // similarity orders the rebuilds; only a proof makes one equivalent
     } catch (e) { a.error = String(e.message || e).slice(0, 160); }
     return a;
   }));
