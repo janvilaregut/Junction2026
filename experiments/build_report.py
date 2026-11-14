@@ -270,5 +270,9 @@ QDATA = dict(kpis=kpis, ranking=ranking, algorithms=algorithms, alves=alves, mp=
 tpl = (LAB / "report" / "template.html").read_text()
 html = tpl.replace("__QDATA__", json.dumps(QDATA, ensure_ascii=False))
 (LAB / "report" / "index.html").write_text(html)
-shutil.copy(LAB / "out" / "messagepack" / "heat.json", LAB / "report" / "heat.json")
+HEAT = json.loads((LAB / "out" / "messagepack" / "heat.json").read_text())
+prh = LAB / "out" / "messagepack" / "pr_heat.json"
+if prh.exists():
+    HEAT["branches"] = json.loads(prh.read_text())
+(LAB / "report" / "heat.json").write_text(json.dumps(HEAT, separators=(",", ":")))
 print("report/index.html", len(html) // 1024, "KB;  heat.json", (LAB / "report" / "heat.json").stat().st_size // 1024, "KB")
