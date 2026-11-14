@@ -38,7 +38,7 @@ const S = { projects: [], agents: [], pid: null, prs: { incoming: [], outgoing: 
 /* The real review pipeline (server/pipeline/complete.js) runs with a profile: a time and token budget. */
 const PROFILE = { quick: ['Quick', '90 s · first checks, no alternatives'], standard: ['Standard', '5 min · two alternatives from the base, debate and attacks'], deep: ['Deep', '15 min · extra exploration, mutations'] };
 S.profile = PROFILE[store.get('katse.profile')] ? store.get('katse.profile') : 'standard';
-S.vmode = store.get('katse.view') === 'graph' ? 'graph' : 'versions'; // a branch opens on its versions; the graph is one click away
+S.vmode = 'graph'; // a branch always opens on its graph; asking to fix something opens Fix it (fixit.js)
 const VERDICT = { 'ready-for-human': ['ok', 'Ready for your approval'], 'request-changes': ['bad', 'Request changes'], 'insufficient-evidence': ['warn', 'Not enough evidence'] };
 const CAND = { built: 'patch built', pending: 'building', failed: 'failed', timeout: 'out of time', duplicate: 'duplicate', empty: 'no changes' };
 const FIND = { 'confirmed-original': ['bad', 'Confirmed failure in the PR'], 'original-failure-unconfirmed': ['warn', 'PR failure, not confirmed'], 'candidate-only': ['no', 'Fails only in an alternative'], refuted: ['ok', 'Refuted: the PR passes'], 'invalid-test': ['no', 'Invalid test'], pending: ['no', 'Pending'], unstable: ['warn', 'Unstable result'] };
@@ -523,7 +523,7 @@ function nodeEl(n) {
   mk('text', { y: r + 17, 'text-anchor': 'middle' }, g).textContent = n.label;
   g.onmouseenter = () => hoverNode(n);
   g.onmouseleave = () => hoverNode(null);
-  g.onpointerdown = (e) => { e.stopPropagation(); G.drag = n; $('g').setPointerCapture(e.pointerId); $('tip').classList.remove('on'); };
+  g.onpointerdown = (e) => { e.stopPropagation(); G.drag = n; G.down = { x: e.clientX, y: e.clientY }; $('g').setPointerCapture(e.pointerId); $('tip').classList.remove('on'); };
   n.el = g; n.lab = false;
   return g;
 }
@@ -720,7 +720,9 @@ function focusGraph(q) { const list = findNodes(q); return list.length ? focusOn
   };
   svg.onpointerup = svg.onpointercancel = (e) => {
     const click = G.pan && !G.pan.moved && e.type === 'pointerup' && e.target === svg;
-    G.drag = null; G.pan = null; svg.classList.remove('panning');
+    const tap = G.drag && G.down && e.type === 'pointerup' && Math.hypot(e.clientX - G.down.x, e.clientY - G.down.y) < 6 ? G.drag : null;
+    G.drag = null; G.down = null; G.pan = null; svg.classList.remove('panning');
+    if (tap) { nodeTap(tap); return; }
     if (click && (G.focus || G.cam.tk !== 1)) zoomGraph('fit'); // a click on empty space steps back out
   };
   svg.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-Math.max(-120, Math.min(120, e.deltaY)) * (e.ctrlKey ? 0.01 : 0.0011))); }, { passive: false });
@@ -760,21 +762,21 @@ async function openGraph(p, x, y) {
   $('drawer').hidden = true; $('card').classList.remove('on'); $('tip').classList.remove('on');
   Object.assign(S, { cur: p, run: null, plan: null, model: null, starting: false, hl: [], origin: [x, y], openedAt: performance.now() });
   const full = $('full');
-  full.classList.remove('open', 'indebate');
-  full.classList.toggle('vmode', S.vmode === 'versions'); paintToggle();
+  if (typeof closeFixit === 'function') closeFixit(true);
+  Object.assign(S, { fixTarget: null });
+  full.classList.remove('open', 'indebate', 'infix');
   $('fid').textContent = name(p); $('fbr').textContent = p.branch;
   renderBar();
   if (!document.body.classList.contains('dive')) dive(x, y);
   full.hidden = false;
   seedGraph(x, y, state(p).tone);
-  if (S.vmode === 'versions') openVersions(p, [x, y]);
   void full.offsetWidth; full.classList.add('open');
   try {
     if (p.running) {
       const plan = await fetchPlan(p);
       if (!alive(seq)) return;
       S.plan = plan; scheduleGraph(seq, model(null, plan));
-      attach(p.running, seq); versionsData(); return;
+      attach(p.running, seq); return;
     }
     const run = p.last ? await api(`/projects/${S.pid}/runs/${p.last.runId}`) : null;
     const plan = run?.brief ? null : await fetchPlan(p);
@@ -783,7 +785,6 @@ async function openGraph(p, x, y) {
   } catch (e) { if (alive(seq)) renderBar(e.message, true); return; }
   renderBar();
   scheduleGraph(seq, model(S.run?.brief, S.plan));
-  versionsData();
 }
 function closeGraph() {
   const full = $('full');
@@ -791,7 +792,7 @@ function closeGraph() {
   openSeq++; // late answers for this branch are now ignored
   clearTimeout(renderTimer); stopStream();
   if (typeof closeDebate === 'function') closeDebate(true);
-  closeVersions();
+  if (typeof closeFixit === 'function') closeFixit(true);
   $('drawer').hidden = true; $('tip').classList.remove('on');
   full.classList.remove('open');
   collapseGraph(S.origin || [innerWidth / 2, innerHeight / 2], S.cur ? state(S.cur).tone : 'core');
@@ -801,22 +802,19 @@ function closeGraph() {
   closeTimer = setTimeout(() => { if (!full.classList.contains('open')) { full.hidden = true; stopLoop(); resetGraph(); } }, 760);
   reloadPRs().catch(() => {});
 }
-$('back').onclick = closeGraph;
-/* Versions (the lanes: how the change was rebuilt and where it converges) or the graph of files and checks. */
-function paintToggle() { $('vtog').querySelectorAll('[data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === S.vmode)); }
-function setView(mode) {
-  if (mode !== 'versions' && mode !== 'graph') return false;
-  S.vmode = mode; store.set('katse.view', mode); paintToggle();
-  const full = $('full'); full.classList.toggle('vmode', mode === 'versions');
-  if (full.hidden || !full.classList.contains('open')) return true;
-  if (mode === 'versions') { openVersions(S.cur, null); versionsData(); } else { closeVersions(true); if (!S.model && (S.run?.brief || S.plan)) renderGraph(model(S.run?.brief, S.plan)); }
-  return true;
+$('back').onclick = () => (typeof fixOpen === 'function' && fixOpen() ? closeFixit() : closeGraph());
+/* There is one view of a branch now, the graph. Kept for older callers. */
+function setView(mode) { return mode === 'graph'; }
+/* A click on a node (not a drag) flies the camera to it; a code region also becomes the target of Fix it. */
+function nodeTap(n) {
+  focusOn([n.id]);
+  S.fixTarget = n.kind === 'zone' ? n : null;
+  renderBar();
 }
-$('vtog').querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => setView(b.dataset.v)));
-paintToggle();
 
 /* The one bar at the bottom of the graph: a number, a state, one action.
    An error from loading the branch is fatal (only Back); an error from an action can be dismissed. */
+const fixBtn = () => `<button class="cta ghost fixb" id="bFix" title="Watch the agents argue it out">Fix it${S.fixTarget ? ` <small>:${S.fixTarget.start}</small>` : ''}</button>`;
 function renderBar(error, fatal) {
   const p = S.cur, b = S.run?.brief;
   const seg = `<div class="seg">${Object.entries(PROFILE).map(([id, [n, d]]) => `<button data-p="${id}" class="${S.profile === id ? 'on' : ''}" title="${esc(d)}">${n}</button>`).join('')}</div>`;
@@ -831,13 +829,14 @@ function renderBar(error, fatal) {
     const [tone, label] = stale ? ['no', 'Out of date'] : so ? (so.decision === 'aprobar' ? ['ok', 'Signed'] : ['bad', 'Sent back']) : v ? VERDICT[v.status] || ['warn', v.label] : [laneTone(b.lane.id, b.lane.tone), laneName(b.lane.id, b.lane.name)];
     const num = v ? (sc && sc.value != null ? `<span class="num">${sc.value}<small> / 10</small></span><span class="txt">review score</span>` : '<span class="num">–</span><span class="txt">no score yet</span>') : `<span class="num">${b.residue.lines}<small> / ${b.totals.lines}</small></span><span class="txt">lines are yours</span>`;
     h = `${num}<span class="chip ${tone}" style="background:${PAL[tone]}">${esc(label)}</span>`
-      + (stale ? `${seg}<button class="cta" id="bVerify">Verify again</button>` : `<button class="cta" id="bReview">${S.run.signoff ? 'View sign-off' : 'Review & sign'}</button>`);
-  } else if (S.plan) h = `<span class="num">${S.plan.totals.files}<small> files</small></span><span class="txt">+${S.plan.totals.added} −${S.plan.totals.removed} · not verified yet</span>${seg}<button class="cta" id="bVerify">Verify</button>`;
+      + (stale ? `${seg}<button class="cta" id="bVerify">Verify again</button>` : `${fixBtn()}<button class="cta" id="bReview">${S.run.signoff ? 'View sign-off' : 'Review & sign'}</button>`);
+  } else if (S.plan) h = `<span class="num">${S.plan.totals.files}<small> files</small></span><span class="txt">+${S.plan.totals.added} −${S.plan.totals.removed} · not verified yet</span>${seg}${fixBtn()}<button class="cta" id="bVerify">Verify</button>`;
   else h = '<span class="txt">Loading…</span>';
   $('fbar').innerHTML = h;
   $('fbar').querySelectorAll('[data-p]').forEach((x) => (x.onclick = () => { S.profile = x.dataset.p; store.set('katse.profile', S.profile); renderBar(); }));
   if ($('bVerify')) $('bVerify').onclick = () => verify();
   if ($('bReview')) $('bReview').onclick = openReview;
+  if ($('bFix')) $('bFix').onclick = () => openFixit({ node: S.fixTarget });
   if ($('bBack')) $('bBack').onclick = closeGraph;
   if ($('bOk')) $('bOk').onclick = () => renderBar();
 }
@@ -854,7 +853,7 @@ async function verify() {
     S.starting = false;
     p.running = r.runId; // the tree and a reopen show it as running until the next reload
     if (S.cur?.id === p.id) S.cur.running = r.runId;
-    if (alive(seq) && S.cur?.id === p.id) { versionsGoLive(); attach(r.runId, seq); }
+    if (alive(seq) && S.cur?.id === p.id) attach(r.runId, seq);
     reloadPRs().catch(() => {});
     return true;
   } catch (e) {
@@ -883,7 +882,7 @@ function attach(runId, seq = openSeq) {
   es.onmessage = async (m) => {
     if (S.es !== es) return;
     const e = JSON.parse(m.data);
-    const live = liveText(e); versionsEvent(e);
+    const live = liveText(e);
     if (e.type === 'stage' && e.status === 'start') { S.stage = STAGE[e.id] || e.name; renderBar(); }
     else if (live) { S.stage = live; renderBar(); }
     else if (e.type === 'end') {
@@ -895,7 +894,7 @@ function attach(runId, seq = openSeq) {
         if (!alive(seq)) return;
         S.run = run;
         if (!run.brief) return renderBar(`Verification failed: ${english(run.error) || 'unknown error'}`);
-        renderBar(); renderGraph(model(run.brief)); versionsLiveDone();
+        renderBar(); renderGraph(model(run.brief));
       } catch (err) { if (alive(seq)) renderBar(err.message); }
     }
   };
@@ -941,7 +940,7 @@ function openReview() {
   $('dbody').querySelectorAll('[data-again]').forEach((x) => (x.onclick = () => { S.profile = x.dataset.again; store.set('katse.profile', S.profile); $('drawer').hidden = true; verify(); }));
   if ($('goDeep')) $('goDeep').onclick = async () => {
     const seq = openSeq; $('drawer').hidden = true; S.starting = true; renderBar();
-    try { const r = await api(`/projects/${S.pid}/runs/${run.id}/continue`, { body: { profile: 'deep' } }); S.starting = false; if (alive(seq)) { versionsGoLive(); attach(r.runId, seq); } }
+    try { const r = await api(`/projects/${S.pid}/runs/${run.id}/continue`, { body: { profile: 'deep' } }); S.starting = false; if (alive(seq)) attach(r.runId, seq); }
     catch (e) { S.starting = false; if (alive(seq)) renderBar(e.message); }
   };
   if (so) bindSigned(run); else bindSign(run);
@@ -1046,10 +1045,10 @@ addEventListener('keydown', (e) => {
   const typing = e.target.closest?.('#drawer input, #drawer textarea');
   if (!$('modal').hidden) closeModal();
   else if (typing) e.target.blur(); // first Esc leaves the field; the sign-off text is not lost
-  else if (typeof versionsEscape === 'function' && versionsEscape()) { /* a region's code or an agent's card */ }
+  else if (typeof fixEscape === 'function' && fixEscape()) { /* Fix it, back to the graph */ }
   else if (typeof debateEscape === 'function' && debateEscape()) { /* the agent, then the debate */ }
   else if (!$('drawer').hidden) $('drawer').hidden = true;
-  else if (!$('full').hidden) { if (S.vmode !== 'versions' && (G.focus || Math.abs(G.cam.tk - 1) > 0.01 || G.cam.tx || G.cam.ty)) zoomGraph('fit'); else closeGraph(); } // step back out, then leave
+  else if (!$('full').hidden) { if ((G.focus || Math.abs(G.cam.tk - 1) > 0.01 || G.cam.tx || G.cam.ty)) zoomGraph('fit'); else closeGraph(); } // step back out, then leave
   else if (S.focus) hideCommits();
 });
 
