@@ -54,7 +54,7 @@ namespace Tools
 {
     public class A
     {
-        public void Go(Helper h, List<int> list) { h.Assist(1); h.Polish(); h.Rare(); h.Common(); h.ToString(); list.Add(1); }
+        public void Go(dynamic h, dynamic list) { h.Assist(1); h.Polish(); h.Rare(); h.Common(); h.ToString(); list.Add(1); }
     }
     public static class Ext { public static int Twist(this string s, int n) { return n; } public static int Plain(string s, int n) { return n; } }
     public class UsesExt { public int Go(string s) { return s.Twist(3) + s.Plain(3); } }
@@ -80,8 +80,8 @@ namespace Tools
 }`,
   'src/Tools/B.cs': 'namespace Tools { public class Helper { public void Assist(int n) { } public void Polish() { } } public class Helper2 { public void Assist(int n) { } public void Assist(int a, int b) { } } }',
   'src/Far/C.cs': 'namespace Far { public class X { public void Assist(int n) { } public void Rare() { } public void Common() { } } public class Y { public void Common() { } } public class Z { public void Common() { } } public class W { public void Common() { } } }',
-  'src/Util/Same.cs': 'namespace Util { public class P { public int Run() { return Twice(2); } } public static class Q { public static int Twice(int x) { return x * 2; } } }',
-  'src/Util/Other.cs': 'namespace Util { public static class R { public static int Twice(int x) { return x; } } }',
+  'src/Util/Same.cs': 'using static Util.Q;\nnamespace Util { public class P { public int Run() { return Twice(2); } } public static class Q { public static int Twice(int x) { return x * 2; } } }',
+  'src/Util/Other.cs': 'namespace Util { public static class R { public static int Twice(int x) { return x; } } public class S { public int Run() { return Twice(2); } } }',
 };
 const cart = (k) => `src/Shop/Cart.cs::Cart.${k}`, fac = (k) => `src/Shop/Factory.cs::${k}`, tool = (k) => `src/Tools/A.cs::${k}`;
 
@@ -104,7 +104,8 @@ test('C# bare identifiers: a property of the same container is a use, a member o
   assert.deepEqual(refsOf(g, cart('Tax'), 'Count').map((r) => r.kind), ['member']);
   assert.deepEqual(uses(g, fac('Init.Read')), [fac('Init.Count')]);
   // `new Cart { Count = 3 }`: Count is Cart's, not Init's; the initialiser calls the parameterless constructor
-  assert.deepEqual(uses(g, fac('Init.Build')), ['src/Shop/Cart.cs::Cart', cart('Cart/0')]);
+  assert.deepEqual(uses(g, fac('Init.Build')), ['src/Shop/Cart.cs::Cart', cart('Cart/0'), cart('Count')]);
+  assert.ok(!g.out.get(fac('Init.Build')).has(fac('Init.Count')));
 });
 
 test('C# construction: the type and only the constructors that admit the arguments', () => {
@@ -128,6 +129,7 @@ test('C# Type.Member resolves inside that type only, even for a stop-list name; 
 
 test('C# member calls on an unknown receiver: rule 4 (namespace), rule 5 (anywhere), ambiguity, stop list', () => {
   const g = repo(CS), go = tool('A.Go');
+  // `dynamic h` says nothing about the receiver. (A declared type does: see the typed-receiver tests below.)
   // h.Assist(1): both one-parameter Assist in namespace Tools; not the two-parameter overload, not Far.X.Assist
   assert.deepEqual([...refsOf(g, go, 'Assist')[0].to].sort(), ['src/Tools/B.cs::Helper.Assist', 'src/Tools/B.cs::Helper2.Assist/1']);
   assert.deepEqual(refsOf(g, go, 'Polish')[0].to, ['src/Tools/B.cs::Helper.Polish']);
@@ -147,9 +149,13 @@ test('C# member calls on an unknown receiver: rule 4 (namespace), rule 5 (anywhe
   assert.equal(refsOf(wide, go, 'Common')[0].to.length, 4);
 });
 
-test('C# rule 3: the same file wins over the rest of the namespace', () => {
+test('C# bare calls outside the enclosing types: only `using static` brings a method of another class into reach', () => {
   const g = repo(CS);
-  assert.deepEqual(uses(g, 'src/Util/Same.cs::P.Run'), ['src/Util/Same.cs::Q.Twice']); // not R.Twice in Other.cs
+  assert.deepEqual(uses(g, 'src/Util/Same.cs::P.Run'), ['src/Util/Same.cs::Q.Twice']); // imported with `using static Util.Q`; not R.Twice
+  // Counterexample to the name-only rule: S.Run() calls Twice(2) with R.Twice right there in its file and namespace,
+  // but without `using static` that is not a call C# can bind to R.Twice. It stays unresolved.
+  assert.deepEqual(uses(g, 'src/Util/Other.cs::S.Run'), []);
+  assert.deepEqual(g.refs.get('src/Util/Other.cs::S.Run').map((r) => [r.name, r.status]), [['Twice', 'unresolved']]);
 });
 
 test('C# extension methods take their receiver as first argument; a static method is not called through an instance', () => {
@@ -341,7 +347,7 @@ test('Python: a re-export through __init__.py, `import *`, and *args as an unkno
 test('graph shape: every symbol is a node, in mirrors out, stats count what is there, output is deterministic', () => {
   const g = repo(CS), h = repo(CS);
   assert.equal(g.stats.symbols, g.nodes.size);
-  assert.equal(g.nodes.size, 72);
+  assert.equal(g.nodes.size, 74);
   assert.equal(g.nodes.get('src/Shop/Factory.cs::Kind').kind, 'type');
   let edges = 0;
   for (const [a, set] of g.out) for (const b of set) { edges++; assert.ok(g.in.get(b).has(a)); assert.notEqual(a, b); }
@@ -613,4 +619,248 @@ test('JavaScript details: the parameter of `f = x => …` is a local, and the me
   assert.deepEqual(['p', 'q', 'r'].map((k) => centrality(h).get(k).dependents), [0, 1, 2]);
   assert.deepEqual(neighbourhood(h, ['q']), { nodes: ['q', 'r', 'p'], edges: [['q', 'r'], ['p', 'q']] });
   assert.deepEqual(callSites(h, 'q'), []);
+});
+
+// ── Counterexamples ───────────────────────────────────────────────────────────────────────────────────
+// Each case below is a false or missing edge that was found by reading sampled edges of a real C# repository
+// against its source (80 sampled edges: 38 right). The fixtures are the smallest programs that show them.
+const ADV = {
+  'src/Core/Writer.cs': `
+namespace Core
+{
+    public class Writer
+    {
+        public void Write(int value) { }
+        public void Write(long value) { }
+        public void Write(string value) { }
+        public void Write(string format, params object[] args) { }
+        public void Flush() { }
+        public void Advance(int count) { }
+        public bool TryRead(System.ReadOnlySpan<byte> src, out ushort value) { value = 0; return true; }
+        public bool TryRead(System.ReadOnlySpan<byte> src, out uint value) { value = 0; return true; }
+    }
+    public class Reader
+    {
+        public int ReadHeader() { return 0; }
+        public void Advance(long count) { }
+        private int Secret() { return 1; }
+    }
+    public class Sink { public void Flush() { } public void Add(int x) { } }
+    public class Options { public Resolver Resolver { get; set; } public static Options Standard { get; } }
+    public class Resolver { public int Depth { get; set; } public int Step() { return Depth; } }
+}`,
+  'src/Core/Uses.cs': `
+using System.Collections.Generic;
+namespace Core
+{
+    public class Uses
+    {
+        private readonly Writer writer = new Writer();
+        private Reader reader;
+        public void Typed(Writer w, Reader r, List<int> list, int n) { w.Flush(); r.Advance(n); w.Advance(n); list.Add(1); }
+        public void Over(Writer w, int n, string s) { w.Write(n); w.Write(s); w.Write("a" + "b"); w.Write(5L); w.Write(Num()); }
+        public void Fields() { this.writer.Advance(1); reader.ReadHeader(); }
+        public void Built() { var w = new Writer(); w.Flush(); var o = Make(); o.Flush(); }
+        public int Chain(Options options) { options.Resolver.Step(); return Options.Standard.Resolver.Depth; }
+        public void Out(Writer w, System.ReadOnlySpan<byte> src) { w.TryRead(src, out uint v); }
+        public void Hidden(dynamic d) { d.Secret(); }
+        private object Make() { return null; }
+        private int Num() { return 0; }
+    }
+}`,
+  'src/Core/Prod.cs': 'namespace Core { public class Prod { public int Run(dynamic r) { return r.ReadHeader() + r.Empty(); } } }',
+  'tests/Core.Tests/ReaderTests.cs': 'namespace Core { public class ReaderTests { [Fact] public void ReadHeader() { } [Fact] public void Empty() { } public void Probe(dynamic r) { r.ReadHeader(); } } }',
+  'src/Core/Ser.cs': `
+namespace Core
+{
+    public static class Ser
+    {
+        public static byte[] Serialize<T>(T value, Options? options = null) { return null; }
+        public static void Serialize<T>(ref Writer writer, T value, Options? options = null) { }
+        public static byte[] Serialize(System.Type type, object? obj, Options? options = null) { return null; }
+        public static T Deserialize<T>(byte[] bytes, Options? options = null) { return default(T); }
+        public static object? Deserialize(System.Type type, byte[] bytes, Options? options = null) { return null; }
+    }
+    public class UsesSer
+    {
+        public void One(int v) { Ser.Serialize(v); }
+        public void Two(int v, Options o, Writer w) { Ser.Serialize(v, o); Ser.Serialize(ref w, v); }
+        public void Gen(byte[] b, Options o) { Ser.Deserialize<int>(b, o); Ser.Deserialize(typeof(int), b, o); }
+    }
+}`,
+  'src/Core/Box.cs': `
+namespace Core
+{
+    public class Box { public int Size() { return 0; } public int Peek() { return Size(); } }
+    public class Box<T> { public int Size() { return 1; } public int Peek() { return Size(); } }
+    public class UsesBox { public void Go() { var a = new Box(); var b = new Box<int>(); a.Size(); b.Size(); } }
+}`,
+  'fix/One/Dup.cs': 'namespace Fix { public class Dup { public int Id() { return Help(); } private int Help() { return 1; } } public class UseDup { public int Go() { var d = new Dup(); return d.Id(); } } }',
+  'fix/Two/Dup.cs': 'namespace Fix { public class Dup { public int Id() { return Help(); } private int Help() { return 2; } } }',
+  'src/Q/A.cs': 'namespace Q.A { public class Thing { public Thing() { } } }',
+  'src/Q/B.cs': 'namespace Q.B { public class Thing { public Thing() { } } }',
+  'src/Q/Use.cs': 'namespace Q { public class Use { public object One() { return new A.Thing(); } public object Two() { return new global::Q.B.Thing(); } public object Three() { return new global::Other.Thing(); } } }',
+  'src/Cha/Shapes.cs': `
+namespace Cha
+{
+    public interface IShape { double Area(); string Name { get; } }
+    public abstract class Base : IShape { public abstract double Area(); public string Name => "b"; public double Twice() { return Area() * 2; } public virtual int Sides() { return 0; } }
+    public class Square : Base { public override double Area() { return 1; } public override int Sides() { return 4; } }
+    public class Circle : Base { public override double Area() { return 3; } public new int Sides() { return 0; } }
+    public class Odd : IShape { double IShape.Area() { return 5; } public string Name => "o"; public int Own() { return Name.Length; } public double Bad() { return Area(); } }
+    public class Draw
+    {
+        public double Go(IShape s) { return s.Area(); }
+        public int Count(Base b) { return b.Sides(); }
+        public double Sq(Square q) { return q.Area(); }
+    }
+}`,
+  'src/Core/Ext.cs': 'namespace Core { public static class Ext { public static int Twist(this string s) { return 1; } public static int Spin(this Reader r) { return 2; } } public class UsesExt2 { public int A(Writer w, Reader r, string s) { return w.Twist() + r.Spin() + s.Twist() + w.Spin(); } } }',
+  'src/Core/New.cs': `
+namespace Core
+{
+    public class Pt { public int X { get; set; } public Pt() { } public Pt(int x) { X = x; } }
+    public class Alt { public int X { get; set; } public void Go() { } }
+    public class Mk
+    {
+        public Pt A() { Pt p = new(3); return p; }
+        public Pt B() { return new Pt { X = 1 }; }
+        public void C(bool f) { if (f) { Pt v = new Pt(); v.ToString(); } else { Alt v = new Alt(); v.Go(); } }
+    }
+}`,
+};
+const core = (file, k) => `src/Core/${file}.cs::${k}`;
+const tos = (g, from, name) => refsOf(g, from, name).map((r) => [...r.to].sort());
+
+test('C# typed receivers: a parameter, a field and a `var x = new T()` resolve inside the declared type', () => {
+  const g = repo(ADV), u = (k) => core('Uses', `Uses.${k}`), w = (k) => core('Writer', k);
+  // was: w.Flush() and r.Advance(n) linked to every Flush / Advance of the namespace (Sink.Flush, Writer.Advance)
+  assert.deepEqual(uses(g, u('Typed')), [w('Reader.Advance'), w('Writer.Advance'), w('Writer.Flush')]);
+  assert.deepEqual(tos(g, u('Typed'), 'Advance'), [[w('Reader.Advance')], [w('Writer.Advance')]]);
+  // List<int> is not a type of the repository: list.Add(1) cannot be Sink.Add. It is unresolved, and no longer
+  // counted against every repository method called Add.
+  assert.deepEqual(refsOf(g, u('Typed'), 'Add').map((r) => [r.status, r.to]), [['unresolved', []]]);
+  assert.equal(g.unlinked.get('Add'), undefined);
+  // fields are read from the type body: this.writer is a Writer, reader is a Reader
+  assert.deepEqual(uses(g, u('Fields')), [w('Reader.ReadHeader'), w('Writer.Advance')]);
+  // var w = new Writer() is a Writer; var o = Make() is not known, so rule 4 still links every Flush of the namespace
+  assert.deepEqual(tos(g, u('Built'), 'Flush'), [[w('Writer.Flush')], [w('Sink.Flush'), w('Writer.Flush')]]);
+  // property chains: options.Resolver is a Resolver; Options.Standard.Resolver.Depth reads three properties
+  assert.deepEqual(uses(g, u('Chain')), [w('Options.Resolver'), w('Options.Standard'), w('Resolver.Depth'), w('Resolver.Step')]);
+});
+
+test('C# overloads: the written types of the arguments choose, ref and out must match, the rest stays linked', () => {
+  const g = repo(ADV), over = core('Uses', 'Uses.Over'), w = (k) => core('Writer', `Writer.${k}`);
+  // Write(n) with int n · Write(s) with string s (not the params overload) · "a" + "b" · 5L · Write(Num()): type not written
+  assert.deepEqual(tos(g, over, 'Write'), [[w('Write/1')], [w('Write/1#3')], [w('Write/1#3')], [w('Write/1#2')], [w('Write/1'), w('Write/1#2'), w('Write/1#3'), w('Write/2')]]);
+  // out uint v converts to nothing: only the overload whose parameter is `out uint`
+  assert.deepEqual(tos(g, core('Uses', 'Uses.Out'), 'TryRead'), [[w('TryRead/2#2')]]);
+});
+
+test('C# accessibility and tests: a private member of another type and a test case are not call targets', () => {
+  const g = repo(ADV);
+  assert.deepEqual(refsOf(g, core('Uses', 'Uses.Hidden'), 'Secret').map((r) => r.status), ['unresolved']);
+  // was: reader.ReadArrayHeader() in production code linked to a [Fact] method of that name in the test project
+  assert.deepEqual(tos(g, core('Prod', 'Prod.Run'), 'ReadHeader'), [[core('Writer', 'Reader.ReadHeader')]]);
+  assert.deepEqual(refsOf(g, core('Prod', 'Prod.Run'), 'Empty').map((r) => r.status), ['unresolved']);
+  assert.deepEqual(uses(g, 'tests/Core.Tests/ReaderTests.cs::ReaderTests.Probe'), [core('Writer', 'Reader.ReadHeader')]);
+  assert.equal(g.in.get('tests/Core.Tests/ReaderTests.cs::ReaderTests.ReadHeader').size, 0);
+});
+
+test('C# arity: `object? obj` is a required parameter; explicit type arguments need a generic method; ref is written at the call', () => {
+  const g = repo(ADV), ser = (k) => core('Ser', `Ser.${k}`), u = (k) => core('Ser', `UsesSer.${k}`);
+  // Serialize(Type type, object? obj, Options? options = null) needs two arguments: a nullable type is not a default value
+  assert.deepEqual(uses(g, u('One')), [ser('Serialize/2')]); // Serialize(v) is not Serialize(Type, object?)
+  assert.deepEqual(tos(g, u('Two'), 'Serialize'), [[ser('Serialize/2'), ser('Serialize/3#2')], [ser('Serialize/3')]]);
+  assert.deepEqual(tos(g, u('Gen'), 'Deserialize'), [[ser('Deserialize/2')], [ser('Deserialize/3')]]);
+});
+
+test('C# containers: `Box` and `Box<T>` are two types, and types that are not partial do not share members across copies', () => {
+  const g = repo(ADV), box = (k) => core('Box', k);
+  assert.deepEqual(uses(g, box('Box.Peek/0')), [box('Box.Size/0')]);
+  assert.deepEqual(uses(g, box('Box.Peek/0#2')), [box('Box.Size/0#2')]);
+  assert.deepEqual(tos(g, box('UsesBox.Go'), 'Size'), [[box('Box.Size/0')], [box('Box.Size/0#2')]]);
+  // two projects keep their own class Fix.Dup: each one's Id() calls its own Help(), and code next to a copy means that copy
+  assert.deepEqual(uses(g, 'fix/One/Dup.cs::Dup.Id'), ['fix/One/Dup.cs::Dup.Help']);
+  assert.deepEqual(uses(g, 'fix/Two/Dup.cs::Dup.Id'), ['fix/Two/Dup.cs::Dup.Help']);
+  assert.deepEqual(uses(g, 'fix/One/Dup.cs::UseDup.Go'), ['fix/One/Dup.cs::Dup', 'fix/One/Dup.cs::Dup.Id']);
+  // partial types still merge by name (the Split class of the first fixture)
+  assert.deepEqual(uses(repo(CS), fac('Split.A')), ['src/Shop/Part2.cs::Split.B']);
+});
+
+test('C# qualified names: `new A.Thing()` is the Thing of A, and `global::` names the whole path', () => {
+  const g = repo(ADV), use = (k) => `src/Q/Use.cs::Use.${k}`;
+  assert.deepEqual(uses(g, use('One')), ['src/Q/A.cs::Thing', 'src/Q/A.cs::Thing.Thing']);
+  assert.deepEqual(uses(g, use('Two')), ['src/Q/B.cs::Thing', 'src/Q/B.cs::Thing.Thing']);
+  assert.deepEqual(g.refs.get(use('Three')).map((r) => [r.name, r.status, r.to.length]), [['Thing', 'unresolved', 0]]);
+});
+
+test('C# dispatch (class hierarchy analysis): a call through a base or an interface reaches the overrides, up to maxDispatch', () => {
+  const g = repo(ADV), sh = (k) => `src/Cha/Shapes.cs::${k}`;
+  assert.deepEqual(uses(g, sh('Draw.Go')), [sh('Base.Area'), sh('Circle.Area'), sh('IShape.Area'), sh('Odd.Area'), sh('Square.Area')]);
+  assert.deepEqual(uses(g, sh('Draw.Count')), [sh('Base.Sides'), sh('Square.Sides')]); // Circle.Sides is `new`, not an override
+  assert.deepEqual(uses(g, sh('Draw.Sq')), [sh('Square.Area')]);
+  assert.deepEqual(uses(g, sh('Base.Twice')), [sh('Base.Area'), sh('Circle.Area'), sh('Square.Area')]);
+  // an explicit interface implementation has no name of its own: Area() inside Odd is not Odd's IShape.Area
+  assert.deepEqual(uses(g, sh('Odd.Bad')), []);
+  assert.deepEqual(uses(g, sh('Odd.Own')), [sh('Odd.Name')]);
+  assert.equal(g.stats.capped, 0);
+  // past the cap the call keeps its declared target, and the name is reported as having callers that are not shown
+  const tight = repo(ADV, { maxDispatch: 2 });
+  assert.deepEqual(uses(tight, sh('Draw.Go')), [sh('IShape.Area')]);
+  assert.equal(tight.stats.capped, 1);
+  assert.equal(tight.unlinked.get('Area'), 1);
+  assert.equal(centrality(tight).get(sh('Square.Area')).unlinked, 1);
+});
+
+test('C# extension methods fit their receiver; target-typed new, object initialisers and a local declared twice', () => {
+  const g = repo(ADV), a = core('Ext', 'UsesExt2.A'), mk = (k) => core('New', k);
+  assert.deepEqual(uses(g, a), [core('Ext', 'Ext.Spin'), core('Ext', 'Ext.Twist')]);
+  // w.Twist(): a Writer is not a string · r.Spin() · s.Twist() · w.Spin(): a Writer is not a Reader
+  assert.deepEqual(g.refs.get(a).map((r) => [r.name, r.status]), [['Twist', 'unresolved'], ['Spin', 'resolved'], ['Twist', 'resolved'], ['Spin', 'unresolved']]);
+  assert.deepEqual(uses(g, mk('Mk.A')), [mk('Pt'), mk('Pt.Pt/1')]); // Pt p = new(3)
+  assert.deepEqual(uses(g, mk('Mk.B')), [mk('Pt'), mk('Pt.Pt/0'), mk('Pt.X')]); // new Pt { X = 1 } sets Pt.X, not Alt.X
+  // v is a Pt in one branch and an Alt in the other: v.Go() is found in the union of the two
+  assert.deepEqual(uses(g, mk('Mk.C')), [mk('Alt'), mk('Alt.Go'), mk('Pt'), mk('Pt.Pt/0')]);
+});
+
+test('Java: a declared receiver type and dispatch through an interface', () => {
+  const g = repo({
+    'j/Shape.java': 'package j;\ninterface Shape { double area(); }\n',
+    'j/Sq.java': 'package j;\nclass Sq implements Shape { public double area() { return 1; } }\n',
+    'j/Ci.java': 'package j;\nclass Ci implements Shape { public double area() { return 3; } void other() { } }\n',
+    'j/Use.java': 'package j;\nclass Use { double go(Shape s, Sq q) { return s.area() + q.area(); } }\n',
+  });
+  assert.deepEqual(tos(g, 'j/Use.java::Use.go', 'area'), [['j/Ci.java::Ci.area', 'j/Shape.java::Shape.area', 'j/Sq.java::Sq.area'], ['j/Sq.java::Sq.area']]);
+});
+
+test('measures on a resolved graph: PageRank sums to 1, percentiles are monotone in what they rank', () => {
+  for (const g of [repo(CS), repo(ADV), repo(JS)]) {
+    const pr = pagerank(g), c = centrality(g);
+    let sum = 0; for (const v of pr.values()) { assert.ok(v >= 0); sum += v; }
+    close(sum, 1, 1e-12);
+    const ranked = [...c].filter(([, m]) => m.fanInPct !== null).map(([, m]) => m);
+    assert.ok(ranked.length > 5);
+    for (const [value, pct] of [['fanIn', 'fanInPct'], ['dependents', 'dependentsPct'], ['pagerank', 'pagerankPct']]) {
+      const sorted = ranked.slice().sort((p, q) => p[value] - q[value]);
+      assert.equal(sorted[0][pct] >= 0 && sorted[sorted.length - 1][pct] <= 1, true);
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i][value] === sorted[i - 1][value]) assert.equal(sorted[i][pct], sorted[i - 1][pct]); // ties share a rank
+        else assert.ok(sorted[i][pct] > sorted[i - 1][pct], `${pct} must grow with ${value}`);
+      }
+    }
+    for (const [id, m] of c) assert.equal(m.dependents, reverseReach(g, id, { includeTests: false }).size); // exact on the graph
+  }
+});
+
+test('measures on a graph built by hand: a self-edge and an edge to a missing node are not edges', () => {
+  // a → a (self), a → b, a → ghost (not a node). Every measure must read this as the single edge a → b.
+  const node = (name) => [name, { id: name, name, kind: 'function', isTest: false, file: 'h.js' }];
+  const g = { nodes: new Map(['a', 'b'].map(node)), out: new Map([['a', new Set(['a', 'b', 'ghost'])], ['b', new Set()]]), in: new Map([['a', new Set(['a'])], ['b', new Set(['a'])]]) };
+  const c = centrality(g), r = pagerank(g);
+  assert.deepEqual([c.get('a').fanIn, c.get('a').fanOut, c.get('a').dependents], [0, 1, 0]); // was fanIn 1: a counted as its own user
+  assert.deepEqual([c.get('b').fanIn, c.get('b').dependents], [1, 1]);
+  assert.deepEqual([...forwardReach(g, 'a')], ['b']); // was ['b', 'ghost'] while fanOut said 1
+  // a → b with b dangling: k = 1 / (2 + d), rA = k, rB = k (1 + d)
+  close(r.get('a'), 1 / 2.85, 1e-12); close(r.get('b'), 1.85 / 2.85, 1e-12);
 });

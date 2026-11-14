@@ -3,25 +3,31 @@
 // it, reads it). Built from tokens and names only, so it works on any ref straight from git in milliseconds.
 //
 // WHAT THE GRAPH IS, AND IS NOT
-// It is name-based: there is no type inference and no compiler. A reference is linked by the rules below, and
-// what they cannot decide stays unresolved or ambiguous with no edge. Nothing is guessed. So every number
-// derived from it (fan-in, dependents, reach, rank) is an ESTIMATE of the real dependency structure, never a
-// proof that something is or is not used.
-//   It over-approximates where a name is all there is to go by: under rules 3 and 4 a call links to EVERY
-//   admissible symbol of that name in the file, namespace or directory, and under rule 5 to up to
-//   `maxCandidates` of them anywhere; C# types that share a name inside one namespace (partial parts, generic
-//   arities, #if alternatives, and copies of one type kept by several projects or test fixtures of the same
-//   repository) are one container; an inherited call links to every nearest base that declares the name.
-//   It under-approximates where the target is decided at run time or lies outside what is parsed: dynamic
-//   dispatch (a call through an interface or a virtual method links to the declaration that the name finds,
-//   not to its overrides), reflection, callbacks and delegates held in variables, member calls with a
-//   ubiquitous name on a receiver of unknown type (the stop list: skipped), names carried by more than
-//   `maxCandidates` symbols (ambiguous: no edge), code that belongs to no declared symbol (field initialisers,
-//   statements at the top of a module), types named only in declarations, casts or generic arguments (a type
-//   gets edges from `new T` and `T.member` only), and everything outside the repository.
-// `graph.unlinked` counts, per name, the references left without an edge because the name is on the stop list
-// or ambiguous; centrality() repeats it per symbol, and a symbol whose name has unlinked references has fan-in
-// and dependents that are LOWER BOUNDS. "Nothing depends on it" is only ever "no dependent was found".
+// It is built from names and from what declarations say in the text: there is no compiler and no inference of
+// the type of an expression. A reference is linked by the rules below, and what they cannot decide stays
+// unresolved or ambiguous with no edge. Nothing is guessed. So every number derived from it (fan-in,
+// dependents, reach, rank) is an ESTIMATE of the real dependency structure, never a proof that something is or
+// is not used. Measured on 80 edges sampled from a 690-file C# repository and read against the source: 59 name
+// exactly the declaration that is used, 77 the right member of the right type (the difference is overloads
+// that only argument types tell apart).
+//   It over-approximates where the text does not decide: a call whose receiver has no declared type links to
+//   EVERY admissible symbol of that name in the namespace or directory (rule 4) and to up to `maxCandidates`
+//   anywhere (rule 5); overloads that differ only in parameter types are all linked unless the written types
+//   of the arguments single one out; a call through a base type or an interface links to the overrides in
+//   every type that derives from it (up to `maxDispatch`); C# `partial` types that share a name inside one
+//   namespace are one container, also when they are copies kept by several projects or test fixtures; a local
+//   declared twice in one body with two types is taken as either.
+//   It under-approximates where the target is decided at run time or lies outside what is parsed: reflection,
+//   callbacks and delegates held in variables, dispatch past `maxDispatch` overrides (the call keeps its
+//   declared target only), member calls with a ubiquitous name on a receiver of unknown type (the stop list:
+//   skipped), names carried by more than `maxCandidates` symbols (ambiguous: no edge), code that belongs to no
+//   declared symbol (field initialisers, statements at the top of a module), types named only in declarations,
+//   casts or generic arguments (a type gets edges from `new T` and `T.member` only), a class that implements
+//   an interface through a member its base class declares, and everything outside the repository.
+// `graph.unlinked` counts, per name, the references left without an edge because the name is on the stop list,
+// ambiguous, or dispatched past the cap; centrality() repeats it per symbol, and a symbol whose name has
+// unlinked references has fan-in and dependents that are LOWER BOUNDS. "Nothing depends on it" is only ever
+// "no dependent was found".
 //
 // RESOLUTION (the first rule that yields candidates wins)
 //   1  bare calls and this./self. calls: members of the same container, then what its declared base types
@@ -31,18 +37,28 @@
 //      the file the import path resolves to, following re-exports
 //   3  same file      4  same directory, or the same namespace in C#
 //   5  anywhere, when at most `maxCandidates` symbols carry the name; more is ambiguous and adds no edge
-//   Type.member with Type declared in the repository resolves inside that type only. A member call on a
-//   receiver of unknown type (also a this./base. call that rule 1 cannot place) uses rules 4 and 5 and is
-//   skipped for stop-list names.
-// Arity: when the number of arguments of a call is known, a candidate must admit it (minParams <= n <=
-// maxParams; a C# extension method called through its receiver takes n + 1). The exception is a name that
-// JavaScript, TypeScript or Python scoping binds to one declaration (rules 1 to 3 there): a wrong argument
-// count is then a finding about that call, not a reason to unlink it.
-// Scoping facts are used only to REMOVE candidates: a parameter, local variable or local function hides an
-// outer name; an identifier bound by an import means that import and nothing else; in a module (a JavaScript
-// file with imports or exports, any Python file) a bare name that is neither declared in the file nor
-// imported is a global or builtin, never another file's function; a C# static method that is not an extension
-// method is not called through an instance.
+//   Type.member with Type declared in the repository resolves inside that type only.
+//   C# and Java, where declarations carry types: a receiver that is a parameter, a local (`T x`, `var x = new
+//   T()`), a field or a property, or a chain of those (`this.options.Resolver`), has the type its declaration
+//   writes. The member is then looked up in that type and its bases only, plus the overrides that deriving
+//   types declare (class hierarchy analysis); when the type has no such member only an extension method whose
+//   `this` parameter can be that type is linked; when the declared type is not one of the repository
+//   (List<int>, string, an array) nothing but such an extension method is. Rules 4 and 5 and the stop list are
+//   for the receivers that are left: `var` from a call, a lambda parameter, the result of a call.
+// Arity: when the number of arguments of a call is known, a candidate must admit it (a C# extension method
+// called through its receiver takes n + 1). The exception is a name that JavaScript, TypeScript or Python
+// scoping binds to one declaration (rules 1 to 3 there): a wrong argument count is then a finding about that
+// call, not a reason to unlink it.
+// Facts of the language are used only to REMOVE candidates. All languages: a parameter, local variable or local
+// function hides an outer name; an identifier bound by an import means that import and nothing else; in a
+// module (a JavaScript file with imports or exports, any Python file) a bare name that is neither declared in
+// the file nor imported is a global or builtin, never another file's function; code that is not test code does
+// not resolve by name to test code. C#: a static method that is not an extension method is not called through
+// an instance, nor an instance method through a type name; a bare call reaches a method of another class only
+// through `using static`; a member that is private to another type, or an explicit interface implementation,
+// is not what a name means; `F<int>(x)` needs a method with one generic parameter, `new Box<int>()` the Box
+// with one; `ref` and `out` are written at the call and convert to nothing; a type that is not `partial` owns
+// exactly the members written inside it; `A.B.C` names a C declared in B.
 //
 // BASIS
 //   Zimmermann, Nagappan 2008, "Predicting Defects using Network Analysis on Dependency Graphs", ICSE,
@@ -61,6 +77,9 @@
 //     components in O(V + E).
 //   Del Corso, Gulli, Romani 2005, "Fast PageRank Computation via a Sparse Linear System", Internet
 //     Mathematics 2(3): PageRank as the solution of a sparse linear system.
+//   Dean, Grove, Chambers 1995, "Optimization of Object-Oriented Programs Using Static Class Hierarchy
+//     Analysis", ECOOP: the targets of a call through a declared type are the method that type sees and its
+//     overrides in the subtypes, read off the class hierarchy.
 import path from 'node:path';
 import { isJsLike } from './lex.js';
 import { isTestPath } from './symbols.js';
@@ -98,6 +117,13 @@ const PATTERN_KW = words('is case not or and');
 const SELF = words('this self Self $this');
 const ACCESS = words('. ?. :: ->');
 const GENERIC_OP = words(', . ? [ ] ( ) :: *');
+const DECLARED = words('cs java');                              // receivers are typed from declarations (verified on these two)
+const NULLABLE = words('cs java kt swift dart c scala');        // `T? x` is a nullable type, not an optional parameter
+// Contextual words that can stand in front of an identifier without being its type (`from x in`, `await x`).
+const NOT_TYPE = words('from let join select group by into orderby ascending descending on equals where await async yield when and or not is in out ref return throw case else new this global value get set init add remove partial with scoped readonly const static params required file unmanaged notnull managed nameof typeof default using var dynamic record final');
+const BCL = { Boolean: 'bool', Byte: 'byte', SByte: 'sbyte', Char: 'char', Decimal: 'decimal', Double: 'double', Single: 'float', Int32: 'int', UInt32: 'uint', Int64: 'long', UInt64: 'ulong', Int16: 'short', UInt16: 'ushort', Object: 'object', String: 'string' };
+const SIZED = { Length: words('[] string Span ReadOnlySpan Memory ReadOnlyMemory StringBuilder'), Count: words('List IList ICollection IReadOnlyList IReadOnlyCollection Dictionary IDictionary IReadOnlyDictionary HashSet Queue Stack') };
+const OUTSIDE = Object.freeze({ outside: true });               // an array, pointer or tuple: its members belong to the runtime
 // What may follow the `>` that closes a type-argument list (C# language standard, ECMA-334, "Grammar
 // ambiguities"): anything else and `a < b > c` is two comparisons.
 const AFTER_GENERIC = words('( ) ] } : ; , . ? == != | ^ { [');
@@ -139,6 +165,18 @@ function genericOpen(T, i, lo) {
     } else if (t.k !== 'id' && t.k !== 'kw') return -1;
   }
   return -1;
+}
+
+/** Number of type arguments between the '<' at `open` and its '>' at `close`: `<int, List<string>>` is 2, `<,>` is 2. */
+function countTypeArgs(T, match, open, close) {
+  let n = 1;
+  for (let i = open + 1, d = 0; i < close; i++) {
+    const t = T[i]; if (t.k !== 'op') continue;
+    if (t.v === '<') d++; else if (t.v === '>') d--;
+    else if ((t.v === '(' || t.v === '[') && match[i] > i && match[i] < close) i = match[i];
+    else if (t.v === ',' && d === 0) n++;
+  }
+  return n;
 }
 
 /**
@@ -252,12 +290,15 @@ function localsOf(f, s) {
 }
 
 /**
- * buildGraph(files, { maxCandidates = 3 }) → graph
+ * buildGraph(files, { maxCandidates = 3, maxDispatch = 16 }) → graph
  *   files   parseFile() results for every source file of one ref
+ *   maxCandidates   rule 5: how many symbols anywhere may carry a name before it is ambiguous
+ *   maxDispatch     how many overrides a call through a base type or interface is linked to; past it the call
+ *                   keeps its declared target only, stats.capped counts it and `unlinked` counts the name
  *   graph   { nodes: Map<id, symbol>, out: Map<id, Set<id>>, in: Map<id, Set<id>>,
  *             refs: Map<id, [{ name, line, kind: 'call'|'new'|'member'|'type', to: id[], status, args }]>,
  *             byName: Map<name, symbol[]>, files: Map<path, file>,
- *             stats: { symbols, edges, resolved, ambiguous, unresolved, skipped },
+ *             stats: { symbols, edges, resolved, ambiguous, unresolved, skipped, capped },
  *             sites, unlinked: Map<name, number> }
  * Establishes: every edge comes from a reference in the source that the rules in the header link to that
  * symbol; `status` says how each reference ended ('resolved' | 'ambiguous' | 'unresolved'), `args` is the
@@ -265,15 +306,16 @@ function localsOf(f, s) {
  * symbol is the one called at run time, nor that an unlinked one is not.
  * refs holds every call and every `new` written inside a symbol, linked or not ('unresolved' is mostly the
  * standard library, not a defect), and the uses of members and types that were linked. `sites` is the index
- * behind callSites(); `unlinked` counts per name the references skipped by the stop list or left ambiguous;
+ * behind callSites(); `unlinked` counts per name the references skipped by the stop list, left ambiguous, or
+ * dispatched past `maxDispatch`;
  * stats.skipped counts the stop-list ones, which are in `sites` but not in refs.
  * Symbols that share an id (type declarations of one name in one file) are one node. A use of a symbol by
  * itself (recursion) is listed in refs but is not an edge.
  * The graph is not meant to be changed afterwards: the measures below cache what they derive from it.
  */
-export function buildGraph(files, { maxCandidates = 3 } = {}) {
+export function buildGraph(files, { maxCandidates = 3, maxDispatch = 16 } = {}) {
   const nodes = new Map(), out = new Map(), inn = new Map(), refs = new Map(), byName = new Map(), fileMap = new Map();
-  const stats = { symbols: 0, edges: 0, resolved: 0, ambiguous: 0, unresolved: 0, skipped: 0 };
+  const stats = { symbols: 0, edges: 0, resolved: 0, ambiguous: 0, unresolved: 0, skipped: 0, capped: 0 };
   const named = new Map(), typesNamed = new Map(), members = new Map(), topOf = new Map(), typeOfGroup = new Map();
   const sites = new Map(), unlinked = new Map(), recs = [];
   const push = (map, key, v) => { const a = map.get(key); if (a) a.push(v); else map.set(key, [v]); };
@@ -285,12 +327,21 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
     const cs = f.lang === 'cs', spaces = cs ? namespacesOf(f) : NONE, dir = dirOf(f.path), inFile = new Map();
     topOf.set(f.path, inFile);
     const scopeD = `D:${dir}`, baseF = `F:${f.path}`;
-    let lastKey = null, group = null, mem = null, ns = null, scope = scopeD, base = baseF;
+    const testFile = isTestPath(f.path), open = []; // the type declarations the walk is inside of
+    let ns = null, scope = scopeD, base = baseF;
     for (const s of f.symbols) {
-      if (cs) { let q = ''; for (const sp of spaces) if (sp.a <= s.a && s.a < sp.b) q = sp.name; if (q !== ns) { ns = q; scope = base = `N:${ns}`; lastKey = null; } }
-      const c = s.container || '';
-      if (c !== lastKey) { lastKey = c; group = `${base}|${c}`; mem = members.get(group); if (!mem) members.set(group, mem = new Map()); }
-      const r = { s, id: s.id, f, ns, scope, base, group, mem, own: s.kind === 'type' ? `${base}|${s.qname}` : null, stat: s.modifiers.includes('static'), ext: undefined, one: undefined };
+      if (cs) { let q = ''; for (const sp of spaces) if (sp.a <= s.a && s.a < sp.b) q = sp.name; if (q !== ns) { ns = q; scope = base = `N:${ns}`; } }
+      while (open.length && s.a >= open[open.length - 1].s.b) open.pop();
+      const c = s.container || '', top = open.length ? open[open.length - 1] : null, decl = top && top.s.qname === c ? top : null;
+      const group = decl ? decl.own : `${base}|${c}`;
+      let mem = members.get(group); if (!mem) members.set(group, mem = new Map());
+      const r = { s, id: s.id, f, ns, scope, base, group, mem, decl, own: null, stat: s.modifiers.includes('static'), test: testFile || !!s.isTest, partial: s.modifiers.includes('partial'), ptypes: undefined, ext: undefined, one: undefined, priv: undefined, expl: undefined, pmods: undefined, head: undefined, min: undefined, dtype: undefined, iface: undefined, fields: undefined };
+      if (s.kind === 'type') {
+        // A C# type is one container across files only when it says `partial`; any other declaration is closed:
+        // its members are exactly the ones written inside it, however many types elsewhere share its name.
+        r.own = cs && !r.partial ? `${base}|${s.qname}#${f.path}@${s.a}` : `${base}|${s.qname}`;
+        open.push(r);
+      }
       if (!nodes.has(s.id)) { nodes.set(s.id, s); out.set(s.id, new Set()); inn.set(s.id, new Set()); refs.set(s.id, []); }
       recs.push(r); push(named, s.name, r); push(byName, s.name, s); push(inFile, s.name, r); push(mem, s.name, r);
       if (r.own) { push(typesNamed, s.name, r); push(typeOfGroup, r.own, r); }
@@ -403,8 +454,95 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
     return null;
   }
 
+  // ── What a declaration says about itself: its name token, parameter list and generic parameters ─────
+  /** → { name, open, gen, tps }: index of the name token, of the '(' of the parameter list (-1: none), number and names of generic parameters. */
+  const headOf = (x) => {
+    if (x.head) return x.head;
+    const s = x.s, T = x.f.tokens, match = x.f.match, hi = s.bodyA > s.a ? s.bodyA : s.b, type = s.kind === 'type';
+    const h = (x.head = { name: -1, open: -1, gen: 0, tps: NONE });
+    for (let i = s.a; i + 1 < hi; i++) {
+      const t = T[i];
+      if (t.k === 'op') { if ((t.v === '[' || t.v === '(') && match[i] > i) i = match[i]; continue; } // attributes, a tuple return type
+      if (t.v !== s.name) continue;
+      const nx = T[i + 1];
+      if (type ? !(i > s.a && T[i - 1].k === 'kw') : !(nx.k === 'op' && (nx.v === '(' || nx.v === '<'))) continue;
+      let j = i + 1;
+      if (nx.k === 'op' && nx.v === '<') {
+        const g = genericClose(T, j, hi);
+        if (g < 0 || (!type && !(T[g + 1] && T[g + 1].k === 'op' && T[g + 1].v === '('))) continue;
+        h.gen = countTypeArgs(T, match, j, g); h.tps = [];
+        for (let k = j + 1, d = 0; k < g; k++) { const y = T[k]; if (y.k === 'op') { if (y.v === '<') d++; else if (y.v === '>') d--; else if ((y.v === '[' || y.v === '(') && match[k] > k) k = match[k]; } else if (y.k === 'id' && d === 0) h.tps.push(y.v); }
+        j = g + 1;
+      }
+      h.name = i;
+      if (!type && T[j] && T[j].k === 'op' && T[j].v === '(' && match[j] > j) h.open = j;
+      break;
+    }
+    return h;
+  };
+  /** Generic parameters in scope at a declaration: its own and those of the types around it. */
+  const isTypeParam = (x, name) => { for (let d = x; d; d = d.decl) if (headOf(d).tps.includes(name)) return true; return false; };
+  /**
+   * Fewest arguments a declaration accepts. The parser counts a parameter of nullable type (`object? x`,
+   * Java `List<?> xs`) as optional; outside JavaScript and TypeScript only a default value (`= …`) or a rest
+   * parameter makes one optional, so the count is taken again from the parameter list.
+   */
+  const minOf = (x) => {
+    if (x.min !== undefined) return x.min;
+    const s = x.s; let min = s.minParams;
+    if (NULLABLE.has(x.f.lang) && s.minParams < s.params) {
+      const open = headOf(x).open, T = x.f.tokens, match = x.f.match;
+      if (open >= 0) {
+        const close = match[open]; let n = 0, need = 0, any = false, opt = false, d = 0;
+        for (let i = open + 1; i <= close; i++) {
+          const t = T[i];
+          if (i === close || (t.k === 'op' && t.v === ',' && d === 0)) { if (any) { n++; if (!opt) need++; } any = opt = false; continue; }
+          any = true;
+          if (t.k === 'op') {
+            if ((t.v === '(' || t.v === '[' || t.v === '{') && match[i] > i) i = match[i];
+            else if (t.v === '<') d++; else if (t.v === '>') { if (d) d--; }
+            else if (t.v === '=' || t.v === '...') opt = true;
+          } else if (t.k === 'kw' && t.v === 'params') opt = true;
+        }
+        if (n === s.params) min = need;
+      }
+    }
+    return (x.min = min);
+  };
+  /** Is the code of `n` written inside the container `group` (or a type nested in it)? */
+  const inside = (n, group) => { if (n.group === group || n.own === group) return true; for (let d = n.decl; d; d = d.decl) if (d.own === group || d.group === group) return true; return false; };
+  /**
+   * Private to its declaring type: written `private`, or, in C#, a member of a class or struct with no access
+   * modifier at all (the language default). Such a symbol cannot be named from outside that type.
+   */
+  const hidden = (x) => {
+    if (x.priv !== undefined) return x.priv;
+    const m = x.s.modifiers, lang = x.f.lang;
+    let p = false;
+    if (x.decl && (lang === 'cs' || lang === 'java')) {
+      if (m.includes('private')) p = !m.includes('protected');
+      else if (lang === 'cs' && !m.includes('public') && !m.includes('internal') && !m.includes('protected') && !isInterface(x.decl)) { p = !explicitImpl(x); }
+    }
+    return (x.priv = p);
+  };
+  /** `void IFoo.Bar()`: an explicit interface implementation. It has no name of its own; only a call through the interface reaches it. */
+  const explicitImpl = (x) => {
+    if (x.expl !== undefined) return x.expl;
+    const s = x.s, T = x.f.tokens; let k = -1;
+    if (x.f.lang === 'cs' && s.kind !== 'type' && s.kind !== 'ctor') { k = headOf(x).name; if (k < 0) { k = (s.bodyA > s.a ? s.bodyA : s.b) - 1; while (k > s.a && !(T[k].k === 'id' && T[k].v === s.name)) k--; } }
+    return (x.expl = k > s.a && T[k - 1].k === 'op' && T[k - 1].v === '.');
+  };
+  const reachable = (n, x) => (n.test || !x.test) && !(hidden(x) && !inside(n, x.group));
+  const isInterface = (t) => {
+    if (!t) return false;
+    if (t.iface === undefined) { t.iface = false; const T = t.f.tokens, hi = t.s.bodyA > t.s.a ? t.s.bodyA : t.s.b; for (let i = t.s.a; i < hi; i++) if (T[i].v === 'interface' && T[i].k !== 'str') { t.iface = true; break; } }
+    return t.iface;
+  };
+
   // ── Types: which declaration a type name means, and what a type inherits ────────────────────────────
-  const usingsOf = (f) => { let u = usingCache.get(f); if (!u) usingCache.set(f, u = new Set(f.imports.map((i) => i.source))); return u; };
+  const globalUsings = new Set(); // C# `global using X;` of any file: which project it belongs to is not known, so it counts for all
+  for (const f of files) if (f.lang === 'cs') { const T = f.tokens; for (let i = 0, lim = Math.min(T.length - 2, 600); i < lim; i++) if (T[i].k === 'kw' && T[i].v === 'global' && T[i + 1].k === 'kw' && T[i + 1].v === 'using') { let j = i + 2, q = ''; if (T[j].v === 'static') j++; for (; j < T.length && !(T[j].k === 'op' && T[j].v === ';'); j++) if (T[j].k === 'id') q += (q ? '.' : '') + T[j].v; if (q) globalUsings.add(q); } }
+  const usingsOf = (f) => { let u = usingCache.get(f); if (!u) usingCache.set(f, u = new Set([...f.imports.map((i) => String(i.source).replace(/^global\./, '')), ...globalUsings])); return u; };
   /** C# `using Alias = Ns.Type<…>;` → Map<alias, type name>. Read from the tokens: generic aliases are not in file.imports. */
   const aliasesOf = (f) => {
     let m = aliasCache.get(f); if (m) return m;
@@ -420,30 +558,56 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
     }
     return m;
   };
-  /** → type records | AMBIGUOUS | null. Nearest first: enclosing types, same file, enclosing namespaces, imported namespaces, anywhere. */
-  function typesFor(n, name) {
-    const f = n.f;
+  const lastSeg = (q) => { const i = q.lastIndexOf('.'); return i < 0 ? q : q.slice(i + 1); };
+  /**
+   * → type records | AMBIGUOUS | null. Nearest first: enclosing types, same file, enclosing namespaces,
+   * imported namespaces, anywhere. C#: `arity` (number of type arguments written, 0 for none) must be the
+   * declaration's, because `Box`, `Box<T>` and `Box<T, U>` are three types; `qual` (the name written in front,
+   * `Outer.Name`) is honoured when a declaration of that name sits in such a type or namespace. `visible`
+   * leaves out the last step: a name that only a declaration somewhere else carries is then AMBIGUOUS.
+   */
+  function typesFor(n, name, arity, qual, visible) {
+    const f = n.f, cs = f.lang === 'cs';
     if (lexicalLang(f.lang)) {
       const r = lexicalName(n, name);
       if (r === EXTERNAL) return null;
       if (r) { const t = r.filter(isType); return t.length ? t : null; }
       if (moduleScoped(f)) return null;
     }
-    if (f.lang === 'cs') name = aliasesOf(f).get(name) || name;
-    const all = typesNamed.get(name); if (!all) return null;
-    let c;
-    for (let q = isType(n) ? n.s.qname : n.s.container; q; q = q.includes('.') ? q.slice(0, q.lastIndexOf('.')) : '') { // a type nested in an enclosing type comes first
-      const m = own(`${n.base}|${q}`, name); c = m ? m.filter(isType) : NONE;
-      if (c.length) return some(c.filter((t) => t.f === f)) || c; // parts of one container in other files may repeat the name
+    let aliased = false;
+    if (cs) { const al = aliasesOf(f), a = al.get(name); if (a) { name = a; aliased = true; } if (qual) qual = al.get(qual) || qual; }
+    let all = typesNamed.get(name); if (!all) return null;
+    let narrowed = false, c;
+    // Test code is not named by the code it tests, and a private nested type is not named outside its container.
+    if (all.some((t) => !reachable(n, t))) { all = all.filter((t) => reachable(n, t)); if (!all.length) return null; narrowed = true; }
+    if (cs && arity !== undefined && !aliased) { c = all.filter((t) => headOf(t).gen === arity); if (!c.length) return null; if (c.length < all.length) { all = c; narrowed = true; } }
+    if (qual) { c = all.filter((t) => lastSeg(t.s.container || t.ns || '') === qual); if (c.length && c.length < all.length) { all = c; narrowed = true; } }
+    for (let d = isType(n) ? n : n.decl; d; d = d.decl) { // a type nested in an enclosing type comes first
+      const m = own(d.own, name); c = m ? m.filter((t) => isType(t) && (!narrowed || all.includes(t))) : NONE;
+      if (c.length) return sameBuild(some(c.filter((t) => t.f === f)) || c, f); // parts of one container in other files may repeat the name
     }
     c = all.filter((t) => t.f === f); if (c.length) return c;
-    if (f.lang === 'cs') {
-      for (let ns = n.ns; ; ns = ns.includes('.') ? ns.slice(0, ns.lastIndexOf('.')) : '') { c = all.filter((t) => t.ns === ns); if (c.length) return c; if (!ns) break; }
-      const u = usingsOf(f); c = all.filter((t) => u.has(t.ns)); if (c.length) return c;
+    if (cs) {
+      for (let ns = n.ns; ; ns = ns.includes('.') ? ns.slice(0, ns.lastIndexOf('.')) : '') { c = all.filter((t) => t.ns === ns); if (c.length) return sameBuild(c, f); if (!ns) break; }
+      const u = usingsOf(f); c = all.filter((t) => u.has(t.ns)); if (c.length) return sameBuild(c, f);
     } else { c = all.filter((t) => t.scope === n.scope); if (c.length) return c; }
-    return new Set(all.map((t) => t.own)).size <= maxCandidates ? all : AMBIGUOUS;
+    if (visible) return AMBIGUOUS;
+    all = sameBuild(all, f);
+    return new Set(all.map((t) => `${t.base}|${t.s.qname}`)).size <= maxCandidates ? all : AMBIGUOUS;
   }
-  /** Names in the base list of a type declaration: `: A, B<T>`, `extends A implements B`, `class X(A, B):`. */
+  /**
+   * C# declarations that are not `partial` and share namespace, name and arity cannot be in one build (error
+   * CS0101): they are copies that separate projects or test fixtures keep. When one of the copies sits in the
+   * directory of the code that names the type, that is the one its build sees, and the others are left out.
+   */
+  function sameBuild(c, f) {
+    if (c.length < 2 || f.lang !== 'cs') return c;
+    const dir = dirOf(f.path), groups = new Map(); let drop = null;
+    for (const t of c) if (!t.partial) push(groups, `${t.base}|${t.s.qname}|${headOf(t).gen}`, t);
+    for (const g of groups.values()) if (g.length > 1 && g.some((t) => dirOf(t.f.path) === dir)) for (const t of g) if (dirOf(t.f.path) !== dir) (drop || (drop = new Set())).add(t);
+    return drop ? c.filter((t) => !drop.has(t)) : c;
+  }
+  /** Types in the base list of a type declaration: `: A, B<T>`, `extends A implements B`, `class X(A, B):` → [{ name, arity, qual }]. */
   function baseNames(t) {
     const T = t.f.tokens, match = t.f.match, s = t.s, py = t.f.lang === 'py', names = [];
     let i = s.a + 1;
@@ -456,7 +620,13 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
         else if ((x.v === '(' && !py || x.v === '[') && match[j] > j) j = match[j]; // primary constructor, base constructor arguments
         else if (py && x.v === '=') j++; // metaclass=Meta
       } else if (x.k === 'kw') { if (x.v === 'where') break; }
-      else if (x.k === 'id' && d === 0) { const nx = T[j + 1]; if (!(nx.k === 'op' && (nx.v === '.' || nx.v === '::' || (py && nx.v === '=')))) names.push(x.v); }
+      else if (x.k === 'id' && d === 0) {
+        const nx = T[j + 1];
+        if (nx.k === 'op' && (nx.v === '.' || nx.v === '::' || (py && nx.v === '='))) continue;
+        let arity = 0;
+        if (nx.k === 'op' && nx.v === '<') { const g = genericClose(T, j + 1, s.bodyA); arity = g > 0 ? countTypeArgs(T, match, j + 1, g) : undefined; }
+        names.push({ name: x.v, arity, qual: T[j - 1].k === 'op' && T[j - 1].v === '.' && T[j - 2].k === 'id' ? T[j - 2].v : null });
+      }
     }
     return names;
   }
@@ -466,21 +636,170 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
     b = []; baseCache.set(group, b);
     for (const t of typeOfGroup.get(group) || NONE) {
       if (t.s.bodyA <= t.s.a) continue;
-      for (const name of baseNames(t)) { const r = typesFor(t, name); if (r && r !== AMBIGUOUS) for (const x of r) if (x.own !== group && !b.includes(x.own)) b.push(x.own); }
+      for (const bn of baseNames(t)) { const r = typesFor(t, bn.name, bn.arity, bn.qual); if (r === AMBIGUOUS) b.open = true; else if (r) for (const x of r) if (x.own !== group && !b.includes(x.own)) b.push(x.own); }
     }
     return b;
   }
   /** Members named `name` that the declared base types hand down: on each branch of the hierarchy, the nearest type that has one `keep` accepts. */
-  function inherited(group, name, keep, seen = new Set([group]), depth = 0) {
+  const ifaceGroup = (g) => { const t = typeOfGroup.get(g); return !!t && t[0].f.lang === 'cs' && isInterface(t[0]); };
+  function inherited(group, name, keep, seen = new Set([group]), depth = 0, cls = !ifaceGroup(group) && (typeOfGroup.get(group) || NONE).some((t) => t.f.lang === 'cs')) {
     let found = null;
     for (const g of basesOf(group)) {
       if (seen.has(g)) continue;
       seen.add(g);
-      const r = keep(own(g, name)) || (depth < 8 ? inherited(g, name, keep, seen, depth + 1) : null);
+      if (cls && ifaceGroup(g)) continue; // a C# class implements an interface; it does not inherit the interface's members
+      const r = keep(own(g, name)) || (depth < 8 ? inherited(g, name, keep, seen, depth + 1, cls) : null);
       if (r) found = found ? found.concat(r) : r;
     }
     return found;
   }
+  /** Is some base of the container a name the repository declares too often to choose from? Then what it inherits is not known. */
+  const openBases = (group, seen = new Set()) => { if (seen.has(group)) return false; seen.add(group); const b = basesOf(group); return !!b.open || b.some((g) => openBases(g, seen)); };
+  /** Can a type that derives from the declaring one supply its own version? */
+  const overridable = (x) => {
+    const s = x.s, m = s.modifiers;
+    if (x.stat || !(callable(s.kind) || s.kind === 'property')) return false;
+    if (x.f.lang === 'cs') return s.abstract || m.includes('virtual') || m.includes('abstract') || m.includes('override') || isInterface(x.decl);
+    return !m.includes('private') && !m.includes('final');
+  };
+  /** Every container whose declared bases lead to `group` (the types that can override what it declares). */
+  let derivedIndex = null; const derivedCache = new Map();
+  function derivedOf(group) {
+    let r = derivedCache.get(group); if (r) return r;
+    if (!derivedIndex) { derivedIndex = new Map(); for (const g of typeOfGroup.keys()) for (const b of basesOf(g)) push(derivedIndex, b, g); }
+    r = []; derivedCache.set(group, r);
+    const seen = new Set([group]);
+    for (let q = [group]; q.length;) { const next = []; for (const g of q) for (const d of derivedIndex.get(g) || NONE) if (!seen.has(d)) { seen.add(d); r.push(d); next.push(d); } q = next; }
+    return r;
+  }
+
+  // ── Declared types (C#, Java): what the text says a parameter, local, field or property is ──────────
+  // A description of a static type is { keys: containers, inst: true (a value of it) | false (the type itself)
+  // | null (either), name } for types declared in the repository, { ext: true, name } for a type the repository
+  // does not declare, and null when the text does not say (var, dynamic, a type parameter, an ambiguous name).
+  const extDesc = (name) => ({ ext: true, name });
+  const descOf = (types, inst, name) => { const keys = []; for (const t of types) if (!keys.includes(t.own)) keys.push(t.own); return { keys, inst, name }; };
+  const sameDesc = (a, b) => !!a && !!b && (a.ext ? !!b.ext && a.name === b.name : !b.ext && a.inst === b.inst && a.keys.length === b.keys.length && a.keys.every((k) => b.keys.includes(k)));
+  /** The type written just before a declared name, read backwards from its last token T[e] → { name, arity, qual } | { kw } | OUTSIDE | null. */
+  function typeHead(T, e, lo) {
+    if (e < lo) return null;
+    let t = T[e];
+    let opt = false;
+    if (t.k === 'op' && t.v === '?') { if (--e < lo) return null; t = T[e]; opt = true; } // nullable annotation
+    const qualAt = (i) => (i - 2 >= lo && T[i - 1].k === 'op' && (T[i - 1].v === '.' || T[i - 1].v === '::') && T[i - 2].k === 'id' ? T[i - 2].v : null);
+    if (t.k === 'op') {
+      if (t.v === ']' || t.v === '*' || t.v === ')') return OUTSIDE;
+      if (t.v !== '>') return null;
+      const o = genericOpen(T, e, lo); if (o <= lo || T[o - 1].k !== 'id') return null;
+      let n = 1, text = BCL[T[o - 1].v] || T[o - 1].v; const ids = [];
+      for (let k = o, d = 0; k <= e; k++) { const y = T[k]; text += BCL[y.v] || y.v; if (y.k !== 'op') { if (y.k === 'id') ids.push(y.v); continue; } if (y.v === '<' || y.v === '(' || y.v === '[') d++; else if (y.v === '>' || y.v === ')' || y.v === ']') d--; else if (y.v === ',' && d === 1) n++; }
+      return { name: T[o - 1].v, arity: n, qual: qualAt(o - 1), opt, text, ids };
+    }
+    if (t.k === 'kw') return TYPE_KW.has(t.v) ? { kw: t.v, opt } : null;
+    return t.k === 'id' ? { name: t.v, arity: 0, qual: qualAt(e), opt } : null;
+  }
+  /**
+   * A name under which two written types can be compared for identity, or null when the text is not enough: a
+   * generic type (its arguments would have to match too), a nullable value type, an array, a type parameter.
+   */
+  const typeKey = (h, ctx) => {
+    if (!h || h === OUTSIDE) return null;
+    if (h.kw) return h.opt && h.kw !== 'string' && h.kw !== 'object' ? null : h.kw === 'var' || h.kw === 'dynamic' ? null : h.kw;
+    if (h.opt || isTypeParam(ctx, h.name)) return null;
+    if (!h.arity) return BCL[h.name] || h.name;
+    return h.ids.some((v) => isTypeParam(ctx, v)) ? null : h.text; // `Span<byte>` is itself; `List<T>` depends on who says T
+  };
+  /** The static type declared by the type expression that ends at token `e` of the file of `ctx`. */
+  function typeDescAt(ctx, e, lo) {
+    const h = typeHead(ctx.f.tokens, e, lo);
+    if (!h) return null;
+    if (h === OUTSIDE) return extDesc('[]');
+    let d;
+    if (h.kw) { if (h.kw === 'var' || h.kw === 'dynamic' || h.kw === 'auto') return null; d = extDesc(h.kw); }
+    else {
+      if (NOT_TYPE.has(h.name) || isTypeParam(ctx, h.name)) return null;
+      const r = typesFor(ctx, h.name, h.arity, h.qual, true);
+      if (r === AMBIGUOUS) return null;
+      d = r ? descOf(r, true, h.name) : extDesc(h.name);
+    }
+    d.key = typeKey(h, ctx);
+    return d;
+  }
+  /** Parameter types of a declaration as comparable keys ('&' in front: ref or out, '~': in), null where the text is not enough. */
+  const paramTypes = (x) => {
+    if (x.ptypes !== undefined) return x.ptypes;
+    const open = headOf(x).open, T = x.f.tokens, match = x.f.match;
+    if (open < 0) { x.pmods = null; return (x.ptypes = null); }
+    const res = [], mods = (x.pmods = []);
+    for (let i = open + 1, close = match[open], d = 0, eq = -1, any = false, mod = ''; i <= close; i++) {
+      const t = T[i];
+      if (i === close || (t.k === 'op' && t.v === ',' && d === 0)) {
+        if (any) {
+          const e = (eq < 0 ? i : eq) - 1, h = e > open && T[e].k === 'id' ? typeHead(T, e - 1, open + 1) : null;
+          const k = typeKey(h, x);
+          res.push(k ? mod + k : null); mods.push(mod);
+        }
+        eq = -1; any = false; mod = ''; continue;
+      }
+      any = true;
+      if (t.k === 'kw') { if (eq < 0 && d === 0) { if (t.v === 'ref' || t.v === 'out') mod = '&'; else if (t.v === 'in' || (t.v === 'readonly' && mod === '&')) mod = '~'; } continue; } // `ref readonly` takes an argument with or without ref, like `in`
+      if (t.k !== 'op') continue;
+      if ((t.v === '(' || t.v === '[' || t.v === '{') && match[i] > i) i = match[i];
+      else if (t.v === '<') d++; else if (t.v === '>') { if (d) d--; }
+      else if (t.v === '=' && eq < 0) eq = i;
+    }
+    return (x.ptypes = res);
+  };
+  /** Fields of one type declaration: name → index of the last token of the declared type. Read from the body: fields are not symbols. */
+  const fieldsOf = (t) => {
+    if (t.fields) return t.fields;
+    const m = (t.fields = new Map()), T = t.f.tokens, match = t.f.match, hi = t.s.bodyB - 1;
+    for (let i = t.s.bodyA + 1, st = i; i < hi; i++) {
+      const x = T[i];
+      if (x.k !== 'op') continue;
+      if (x.v === '{') { i = match[i] > i ? match[i] : hi; st = i + 1; continue; }
+      if (x.v === '}') { st = i + 1; continue; }
+      if (x.v !== ';') { if ((x.v === '(' || x.v === '[') && match[i] > i) i = match[i]; continue; }
+      let end = i, ok = true; // the declarator part: up to the first `=`
+      for (let k = st; k < i; k++) { const y = T[k]; if (y.k === 'op') { if (y.v === '=') { end = k; break; } if (y.v === '(' || y.v === '=>') { ok = false; break; } if (y.v === '[' && match[k] > k) k = match[k]; } else if (y.k === 'kw' && (y.v === 'using' || y.v === 'namespace' || y.v === 'delegate' || y.v === 'return' || y.v === 'import' || y.v === 'package')) { ok = false; break; } }
+      if (ok && end - st >= 2 && T[end - 1].k === 'id') m.set(T[end - 1].v, end - 2);
+      st = i + 1;
+    }
+    return m;
+  };
+  const propDesc = (x) => { // the declared type of a property
+    if (x.dtype !== undefined) return x.dtype;
+    const s = x.s, T = x.f.tokens; let k = (s.bodyA > s.a ? s.bodyA : s.b) - 1;
+    while (k > s.a && !(T[k].k === 'id' && T[k].v === s.name)) k--;
+    return (x.dtype = k > s.a && !(T[k - 1].k === 'op' && T[k - 1].v === '.') ? typeDescAt(x, k - 1, s.a) : null);
+  };
+  const mergeDesc = (a, b) => {
+    if (a === undefined) return b; if (b === undefined) return a;
+    if (!a || !b) return null;
+    if (sameDesc(a, b)) return a;
+    if (a.ext || b.ext) return null;
+    const keys = a.keys.slice(); for (const k of b.keys) if (!keys.includes(k)) keys.push(k);
+    return { keys, inst: a.inst === b.inst ? a.inst : null, name: a.name };
+  };
+  /** Declared type of the property or field `name` of a container, or of the nearest base that has one. undefined: there is none. */
+  const memberTypeCache = new Map();
+  function memberType(group, name, depth = 0) {
+    const key = `${group}\n${name}`; let d = memberTypeCache.get(key);
+    if (d !== undefined || memberTypeCache.has(key)) return d;
+    memberTypeCache.set(key, undefined); // a cycle of bases ends here
+    for (const x of own(group, name) || NONE) if (x.s.kind === 'property' && !explicitImpl(x)) d = mergeDesc(d, propDesc(x));
+    if (d === undefined) for (const t of typeOfGroup.get(group) || NONE) { if (t.s.bodyB <= t.s.bodyA) continue; const e = fieldsOf(t).get(name); if (e !== undefined) d = mergeDesc(d, typeDescAt(t, e, t.s.bodyA)); }
+    if (d === undefined && depth < 8) for (const b of basesOf(group)) d = mergeDesc(d, memberType(b, name, depth + 1));
+    memberTypeCache.set(key, d);
+    return d;
+  }
+  /** Names a description answers to: its types and everything they declare as a base, resolved or not. */
+  const superNames = (d) => {
+    if (d.names) return d.names;
+    const names = (d.names = new Set()), seen = new Set();
+    for (let q = d.keys.slice(); q.length;) { const g = q.pop(); if (seen.has(g)) continue; seen.add(g); for (const t of typeOfGroup.get(g) || NONE) { names.add(t.s.name); if (t.s.bodyA > t.s.a) for (const b of baseNames(t)) names.add(b.name); } for (const b of basesOf(g)) q.push(b); }
+    return names;
+  };
 
   // ── Candidates ──────────────────────────────────────────────────────────────────────────────────────
   const isExt = (x) => { // a C# extension method: static, first parameter marked `this`
@@ -489,35 +808,67 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
     if (x.f.lang === 'cs' && x.stat && x.s.maxParams > 0) { const T = x.f.tokens, hi = Math.min(x.s.b, x.s.bodyA > x.s.a ? x.s.bodyA : x.s.b); for (let i = x.s.a; i + 1 < hi; i++) if (T[i].k === 'op' && T[i].v === '(' && T[i + 1].k === 'kw' && T[i + 1].v === 'this') { x.ext = true; break; } }
     return x.ext;
   };
+  /**
+   * Can the extension method `x` be called on a receiver described by `d`? 2: its `this` type is the receiver's
+   * type or one of its declared bases; 1: cannot be told (a type parameter, or a type the repository does not
+   * declare on either side); 0: no (its `this` type is declared here and the receiver is not one).
+   */
+  const extFits = (x, d) => {
+    const T = x.f.tokens, open = headOf(x).open; if (open < 0) return 1;
+    const close = x.f.match[open]; let e = open + 1, depth = 0;
+    for (; e < close; e++) { const t = T[e]; if (t.k !== 'op') continue; if (t.v === '<') depth++; else if (t.v === '>') { if (depth) depth--; } else if ((t.v === ',' || t.v === '=') && !depth) break; else if ((t.v === '(' || t.v === '[') && x.f.match[e] > e) e = x.f.match[e]; }
+    const h = typeHead(T, e - 2, open + 1); // the type written before the name of the first parameter
+    if (!h) return 1;
+    const runtime = !!d.ext && (d.name === '[]' || TYPE_KW.has(d.name)); // an array or a built-in type: never a type declared here
+    if (h === OUTSIDE) return d.ext ? 1 : 0;
+    if (h.kw) return h.kw === 'object' ? 1 : d.ext ? (d.name === h.kw ? 2 : runtime ? 0 : 1) : 0;
+    if (headOf(x).tps.includes(h.name)) return 1;
+    if (d.ext) return d.name === h.name ? 2 : runtime && typesNamed.has(h.name) ? 0 : 1;
+    if (superNames(d).has(h.name)) return 2;
+    if (!typesNamed.has(h.name)) return 1;
+    for (const g of d.keys) for (const t of typeOfGroup.get(g) || NONE) if (t.s.modifiers.includes('partial')) return 1; // a generated part may add a base
+    return 0;
+  };
   /** `name = x => …`: the parser reports no parameters for a lambda with one unparenthesised parameter. It takes exactly one. */
   const oneParam = (x) => {
     if (x.one !== undefined) return x.one;
     const s = x.s, T = x.f.tokens, a = s.bodyA - 1; // the token before the body: the arrow
     return (x.one = s.maxParams === 0 && callable(s.kind) && a > s.a + 1 && T[a].k === 'op' && T[a].v === '=>' && T[a - 1].k === 'id' && T[a - 2].k !== 'id' && !(T[a - 2].k === 'op' && T[a - 2].v === '.'));
   };
-  /** Does the declaration accept `args` arguments? Unknown counts, properties and types always pass. */
+  /**
+   * Does the declaration accept `args` arguments? Unknown counts, properties and types always pass. `targs` is
+   * the number of type arguments the C# call spells out (`F<int>(x)`): only a method with that many generic
+   * parameters can be meant (a call without them may still be generic: they are inferred).
+   */
+  let targs = null;
   const admits = (x, args, viaMember) => {
     const s = x.s;
+    if (targs !== null && callable(s.kind) && x.f.lang === 'cs' && headOf(x).gen !== targs) return false;
     if (args == null || s.kind === 'property' || s.kind === 'type') return true;
     if (s.maxParams === 0 && oneParam(x)) return args === 1;
     const k = viaMember && isExt(x) ? args + 1 : args; // an extension method takes its receiver as first argument
-    return k >= s.minParams && k <= s.maxParams;
+    return k >= minOf(x) && k <= s.maxParams;
   };
   /** A type stands for itself and for the constructors that accept the arguments. */
   const withCtors = (res, args, strict) => {
-    if (!res || res === AMBIGUOUS || !res.some(isType)) return res;
-    const all = res.slice();
+    if (!res || res === AMBIGUOUS || res === SKIP || !res.some(isType)) return res;
+    const all = res.slice(), saved = targs; targs = null; // type arguments written at a construction belong to the type
     for (const x of res) {
       if (!isType(x)) continue;
       const g = members.get(x.own); if (!g) continue;
       for (const nm of [x.s.name, 'constructor', '__init__', 'init']) for (const c of g.get(nm) || NONE) if ((c.s.kind === 'ctor' || nm === '__init__') && (!strict || admits(c, args, false)) && !all.includes(c)) all.push(c);
     }
+    targs = saved;
     return all;
   };
-  /** Rules 3, 4 and 5 over every symbol of that name that `pred` and the arity admit. `from4` skips rule 3. */
+  /**
+   * Rules 3, 4 and 5 over every symbol of that name that `pred` and the arity admit. `from4` skips rule 3.
+   * Code that is not test code never resolves to test code by name alone (a build depends on its tests in one
+   * direction only), and nothing resolves to a member that is private to another type.
+   */
   const byRules = (n, name, args, pred, viaMember, from4) => {
     const all = named.get(name); if (!all) return null;
-    const c = []; for (const x of all) if (pred(x) && admits(x, args, viaMember)) c.push(x);
+    const c = []; for (const x of all) if (pred(x) && reachable(n, x) && admits(x, args, viaMember)) c.push(x);
     if (!c.length) return null;
     if (!from4) { const here = c.filter((x) => x.f === n.f); if (here.length) return here; }
     const near = c.filter((x) => x.scope === n.scope); if (near.length) return near;
@@ -531,8 +882,236 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
     const js = isJsLike(lang), py = lang === 'py', cs = lang === 'cs', lexical = js || py, modular = lexical && moduleScoped(f);
     const angle = ANGLE.has(lang), implicit = IMPLICIT_THIS.has(lang), strict = OVERLOADS.has(lang), constructs = CALL_CONSTRUCTS.has(lang);
     const declBlock = DECL_BLOCK.has(lang), typed = TYPED.has(lang), hasNew = !NO_NEW.has(lang);
-    const bound = localsOf(f, s), binds = lexical ? bindingsOf(f) : null;
+    const declared = DECLARED.has(lang), bound = localsOf(f, s), binds = lexical ? bindingsOf(f) : null;
     const braces = []; // C#: is the innermost open brace an object or collection initialiser?
+    const inits = [], initOf = new Map(); // … and of which types (`new T { P = 1 }`, `x with { P = 1 }`), when the text says
+    const selfDesc = n.decl ? { keys: [n.group], inst: true, name: n.decl.s.name } : null;
+
+    /** `= new Name<…>(…);` after `var x`: the type the variable is built from, when the construction is the whole initialiser. */
+    const constructed = (k) => {
+      if (!(k + 2 < B && T[k].k === 'op' && T[k].v === '=' && T[k + 1].k === 'kw' && T[k + 1].v === 'new')) return null;
+      let j = k + 2, last = -1, arity = 0;
+      if (T[j].k === 'kw' && T[j].v === 'global' && T[j + 1].v === '::') j += 2;
+      while (j < B && T[j].k === 'id') {
+        last = j; arity = 0; j++;
+        if (j < B && T[j].k === 'op' && T[j].v === '<') { const g = genericClose(T, j, B); if (g < 0) return null; arity = countTypeArgs(T, match, j, g); j = g + 1; }
+        if (j + 1 < B && T[j].k === 'op' && (T[j].v === '.' || T[j].v === '::') && T[j + 1].k === 'id') j++; else break;
+      }
+      if (last < 0 || j >= B || T[j].k !== 'op') return null;
+      if (T[j].v === '[') return extDesc('[]');
+      if (T[j].v === '(' && match[j] > j) j = match[j] + 1; else if (T[j].v !== '{') return null;
+      if (j < B && T[j].k === 'op' && T[j].v === '{' && match[j] > j) j = match[j] + 1; // an object initialiser
+      if (!(j < B && T[j].k === 'op' && (T[j].v === ';' || T[j].v === ')' || T[j].v === ','))) return null; // `new A().Build()` is not an A
+      const name = T[last].v, qual = T[last - 1].k === 'op' && T[last - 2].k === 'id' ? T[last - 2].v : null;
+      if (isTypeParam(n, name)) return null;
+      const r = typesFor(n, name, cs ? arity : undefined, qual, true);
+      if (r === AMBIGUOUS) return null;
+      const d = r ? descOf(r, true, name) : extDesc(name);
+      d.key = arity ? null : BCL[name] || name;
+      return d;
+    };
+    /**
+     * Declared types of the parameters and locals of this body: name → description, or null when the body
+     * declares the name without a type (var, a lambda parameter) or with two different ones.
+     */
+    const typesOfLocals = () => {
+      const m = new Map();
+      // Flow-insensitive: a name declared in two scopes with two repository types is a value of either (the union);
+      // one declaration without a type, or of a type from outside, leaves it unknown.
+      const put = (name, d) => { if (!m.has(name)) m.set(name, d || null); else { const o = m.get(name); if (o && !sameDesc(o, d)) m.set(name, d ? mergeDesc(o, d) : null); } };
+      const open = headOf(n).open;
+      if (open >= 0) for (let i = open + 1, close = match[open], d = 0, eq = -1; i <= close; i++) {
+        const t = T[i];
+        if (i === close || (t.k === 'op' && t.v === ',' && d === 0)) { const e = (eq < 0 ? i : eq) - 1; if (e > open && T[e].k === 'id') put(T[e].v, typeDescAt(n, e - 1, open + 1)); eq = -1; continue; }
+        if (t.k !== 'op') continue;
+        if ((t.v === '(' || t.v === '[' || t.v === '{') && match[i] > i) i = match[i];
+        else if (t.v === '<') d++; else if (t.v === '>') { if (d) d--; }
+        else if (t.v === '=' && eq < 0) eq = i;
+      }
+      for (let i = A; i + 1 < B; i++) {
+        const t = T[i], nx = T[i + 1];
+        if (nx.k !== 'id') {
+          if (t.k === 'op' && t.v === ')' && nx.k === 'op' && nx.v === '=>' && match[i] >= A) for (let k = match[i] + 1; k < i; k++) { // (a, b) => …
+            if (T[k].k === 'id' && T[k - 1].k === 'op' && (T[k - 1].v === '(' || T[k - 1].v === ',') && T[k + 1].k === 'op' && (T[k + 1].v === ',' || T[k + 1].v === ')')) put(T[k].v, null);
+          }
+          continue;
+        }
+        const n2 = i + 2 < B ? T[i + 2] : null;
+        if (n2 && n2.k === 'op' && n2.v === '=>') { put(nx.v, null); continue; } // x => …
+        if (t.k === 'id') put(nx.v, NOT_TYPE.has(t.v) ? null : typeDescAt(n, i, A));
+        else if (t.k === 'kw') { if (t.v === 'var') put(nx.v, constructed(i + 2)); else if (TYPE_KW.has(t.v)) put(nx.v, typeDescAt(n, i, A)); }
+        else if (t.k === 'op' && (t.v === '>' || t.v === ']' || t.v === '?') && n2 && ((n2.k === 'op' && n2.v === '=') || (n2.k === 'kw' && n2.v === 'in'))) put(nx.v, typeDescAt(n, i, A));
+      }
+      return m;
+    };
+    let localTypes = null;
+    const localType = (v) => (localTypes || (localTypes = typesOfLocals())).get(v) || null;
+    /** A property or field of the types around this code, reached without `this.` → description | null | undefined (no such member). */
+    const implicitMember = (v) => {
+      let d = n.decl ? memberType(n.group, v) : undefined;
+      for (let o = n.decl && n.decl.decl; d === undefined && o; o = o.decl) d = memberType(o.own, v);
+      return d;
+    };
+    const stepDesc = (d, name) => { // the type of `d.name`
+      if (d.ext) return null;
+      let r; for (const g of d.keys) r = mergeDesc(r, memberType(g, name));
+      if (r !== undefined) return r;
+      let types = null; for (const g of d.keys) for (const x of own(g, name) || NONE) if (isType(x)) (types || (types = [])).push(x);
+      return types ? descOf(types, false, name) : null;
+    };
+    /**
+     * Static type of the receiver that ends at T[r] (`x`, `this.a.b`, `Ns.Type.Prop`), from declarations only:
+     * a typed parameter or local, a property or field and its declared type, a type name behind its namespace.
+     * → description | AMBIGUOUS | null (the text does not say: var, a call in the chain, an unknown name).
+     */
+    const chainDesc = (r, arity0) => {
+      const parts = [];
+      for (let q = r; ;) {
+        const x = T[q];
+        if (x.k !== 'id' && x.k !== 'kw') return null;
+        parts.push(q);
+        const p = q - 1;
+        if (p <= A || T[p].k !== 'op' || (T[p].v !== '.' && T[p].v !== '?.')) break;
+        q = p - 1;
+        if (T[q].k === 'op' && T[q].v === '!' && q > A) q--;
+      }
+      parts.reverse();
+      const h = T[parts[0]], pre = parts[0] - 1, root = pre > A && T[pre].k === 'op' && T[pre].v === '::' ? T[pre - 1].v : null;
+      let d = null, k = 1;
+      if (root !== null) { // `global::A.B.C`, `Alias::A.B`: read from the root of a namespace, so neither a local nor a member nor a nested type
+        for (k = 0; k < parts.length && !d; k++) {
+          const y = T[parts[k]]; if (y.k !== 'id') return null;
+          let tail = ''; for (let z = 0; z < k; z++) tail += (z ? '.' : '') + T[parts[z]].v;
+          const ty = (typesNamed.get(y.v) || NONE).filter((x) => !x.s.container && (root === 'global' ? (x.ns || '') === tail : !tail || x.ns === tail || (x.ns || '').endsWith(`.${tail}`)) && (!cs || headOf(x).gen === (k === parts.length - 1 && arity0 !== undefined ? arity0 : 0)));
+          if (ty.length) d = descOf(sameBuild(ty, f), false, y.v);
+        }
+      } else if (h.k === 'kw') {
+        if (h.v === 'this') d = selfDesc;
+        else if (h.v === 'base' || h.v === 'super') { const b = n.decl ? basesOf(n.group) : NONE; d = b.length ? { keys: b, inst: true, name: '' } : null; }
+        else if (TYPE_KW.has(h.v) && h.v !== 'var' && h.v !== 'dynamic') return parts.length === 1 ? { ext: true, name: h.v, inst: false } : null; // string.Join(…)
+        else return null;
+      } else if (bound.has(h.v)) d = localType(h.v);
+      else {
+        d = implicitMember(h.v);
+        if (d && !d.ext && typesNamed.has(h.v)) d = { keys: d.keys, inst: null, name: d.name }; // `Color Color`: the name is the member and the type
+        if (d === undefined) { // a type name, possibly behind the namespace or the types it is declared in
+          d = null;
+          for (k = 0; k < parts.length && !d; k++) {
+            const y = T[parts[k]]; if (y.k !== 'id') return null;
+            if (!typesNamed.has(cs ? aliasesOf(f).get(y.v) || y.v : y.v)) continue;
+            let ty = typesFor(n, y.v, cs ? (k === parts.length - 1 && arity0 !== undefined ? arity0 : 0) : undefined, k > 0 ? T[parts[k - 1]].v : null);
+            if (ty === AMBIGUOUS) return AMBIGUOUS;
+            if (!ty) continue;
+            if (k > 0) { // what is written in front must be where the declaration sits
+              let tail = ''; for (let z = 0; z < k; z++) tail += (z ? '.' : '') + T[parts[z]].v;
+              ty = ty.filter((x) => { const q = x.s.container ? `${x.ns ? `${x.ns}.` : ''}${x.s.container}` : x.ns || ''; return q === tail || q.endsWith(`.${tail}`); });
+              if (!ty.length) return null;
+            }
+            d = descOf(ty, false, y.v);
+          }
+        }
+      }
+      for (; d && k < parts.length; k++) d = stepDesc(d, T[parts[k]].v);
+      return d || null;
+    };
+
+    // ── Overloads told apart by the written types of the arguments (C#) ─────────────────────────────────
+    let callOpen = -1, callVia = false; // the '(' of the call being resolved; is it written on a receiver?
+    const keyOf = (d) => (d && d.inst !== false && d.key ? d.key : null);
+    const numType = (v) => (/^\d{1,9}$/.test(v) || /^0[xX][0-9a-fA-F]{1,7}$/.test(v) ? 'int' : /^\d+[lL]$/.test(v) ? 'long' : /^\d+[uU]$/.test(v) ? 'uint' : /^(\d+\.\d+|\.\d+)([eE][+-]?\d+)?[dD]?$/.test(v) || /^\d+[dD]$/.test(v) ? 'double' : /^(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?[fF]$/.test(v) ? 'float' : /^(\d+\.?\d*|\.\d+)[mM]$/.test(v) ? 'decimal' : null);
+    /** The type an argument is written with, as a comparable key, or null when the text does not settle it. */
+    const argType = (a, b) => {
+      let t = T[a], mod = '';
+      if (t.k === 'kw' && (t.v === 'ref' || t.v === 'out' || t.v === 'in')) { mod = t.v === 'in' ? '~' : '&'; if (++a >= b) return null; t = T[a]; }
+      const one = b - a === 1; let k = null;
+      if (t.k === 'str') {
+        const c = t.v[0];
+        if (c === "'") k = one ? 'char' : null;
+        else { k = 'string'; for (let i = a + 1; i < b && k; i++) { const x = T[i]; if (x.k === 'op' && (x.v === '{' || x.v === '${') && match[i] > i) i = match[i]; else if (!(x.k === 'str' && x.v[0] !== "'") && !(x.k === 'op' && x.v === '+')) k = null; } } // literals, interpolated or joined with +
+      } else if (one) {
+        if (t.k === 'num') k = numType(t.v);
+        else if (t.k === 'kw') k = t.v === 'true' || t.v === 'false' ? 'bool' : null;
+        else if (t.k === 'id') k = keyOf(bound.has(t.v) ? localType(t.v) : implicitMember(t.v));
+      } else if (b - a === 2 && T[a + 1].k === 'id' && mod === '&') k = keyOf(typeDescAt(n, a, a)); // out T name
+      else if (b - a === 2 && t.k === 'op' && t.v === '-' && T[a + 1].k === 'num') k = numType(T[a + 1].v);
+      else if (t.k === 'op' && t.v === '(' && match[a] === a + 2 && ((T[a + 1].k === 'kw' && TYPE_KW.has(T[a + 1].v) && T[a + 1].v !== 'var' && T[a + 1].v !== 'dynamic') || (T[a + 1].k === 'id' && BCL[T[a + 1].v] && !typesNamed.has(T[a + 1].v) && !bound.has(T[a + 1].v)))) { // (int)x, (Single)x: a cast binds tighter than any operator after it
+        k = BCL[T[a + 1].v] || T[a + 1].v;
+        for (let i = a + 3; i < b && k; i++) { const x = T[i]; if (x.k === 'op') { if ((x.v === '(' || x.v === '[') && match[i] > i) i = match[i]; else if (x.v !== '.' && x.v !== '?.' && x.v !== '!') k = null; } else if (x.k !== 'id' && x.k !== 'num' && !(x.k === 'kw' && x.v === 'this')) k = null; }
+      }
+      else if (t.k === 'kw' && (t.v === 'nameof' || t.v === 'typeof') && T[a + 1].v === '(' && match[a + 1] === b - 1) k = t.v === 'nameof' ? 'string' : 'Type';
+      else if (t.k === 'kw' && (t.v === 'unchecked' || t.v === 'checked') && T[a + 1].v === '(' && match[a + 1] === b - 1 && b - a > 3) k = argType(a + 2, b - 1);
+      else if (b - a >= 5 && T[b - 1].v === ')' && T[b - 2].v === '(' && T[b - 3].v === 'ToString' && T[b - 4].k === 'op' && (T[b - 4].v === '.' || T[b - 4].v === '?.') && match[b - 2] === b - 1) k = 'string'; // x.ToString() is a string
+      else if (t.k === 'id' || (t.k === 'kw' && t.v === 'this')) { // a.b.c: properties and fields with declared types
+        let chain = true; for (let i = a + 1; i < b && chain; i++) chain = (i - a) % 2 ? T[i].k === 'op' && T[i].v === '.' : T[i].k === 'id';
+        if (chain && (b - a) % 2) {
+          k = keyOf(chainDesc(b - 1));
+          const last = T[b - 1].v; // the size of a runtime collection is an int whatever it holds
+          if (!k && b - a >= 3 && (last === 'Length' || last === 'Count')) { const d = chainDesc(b - 3); if (d && d.ext && d.inst !== false && SIZED[last].has(d.name)) k = 'int'; }
+        }
+      }
+      return k ? mod + k : null;
+    };
+    /**
+     * Among the overloads one receiver offers, C# takes the one whose parameter types are exactly the argument
+     * types when there is one (an identity conversion beats every other, ECMA-334 "Better conversion from
+     * expression"). So when every argument has a written type and some candidate matches them all, the others
+     * are not what the call means. Anything less than that keeps every candidate.
+     */
+    /**
+     * C# writes `ref` and `out` at the call: an argument with one needs a parameter with one, and a `ref` or
+     * `out` parameter needs it at the call; and such an argument converts to nothing, so when its type is
+     * written (`out uint x`, a typed local) the parameter's type must be that one. Candidates that disagree
+     * are not applicable, whatever the receiver.
+     */
+    const byRef = (res) => {
+      if (!cs || callOpen < 0 || res.length < 2) return res;
+      const close = match[callOpen], mods = [], keys = [];
+      for (let a = callOpen + 1, i = a; i <= close; i++) {
+        const t = T[i];
+        if (i < close && t.k === 'op' && (t.v === '(' || t.v === '[' || t.v === '{' || t.v === '${') && match[i] > i) { i = match[i]; continue; }
+        if (i < close && !(t.k === 'op' && t.v === ',')) continue;
+        if (a >= i) break;
+        if (T[a + 1] && T[a + 1].k === 'op' && T[a + 1].v === ':' && a + 1 < i) return res; // a named argument: positions say nothing
+        const by = T[a].k === 'kw' && (T[a].v === 'ref' || T[a].v === 'out');
+        mods.push(by ? '&' : ''); keys.push(by ? argType(a, i) : null); a = i + 1;
+      }
+      const ok = res.filter((x) => {
+        if (!callable(x.s.kind) && x.s.kind !== 'ctor') return true;
+        const pt = paramTypes(x), pm = x.pmods; if (!pm) return true;
+        const sh = callVia && isExt(x) ? 1 : 0;
+        for (let i = 0; i < mods.length && i + sh < pm.length; i++) {
+          if ((pm[i + sh] === '&') !== (mods[i] === '&') && !(mods[i] === '&' && pm[i + sh] === '~')) return false;
+          if (keys[i] && pt[i + sh] && pm[i + sh] === '&' && pt[i + sh] !== keys[i]) return false;
+        }
+        return true;
+      });
+      return ok.length && ok.length < res.length ? ok : res;
+    };
+    const exact = (res) => {
+      if (!cs || callOpen < 0 || !res || res.length < 2) return res;
+      const close = match[callOpen], types = [];
+      for (let a = callOpen + 1, i = a; i <= close; i++) {
+        const t = T[i];
+        if (i < close && t.k === 'op' && (t.v === '(' || t.v === '[' || t.v === '{' || t.v === '${') && match[i] > i) { i = match[i]; continue; }
+        if (i < close && !(t.k === 'op' && t.v === ',')) continue;
+        if (i === close && a === i) break; // no arguments, or a trailing comma
+        const k = a < i ? argType(a, i) : null;
+        if (!k) return res;
+        types.push(k); a = i + 1;
+      }
+      const hit = [];
+      for (const x of res) {
+        if (!callable(x.s.kind) && x.s.kind !== 'ctor') continue;
+        const pt = paramTypes(x), sh = callVia && isExt(x) ? 1 : 0;
+        let ok = !!pt && pt.length - sh >= types.length;
+        for (let i = 0; ok && i < types.length; i++) { const p = pt[i + sh]; ok = p === types[i] || (p !== null && p === `~${types[i]}`); }
+        if (ok) hit.push(x);
+      }
+      if (!hit.length) return res;
+      // Equal conversions: the candidate whose parameters all have an argument beats one that needs a default or a params array.
+      const full = hit.filter((x) => paramTypes(x).length - (callVia && isExt(x) ? 1 : 0) === types.length && x.s.maxParams !== Infinity), best = full.length ? full : hit;
+      return best.length < res.length ? res.filter((x) => best.includes(x) || (!callable(x.s.kind) && x.s.kind !== 'ctor')) : res;
+    };
 
     const site = (name, ref) => { const a = sites.get(name); if (a) a.push(n.id, ref); else sites.set(name, [n.id, ref]); };
     const emit = (name, line, kind, res, args) => {
@@ -540,6 +1119,7 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
       let to = NONE, status = 'unresolved';
       if (res === AMBIGUOUS) { status = 'ambiguous'; unlinked.set(name, (unlinked.get(name) || 0) + 1); }
       else if (res && res.length) {
+        if (kind === 'call' || kind === 'new') res = byRef(res);
         status = 'resolved'; to = res.length > 8 ? [...new Set(res.map((x) => x.id))] : [];
         if (res.length <= 8) for (const x of res) if (!to.includes(x.id)) to.push(x.id);
         for (const id of to) if (id !== n.id && !outSet.has(id)) { outSet.add(id); inn.get(id).add(n.id); stats.edges++; }
@@ -548,19 +1128,75 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
       list.push(ref); stats[status]++;
       if (kind === 'call' || kind === 'new') site(name, ref);
     };
+    let viaInterface = false; // set while the overrides of a declaration are collected
     const pick = (cands, args, kindOk, viaMember) => {
       if (!cands) return null;
-      const r = []; for (const x of cands) if (kindOk(x.s.kind) && (!strict || admits(x, args, viaMember))) r.push(x);
+      const r = []; for (const x of cands) if (kindOk(x.s.kind) && (!strict || admits(x, args, viaMember)) && (viaInterface || !cs || !explicitImpl(x))) r.push(x);
       return r.length ? r : null;
     };
     const memberKind = (k) => callable(k) || k === 'property';
     const calleeKind = (k) => callable(k) || k === 'property' || (constructs && k === 'type');
-    const notSelf = (r) => (r ? some(r.filter((x) => x.id !== n.id && x.s.kind !== 'type' && x.s.kind !== 'ctor')) : null);
+    const notSelf = (r) => (r ? some(r.filter((x) => x.id !== n.id && x.s.kind !== 'type' && x.s.kind !== 'ctor' && (viaInterface || !cs || !explicitImpl(x)))) : null);
 
     /** A member call whose receiver says nothing: rules 4 and 5, nothing for stop-list names. */
     const unknownCall = (name, args, exclude) => {
       if (STOPLIST.has(name)) return SKIP;
-      return byRules(n, name, args, (x) => callable(x.s.kind) && x.group !== exclude && !(cs && x.stat && !isExt(x)), true, true);
+      return byRules(n, name, args, (x) => callable(x.s.kind) && x.group !== exclude && !(cs && x.stat && !isExt(x)) && !x.s.isTest, true, true);
+    };
+    /**
+     * Class hierarchy analysis (Dean, Grove, Chambers 1995): a call bound to a declaration that derived types can
+     * override may run any of those overrides, so they are targets too. Past `maxDispatch` of them the call
+     * keeps its declared target only and the name is counted in `unlinked`: the overrides have callers the graph
+     * does not show.
+     */
+    const cap = (res, extra, name) => {
+      if (!extra) return res;
+      if (extra.length > maxDispatch) { stats.capped++; unlinked.set(name, (unlinked.get(name) || 0) + 1); return res; }
+      return res ? res.concat(extra) : extra;
+    };
+    const dispatch = (res, name, keep) => {
+      let extra = null, seen = null;
+      viaInterface = true;
+      for (const x of res) {
+        if (!overridable(x)) continue;
+        const any = !cs || isInterface(x.decl); // an interface member is implemented without `override`
+        for (const g of derivedOf(x.group)) {
+          if (seen && seen.has(g)) continue;
+          (seen || (seen = new Set())).add(g);
+          for (const y of keep(own(g, name)) || NONE) if (!y.stat && (any || y.s.modifiers.includes('override')) && !res.includes(y)) (extra || (extra = [])).push(y);
+        }
+      }
+      viaInterface = false;
+      return cap(res, extra, name);
+    };
+    /** The receiver's type declares no such member: it comes from a base outside the repository, and the types deriving from the receiver's may implement it. */
+    const below = (keys, name, keep) => {
+      let extra = null; const seen = new Set();
+      viaInterface = true;
+      for (const k of keys) for (const g of derivedOf(k)) {
+        if (seen.has(g)) continue;
+        seen.add(g);
+        for (const y of keep(own(g, name)) || NONE) if (!y.stat) (extra || (extra = [])).push(y);
+      }
+      viaInterface = false;
+      return extra;
+    };
+    /** A call that can only reach the repository as an extension method: the receiver's type has no member of that name. */
+    const extCall = (name, args, d) => {
+      const all = named.get(name); if (!all) return null;
+      let sure = null, maybe = null;
+      for (const x of all) {
+        if (!isExt(x) || !reachable(n, x) || !admits(x, args, true)) continue;
+        const fit = extFits(x, d);
+        if (fit === 2) (sure || (sure = [])).push(x); else if (fit === 1) (maybe || (maybe = [])).push(x);
+      }
+      if (!sure && !maybe) return null;
+      if (!sure && STOPLIST.has(name)) return SKIP;
+      const u = usingsOf(f), c = sure || maybe, open = c.filter((x) => !x.ns || x.ns === n.ns || u.has(x.ns) || (n.ns || '').startsWith(`${x.ns}.`));
+      const v = open.length ? open : c; // the namespaces this file opens come first; a project file may open others
+      if (sure) return v;
+      const near = v.filter((x) => x.scope === n.scope); if (near.length) return near;
+      return v.length <= maxCandidates ? v : AMBIGUOUS;
     };
     const bareCall = (name, args) => {
       if (lexical) {
@@ -571,15 +1207,29 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
         return withCtors(byRules(n, name, args, (x) => !x.s.container && (callable(x.s.kind) || x.s.kind === 'type'), false, false), args, false);
       }
       const keep = (c) => pick(c, args, calleeKind, false);
-      let r = keep(n.mem.get(name)) || (implicit ? inherited(n.group, name, keep) : null);
-      for (let c = s.container; !r && implicit && c && c.includes('.');) { c = c.slice(0, c.lastIndexOf('.')); r = keep(own(`${n.base}|${c}`, name)); } // enclosing types
+      let r = exact(keep(n.mem.get(name)) || (implicit ? inherited(n.group, name, keep) : null));
+      if (r && declared) r = dispatch(r, name, keep);
+      for (let o = n.decl && n.decl.decl; !r && implicit && o; o = o.decl) r = exact(keep(own(o.own, name)) || inherited(o.own, name, keep)); // enclosing types
       if (r) return withCtors(r, args, strict);
+      if (cs) {
+        // Not a member of any type around the call. C# then leaves three readings: a static method brought in
+        // by `using static`, a member inherited from a base outside the repository (which derived types may
+        // override), or a delegate held in a field. An instance method of some other type is never one of them.
+        const all = named.get(name), u = usingsOf(f); let vis = null;
+        for (const x of all || NONE) if (x.stat && callable(x.s.kind) && x.s.container && (n.test || !x.test) && admits(x, args, false) && u.has(`${x.ns ? `${x.ns}.` : ''}${x.s.container}`)) (vis || (vis = [])).push(x);
+        if (vis) return vis;
+        const sub = n.decl ? below([n.group], name, keep) : null;
+        if (sub) return cap(null, sub, name);
+        if (STOPLIST.has(name)) return SKIP;
+        return n.decl && openBases(n.group) ? byRules(n, name, args, (x) => callable(x.s.kind), false, false) : null;
+      }
       if (implicit && STOPLIST.has(name)) return SKIP; // inherited from a type the repository does not declare
       return withCtors(byRules(n, name, args, (x) => callable(x.s.kind) || (constructs && x.s.kind === 'type'), false, false), args, strict);
     };
     const bareUse = (name) => {
       if (lexical) { const r = lexicalName(n, name); return r && r !== EXTERNAL ? some(r.filter((x) => x.id !== n.id)) : null; }
-      return implicit ? notSelf(n.mem.get(name)) : null;
+      if (!implicit) return null;
+      return notSelf(n.mem.get(name)) || (declared && n.decl && basesOf(n.group).length ? inherited(n.group, name, (c) => (c ? some(c.filter((x) => x.s.kind === 'property')) : null)) : null);
     };
     const isInit = (i) => { // C#: `new T { … }`, `new T(…) { … }`, `x with { … }`, `P = { … }`
       if (i === A) return false;
@@ -598,15 +1248,32 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
 
     /** `new Name(args)`: the type and the constructors that admit the arguments. Returns the index to continue from. */
     const construct = (i) => {
-      let j = i + 1, last = null, head = null, parts = 0;
-      if (j + 1 < B && T[j].k === 'kw' && T[j].v === 'global' && T[j + 1].v === '::') j += 2;
+      const t0 = T[i];
+      let j = i + 1, last = null, head = null, parts = 0, qual = null, arity = 0, rooted = false, written = '';
+      if (j + 1 < B && T[j].k === 'kw' && T[j].v === 'global' && T[j + 1].v === '::') { j += 2; rooted = true; }
       while (j < B && T[j].k === 'id') {
         if (!head) head = T[j];
-        last = T[j]; parts++; j++;
-        if (angle && j < B && T[j].k === 'op' && T[j].v === '<') { const g = genericClose(T, j, B); if (g > 0) j = g + 1; }
+        qual = last ? last.v : null; last = T[j]; parts++; j++; arity = 0; written += (written ? '.' : '') + last.v;
+        if (angle && j < B && T[j].k === 'op' && T[j].v === '<') { const g = genericClose(T, j, B); if (g > 0) { arity = countTypeArgs(T, match, j, g); j = g + 1; } else arity = undefined; }
         if (j + 1 < B && T[j].k === 'op' && (T[j].v === '.' || T[j].v === '::') && T[j + 1].k === 'id') j++; else break;
       }
-      if (!last) return i; // new(), new[] { … }, new { … }, new int[n]
+      if (!last) { // new(), new[] { … }, new { … }, new int[n]
+        if (!cs || !(j < B && T[j].k === 'op' && T[j].v === '(' && match[j] > j)) return i;
+        // C# 9 target-typed `new(…)`: the type is the one the value is declared, assigned or returned as.
+        const pv = T[i - 1]; let ty = null, h = null;
+        if (pv.k === 'op' && pv.v === '=' && i - 3 >= A && T[i - 2].k === 'id') {
+          const b3 = T[i - 3];
+          if (b3.k === 'id' || b3.k === 'kw' || (b3.k === 'op' && (b3.v === '>' || b3.v === '?'))) h = typeHead(T, i - 3, A); // T name = new(…)
+          else { const d = chainDesc(i - 2); if (d && d !== AMBIGUOUS && !d.ext && d.inst !== false) { ty = []; for (const g of d.keys) for (const x of typeOfGroup.get(g) || NONE) ty.push(x); } } // this.x = new(…)
+        } else if ((pv.k === 'kw' && pv.v === 'return') || (pv.k === 'op' && pv.v === '=>' && i === A)) { const k = headOf(n).name; if (k > s.a) h = typeHead(T, k - 1, s.a); } // return new(…)
+        if (h && h.name && !NOT_TYPE.has(h.name) && !isTypeParam(n, h.name)) { const r = typesFor(n, h.name, h.arity, h.qual, true); if (r && r !== AMBIGUOUS) ty = r; }
+        if (!ty || !ty.length) return i;
+        const args = countArgs(T, match, j, lang), b = match[j] + 1;
+        if (b < B && T[b].k === 'op' && T[b].v === '{') initOf.set(b, ty);
+        callOpen = j; callVia = false;
+        emit(ty[0].s.name, t0.l, 'new', exact(withCtors(ty, args, strict)), args);
+        return i;
+      }
       const nx = j < B ? T[j] : null, name = last.v;
       let kind = 'new', args = 0;
       if (nx && nx.k === 'op' && nx.v === '(') args = countArgs(T, match, j, lang);
@@ -618,22 +1285,34 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
         const r = parts === 1 ? lexicalName(n, name) : b && b.kind !== 'named' && b.target ? exportsOf(b.target, name) : null;
         res = r === EXTERNAL || (r && !r.length) ? null : r;
         if (!r && !modular && parts === 1) res = typesFor(n, name);
-      } else res = typesFor(n, name);
-      if (kind === 'new') emit(name, last.l, kind, withCtors(res, args, strict), args);
+      } else {
+        res = typesFor(n, name, cs ? arity : undefined, qual);
+        // `new A.B.C()` names the type by where it is declared (unless A is a `using` alias); `global::` leaves nothing out.
+        if (cs && res && res !== AMBIGUOUS && (rooted || (parts > 1 && !aliasesOf(f).has(head.v)))) res = some(res.filter((x) => { const q = `${x.ns ? `${x.ns}.` : ''}${x.s.qname}`; return q === written || (!rooted && q.endsWith(`.${written}`)); }));
+      }
+      callOpen = nx && nx.k === 'op' && nx.v === '(' ? j : -1; callVia = false;
+      if (cs && kind === 'new' && res && res !== AMBIGUOUS) { const b = callOpen < 0 ? j : match[j] + 1; if (b > 0 && b < B && T[b].k === 'op' && T[b].v === '{') initOf.set(b, res.filter(isType)); }
+      if (kind === 'new') emit(name, last.l, kind, exact(withCtors(res, args, strict)), args);
       else if (res) emit(name, last.l, kind, res, null);
       return j - 1;
     };
 
     const member = (i, t, call, j) => {
       const name = t.v, args = call ? countArgs(T, match, j, lang) : null;
-      let r = i - 2, rt = r >= 0 ? T[r] : null;
+      let r = i - 2, rt = r >= 0 ? T[r] : null, arity0;
       if (rt && rt.k === 'op' && rt.v === '!' && r > 0) rt = T[--r]; // x!.Member
-      if (rt && rt.k === 'op' && rt.v === '>' && angle) { const o = genericOpen(T, r, 0); if (o > 0) { r = o - 1; rt = T[r]; } } // Cache<T>.Member
-      let mode = 'unknown', types = null, target = null, chained = false;
+      if (rt && rt.k === 'op' && rt.v === '>' && angle) { const o = genericOpen(T, r, 0); if (o > 0) { arity0 = countTypeArgs(T, match, o, r); r = o - 1; rt = T[r]; } } // Cache<T>.Member
+      let mode = 'unknown', types = null, target = null, chained = false, desc = null, fixed = false;
       if (rt && rt.k === 'kw' && (rt.v === 'base' || rt.v === 'super')) mode = 'base';
       else if (rt && (rt.k === 'kw' || rt.k === 'id') && (SELF.has(rt.v) || (py && rt.v === 'cls'))) mode = 'this';
       else if (rt && rt.k === 'op' && rt.v === ')' && py && r >= 2 && T[r - 1].v === '(' && T[r - 2].v === 'super') mode = 'base';
-      else if (rt && rt.k === 'id') {
+      else if (declared && rt && (rt.k === 'id' || rt.k === 'kw') && r >= A) {
+        const d = chainDesc(r, arity0);
+        if (d === AMBIGUOUS) mode = 'ambiguous';
+        else if (d && d.ext) { if (d.inst === false) mode = 'external'; else { mode = 'ext'; desc = d; } }
+        else if (d && d.inst === false) { mode = 'type'; fixed = cs; types = []; for (const g of d.keys) for (const x of typeOfGroup.get(g) || NONE) types.push(x); }
+        else if (d) { mode = 'typed'; desc = d; }
+      } else if (rt && rt.k === 'id') {
         const v = rt.v;
         chained = r > 0 && T[r - 1].k === 'op' && ACCESS.has(T[r - 1].v);
         if (chained) { if (!lexical && typesNamed.has(v)) { const ty = typesFor(n, v); if (ty && ty !== AMBIGUOUS) { mode = 'type'; types = ty; } } }
@@ -648,19 +1327,37 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
       }
       if (mode === 'this') {
         const keep = call ? (c) => pick(c, args, memberKind, true) : notSelf;
-        const res = keep(n.mem.get(name)) || inherited(n.group, name, keep);
-        if (res) emit(name, t.l, call ? 'call' : 'member', res, args);
-        else if (call) emit(name, t.l, 'call', unknownCall(name, args, null), args);
+        const res = exact(keep(n.mem.get(name)) || inherited(n.group, name, keep));
+        if (res) emit(name, t.l, call ? 'call' : 'member', declared ? dispatch(res, name, keep) : res, args);
+        else if (!call) return;
+        else if (declared && selfDesc) { // inherited from outside the repository (derived types may implement it), or an extension method
+          const sub = below(selfDesc.keys, name, keep);
+          emit(name, t.l, 'call', sub ? cap(null, sub, name) : extCall(name, args, selfDesc), args);
+        } else emit(name, t.l, 'call', unknownCall(name, args, null), args);
+      } else if (mode === 'typed') { // a value whose declared type the repository declares: its members, what they are overridden by, extension methods
+        const inst = cs && desc.inst === true;
+        const keep = call ? (c) => { const q = pick(c, args, memberKind, true); return q && inst ? some(q.filter((x) => !x.stat || isExt(x))) : q; } : notSelf;
+        let res = null;
+        for (const g of desc.keys) { const q = keep(own(g, name)) || inherited(g, name, keep); if (q) res = res ? res.concat(q.filter((x) => !res.includes(x))) : q; }
+        if (res) emit(name, t.l, call ? 'call' : 'member', dispatch(exact(res), name, keep), args);
+        else {
+          const sub = below(desc.keys, name, keep);
+          if (sub) emit(name, t.l, call ? 'call' : 'member', cap(null, sub, name), args);
+          else if (call) emit(name, t.l, 'call', extCall(name, args, desc), args);
+        }
+      } else if (mode === 'ext') { // a value of a type the repository does not declare: only an extension method can be ours
+        if (call) emit(name, t.l, 'call', extCall(name, args, desc), args);
       } else if (mode === 'base') { // never the caller's own container: base access is not virtual
         const keep = call ? (c) => pick(c, args, memberKind, true) : notSelf;
         const res = inherited(n.group, name, keep);
         if (res) emit(name, t.l, call ? 'call' : 'member', res, args);
         else if (call) emit(name, t.l, 'call', unknownCall(name, args, n.group), args);
       } else if (mode === 'type') {
-        const keep = (c) => (c ? (call ? pick(c, args, (k) => memberKind(k) || k === 'type', false) : some(c.filter((x) => x.s.kind !== 'ctor'))) : null);
+        // C#: a call written on a type name reaches static members only.
+        const keep = (c) => { if (!c) return null; if (!call) return some(c.filter((x) => x.s.kind !== 'ctor')); const q = pick(c, args, (k) => memberKind(k) || k === 'type', false); return q && fixed ? some(q.filter((x) => x.stat || isType(x))) : q; };
         let res = null;
         for (const g of new Set(types.map((x) => x.own))) { const q = keep(own(g, name)) || inherited(g, name, keep); if (q) res = res ? res.concat(q) : q; }
-        if (res) emit(name, t.l, call ? 'call' : res.every(isType) ? 'type' : 'member', call ? withCtors(res, args, strict) : res, args);
+        if (res) emit(name, t.l, call ? 'call' : res.every(isType) ? 'type' : 'member', call ? withCtors(fixed ? exact(res) : res, args, strict) : res, args);
         else if (chained) { if (call) emit(name, t.l, 'call', unknownCall(name, args, null), args); }
         else { // a field, constant or enum member, which are not symbols: the use is of the type
           emit(rt.v, rt.l, 'type', types, null);
@@ -690,7 +1387,15 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
       const nx = i + 1 < T.length ? T[i + 1] : null;
       if (nx && nx.k === 'op' && p && p.k === 'op') {
         if (nx.v === ':' && (p.v === '(' || p.v === ',' || p.v === '{')) return; // named argument, object key, property pattern
-        if (nx.v === '=' && (py ? p.v === '(' || p.v === ',' : (p.v === '{' || p.v === ',') && braces.length > 0 && braces[braces.length - 1])) return; // keyword argument, member of the object being initialised
+        if (nx.v === '=' && (py ? p.v === '(' || p.v === ',' : (p.v === '{' || p.v === ',') && braces.length > 0 && braces[braces.length - 1])) { // keyword argument, member of the object being initialised
+          const ty = cs ? inits[inits.length - 1] : null;
+          if (ty) { // `new T { Name = … }` sets T's property
+            const props = (c) => (c ? some(c.filter((x) => x.s.kind === 'property' && !explicitImpl(x))) : null); let res = null;
+            for (const g of new Set(ty.map((x) => x.own))) { const q = props(own(g, name)) || inherited(g, name, props); if (q) res = res ? res.concat(q) : q; }
+            if (res) emit(name, t.l, 'member', res, null);
+          }
+          return;
+        }
       } else if (nx && typed && nx.k === 'id') return; // `Type name`: the identifier is a type in a declaration
       const res = bareUse(name);
       if (res) emit(name, t.l, res.every(isType) ? 'type' : 'member', res, null);
@@ -704,21 +1409,35 @@ export function buildGraph(files, { maxCandidates = 3 } = {}) {
       let res = [];
       if (t.v === 'this') res = ok(n.mem.get(s.name));
       else for (const g of basesOf(n.group)) for (const b of typeOfGroup.get(g) || NONE) for (const c of ok(own(g, b.s.name))) if (!res.includes(c)) res.push(c);
-      emit(t.v === 'this' ? s.name : res.length ? res[0].s.name : 'base', t.l, 'new', res.length ? res : null, args);
+      callOpen = i + 1; callVia = false;
+      emit(t.v === 'this' ? s.name : res.length ? res[0].s.name : 'base', t.l, 'new', res.length ? exact(res) : null, args);
       break;
     }
 
     for (let i = A; i < B; i++) {
       const t = T[i], k = t.k;
-      if (k === 'op') { if (cs) { if (t.v === '{') braces.push(isInit(i)); else if (t.v === '}') braces.pop(); } continue; }
+      if (k === 'op') {
+        if (cs) {
+          if (t.v === '{') {
+            braces.push(isInit(i));
+            let ty = initOf.get(i) || null;
+            if (!ty && i > A + 1 && T[i - 1].k === 'kw' && T[i - 1].v === 'with') { const d = chainDesc(i - 2); if (d && d !== AMBIGUOUS && !d.ext && d.inst !== false) { ty = []; for (const g of d.keys) for (const x of typeOfGroup.get(g) || NONE) ty.push(x); } }
+            inits.push(ty);
+          } else if (t.v === '}') { braces.pop(); inits.pop(); }
+        }
+        continue;
+      }
       if (k !== 'id' && k !== 'kw') continue;
       const p = i > 0 ? T[i - 1] : null, access = p !== null && p.k === 'op' && (p.v === '.' || p.v === '?.' || p.v === '::' || p.v === '->');
+      targs = null;
       if (k === 'kw' && !access) { if (t.v === 'new' && hasNew) i = construct(i); continue; }
       let j = i + 1; // the call parenthesis, past explicit generic arguments: Name<T>(…)
-      if (angle && j < B && T[j].k === 'op' && T[j].v === '<') { const g = genericClose(T, j, B); if (g > 0 && g + 1 < B && T[g + 1].k === 'op' && T[g + 1].v === '(') j = g + 1; }
+      if (angle && j < B && T[j].k === 'op' && T[j].v === '<') { const g = genericClose(T, j, B); if (g > 0 && g + 1 < B && T[g + 1].k === 'op' && T[g + 1].v === '(') { if (cs) targs = countTypeArgs(T, match, j, g); j = g + 1; } }
       const call = j < B && T[j].k === 'op' && T[j].v === '(' && match[j] > j;
+      callOpen = call ? j : -1; callVia = access;
       if (access) member(i, t, call, j); else bare(i, t, call, j);
     }
+    targs = null;
   }
 
   for (const n of recs) if (n.s.kind !== 'type' && n.s.bodyB > n.s.bodyA) scan(n);
@@ -742,16 +1461,20 @@ export function callSites(graph, name) {
 
 // ── Derived structure: arrays, strongly connected components ──────────────────────────────────────────
 const derived = new WeakMap();
-/** The graph as index arrays (compressed sparse rows, both directions), node order = insertion order of graph.nodes. */
+/**
+ * The graph as index arrays (compressed sparse rows, both directions), node order = insertion order of graph.nodes.
+ * An edge from a symbol to itself and an edge to something that is not a node are left out, so every measure
+ * agrees on what an edge is (buildGraph adds neither; a graph built by hand may hold them).
+ */
 function arrays(graph) {
   let c = derived.get(graph); if (c) return c;
   const ids = [...graph.nodes.keys()], n = ids.length, pos = new Map();
   for (let i = 0; i < n; i++) pos.set(ids[i], i);
   const outStart = new Int32Array(n + 1), inStart = new Int32Array(n + 1);
-  for (let i = 0; i < n; i++) { const s = graph.out.get(ids[i]); if (s) for (const to of s) { const j = pos.get(to); if (j !== undefined) { outStart[i + 1]++; inStart[j + 1]++; } } }
+  for (let i = 0; i < n; i++) { const s = graph.out.get(ids[i]); if (s) for (const to of s) { const j = pos.get(to); if (j !== undefined && j !== i) { outStart[i + 1]++; inStart[j + 1]++; } } }
   for (let i = 0; i < n; i++) { outStart[i + 1] += outStart[i]; inStart[i + 1] += inStart[i]; }
   const outTo = new Int32Array(outStart[n]), inFrom = new Int32Array(outStart[n]), fill = inStart.slice(0, n);
-  for (let i = 0, e = 0; i < n; i++) { const s = graph.out.get(ids[i]); if (s) for (const to of s) { const j = pos.get(to); if (j !== undefined) { outTo[e++] = j; inFrom[fill[j]++] = i; } } }
+  for (let i = 0, e = 0; i < n; i++) { const s = graph.out.get(ids[i]); if (s) for (const to of s) { const j = pos.get(to); if (j !== undefined && j !== i) { outTo[e++] = j; inFrom[fill[j]++] = i; } } }
   const testCode = new Uint8Array(n), testCase = new Uint8Array(n), type = new Uint8Array(n);
   for (let i = 0; i < n; i++) { const s = graph.nodes.get(ids[i]); testCode[i] = isTestCode(s) ? 1 : 0; testCase[i] = s && s.isTest ? 1 : 0; type[i] = s && s.kind === 'type' ? 1 : 0; }
   c = { ids, pos, n, outStart, outTo, inStart, inFrom, testCode, testCase, type, cond: null };
@@ -856,7 +1579,7 @@ function reach(graph, edges, id, { maxDepth = Infinity, includeTests = true } = 
   let frontier = [id];
   for (let d = 0; d < maxDepth && frontier.length; d++) {
     const next = [];
-    for (const v of frontier) { const s = edges.get(v); if (s) for (const u of s) if (!seen.has(u)) { seen.add(u); next.push(u); } }
+    for (const v of frontier) { const s = edges.get(v); if (s) for (const u of s) if (!seen.has(u) && graph.nodes.has(u)) { seen.add(u); next.push(u); } }
     frontier = next;
   }
   seen.delete(id);
@@ -941,7 +1664,8 @@ function percentiles(values, inPop, n) {
  *   …Pct         rank percentile in [0, 1] among production symbols that are not types (ties share their mean
  *                rank); null for test code and for types, which are not ranked
  *   instability  Martin 1994: fanOut / (fanIn + fanOut); null when both are 0
- *   unlinked     references written with this symbol's name that could not be linked (stop list, ambiguous).
+ *   unlinked     references written with this symbol's name that could not be linked (stop list, ambiguous,
+ *                dispatch past the cap).
  *                When it is not 0, fanIn and dependents are lower bounds.
  * "Test code" is a test case (symbol.isTest) or anything declared in a test file; a "test case" is symbol.isTest.
  * Method: exact for every node. Strongly connected components are condensed (Tarjan 1972) and the set of
