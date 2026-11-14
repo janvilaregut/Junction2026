@@ -8,19 +8,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function createTools({ act, end }) {
 const T = (props = {}, required = []) => ({ type: 'OBJECT', properties: props, ...(required.length ? { required } : {}) });
 const TOOLS = [
-  { name: 'get_screen', description: 'What the user is looking at right now: home (branch tree), the graph of one pull request, or its review (the tree of agents and the verdict card); plus that PR and its verification summary. Call it whenever the user says "this", "here" or you are unsure.', parameters: T() },
+  { name: 'get_screen', description: 'What the user is looking at right now: the project picker, home (branch tree), the graph of one pull request, the code panel of one spot, or a review (the tree of agents and the verdict card); plus that PR and its verification summary. Call it whenever the user says "this", "here" or you are unsure.', parameters: T() },
   { name: 'list_pull_requests', description: 'List the pull requests (branches) of the current project with their verification state, and point at them on screen. By default only the active ones (recent or already verified); older stale branches only if include_old is true.', parameters: T({ direction: { type: 'STRING', enum: ['incoming', 'outgoing', 'all'], description: 'incoming = others want to merge into the base; outgoing = the user\'s own branches. Default all.' }, include_old: { type: 'BOOLEAN', description: 'Also include old, stale branches. Default false.' } }) },
   { name: 'highlight_pull_requests', description: 'Point at specific pull requests in the branch tree (dims the rest). Empty list clears.', parameters: T({ ids: { type: 'ARRAY', items: { type: 'STRING' }, description: 'PR ids from list_pull_requests' } }, ['ids']) },
   { name: 'open_pull_request', description: 'Open one pull request full screen. Accepts its id, branch, number, a word from its title, or an ordinal like "first"/"second".', parameters: T({ query: { type: 'STRING' } }, ['query']) },
   { name: 'go_home', description: 'Close the pull request and go back to the branch tree.', parameters: T() },
   { name: 'get_verification_details', description: 'Details of the current pull request verification, for explaining it: verdict lane, recommendation, what was checked and how (tests red-before/green-after, seeded defects, rewind, blind replicas), what was NOT checked and why, the lines the human must read, and the open questions.', parameters: T({ section: { type: 'STRING', enum: ['summary', 'checked', 'not_checked', 'residue', 'questions', 'all'] } }) },
-  { name: 'open_review', description: 'Review one spot with the agents, shown as the agents\' tree growing out of that node: three AI agents rebuild that one function blind from the requirement (each is a branch), mathematics compares their versions with the pull request, they argue at the junction and it ends in a verdict card (reproduced, differs with a fix, or you decide). Takes about 15 seconds. query: the function name or file:line of the spot; empty = the most pressing open spot. Use it when the user asks to review, check, verify or fix a spot, or asks whether it is right.', parameters: T({ query: { type: 'STRING', description: 'The spot: a line like "985" or "TypeCollector.cs:985", a file name, or empty for the whole change.' } }) },
+  { name: 'open_spot', description: 'Go to one spot of the graph (a changed function, or a file): the camera flies to it and the CODE PANEL opens on the right, with the chunks worth reading open and the filler folded, so the person can review it themselves. This is the DEFAULT for "go to", "enter", "open", "show me", "let\'s see", "look at" a spot ("entra en X", "vamos a X", "enséñame X", "ábreme X", "amplíame X"). It never starts the agents. After it: say in one or two sentences what the spot is and which lines deserve reading, then ASK whether they want the agents to review it. query: the function name, a file name or file:line; empty = the spot already selected, else the most pressing open one.', parameters: T({ query: { type: 'STRING' } }) },
+  { name: 'spot_tab', description: 'Switch the tab of the open code panel: "code" (only the chunks worth reading), "all_code" (the whole file), "evidence" (what mathematics established and every criterion it is held to), "dependencies" (which chunks read each other and through which names). Use it for "show me all the code", "the evidence", "the dependencies" of the spot that is open.', parameters: T({ tab: { type: 'STRING', enum: ['code', 'all_code', 'evidence', 'dependencies'] } }, ['tab']) },
+  { name: 'open_review', description: 'Send one spot to the AGENTS, shown as the agents\' tree growing out of that node: three AI agents rebuild that one function blind from the requirement (each is a branch), mathematics compares their versions with the pull request, they argue at the junction and it ends in a verdict card (reproduced, differs with a fix, or you decide). Takes about 15 seconds. ONLY when the user explicitly asks for the agents or for a review ("open the agents", "ábreme el agente", "que lo revisen los agentes", "review / check / verify / fix it", "is it right?"), or says yes after you offered it. To just go to a spot or see its code use open_spot. query: the function name or file:line; empty = the spot that is open or selected, else the most pressing open one.', parameters: T({ query: { type: 'STRING', description: 'The spot: a function name, a line like "985" or "TypeCollector.cs:985", or empty for the one that is open.' } }) },
   { name: 'start_verification', description: 'Start the real review of the current pull request: contract, alternatives rebuilt from the base by AI agents, their debate, attacks on the PR and a judge with a 0-10 score. Profiles: quick (90 s, no alternatives), standard (5 min, default), deep (15 min). Ask the user to confirm first.', parameters: T({ profile: { type: 'STRING', enum: ['quick', 'standard', 'deep'] } }) },
   { name: 'show_commits', description: 'Unfold one branch in the tree so all its commits show on a long rail (the other branches fold away). Use when the user asks for the commits / history of a branch. query: id, branch, number, a word from its title, or empty for the one open or in focus.', parameters: T({ query: { type: 'STRING' } }) },
   { name: 'show_all_branches', description: 'Fold the commits back (or zoom back out) and show every branch in the tree again.', parameters: T() },
   { name: 'zoom_branch', description: 'Zoom the home tree\'s camera into one branch: a close-up of where it starts and its first commits, big, on one glowing line (the user can then slide along it). Use when the user asks to zoom in on, enlarge or magnify a branch ("amplíame la rama", "acércate a esa rama"). query: id, branch, number, a word from its title, or empty for the one in focus.', parameters: T({ query: { type: 'STRING' } }) },
   { name: 'focus_graph', description: 'Inside the open pull request graph: fly the camera to a node or group and light it up while you talk about it. query: a file name, "Tests", "Builds", "Mutation", a line like "Foo.cs:120", an agent, or a group: "what I must read" (red), "decisions" (yellow), "reproduced" (green), "checks", "files", "agents", "whole" (the core). Call it EVERY time you start explaining a specific part of the graph.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
-  { name: 'zoom_graph', description: 'Move the graph camera: "in" (closer), "out" (further), "overview" (back to the whole graph, clears the highlight).', parameters: T({ action: { type: 'STRING', enum: ['in', 'out', 'overview'] } }, ['action']) },
+  { name: 'zoom_graph', description: 'Move the graph camera: "in" (closer), "out" (further), "turn_left" / "turn_right" (turn the graph in 3D, so its depth shows), "overview" (back to the whole flat graph: clears the highlight, the turn and closes the code panel).', parameters: T({ action: { type: 'STRING', enum: ['in', 'out', 'turn_left', 'turn_right', 'overview'] } }, ['action']) },
   { name: 'show_agent_debate', description: 'Dive into the animated story of the AI agents for the open pull request: bubbles that solve it blind, compare, argue round by round (they meet, merge when they agree, the convinced one takes the winner\'s colour) and reach a consensus. Use when the user asks how the agents are doing, how they debated, who convinced whom, or to see the agents. It plays by itself; returns the story so you can narrate it. Uses the REAL review run of the PR when it has one (alternatives from the base, their debate, the attacks on the PR and the judge); otherwise a sample (say so).', parameters: T() },
   { name: 'debate_step', description: 'Move through the agents story: next, previous, restart, or jump to a chapter: agents, solve, compare, debate, verdict.', parameters: T({ to: { type: 'STRING', enum: ['next', 'previous', 'restart', 'agents', 'solve', 'compare', 'debate', 'verdict'] } }, ['to']) },
   { name: 'open_agent', description: 'In the agents story: dive into one agent (its bubble fills the screen with its details, arguments and how its debates went). name as shown: in a real run "C1 Hydrogen"/"Hydrogen", "Attacker", "Judge", "The PR"; in a sample run Precise, Steady, Balanced, Curious, Bold.', parameters: T({ name: { type: 'STRING' } }, ['name']) },
@@ -32,7 +34,6 @@ TOOLS.push(
   { name: 'review_step', description: 'In the review tree: "skip" jumps to the verdict, "replay" plays it again.', parameters: T({ to: { type: 'STRING', enum: ['skip', 'replay'] } }, ['to']) },
   { name: 'leave_review', description: 'Leave the review tree and go back to the graph.', parameters: T() },
   { name: 'where_to_look', description: 'The spots that still need someone, most pressing first, lit up in the graph: the risky (red) and uncertain (amber) functions that mathematics could not settle and no agent or person has settled since. Use it for "where do I start", "what should I review", "what is risky", "what is left".', parameters: T() },
-  { name: 'show_code', description: 'Fly the graph to one code region and return its code (removed and added lines) and which agents also wrote it. query: a line like "1429" or "TypeCollector.cs:985", or a file name. For understanding, not fixing.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
   { name: 'ask_agent', description: 'What one agent did and said in the review: C1, C2 (agents that rebuilt the change from the base), the PR, the attacker, or the judge.', parameters: T({ name: { type: 'STRING' } }, ['name']) },
   { name: 'review_all', description: 'Send every open spot of the graph to the agents at once (three at a time, about 15 seconds each): the nodes turn green when the agents reproduce them, red when they wrote it differently, and stay amber when a person must decide. Use it for "review everything", "check it all", "turn it green".', parameters: T() },
   { name: 'graph_overview', description: 'What mathematics settled in the open pull request, without any AI: how many changed functions are proved (the edit cannot change behaviour), cleared (nothing flagged, not a proof), uncertain and risky, how many lines still need someone, and the open spots in order. Use it for "how risky is this", "what did the maths say", "can I approve".', parameters: T() },
@@ -41,10 +42,14 @@ TOOLS.push(
   { name: 'show_ai_session', description: 'Open the panel with the AI agent session (recorded by Entire) behind one commit: which agent and model made it, the prompt that led to it and the conversation up to it, with a button to reopen it in its agent. ONLY when the user explicitly and directly asks for it: the prompt, the AI session, the conversation, or which AI made a commit ("¿con qué prompt se hizo este commit?", "enséñame la sesión de Claude del último commit", "which AI wrote this"). NEVER call it on your own initiative, to illustrate something else, or as part of a review. query: a commit (sha, words from its message, "last"/"first"); empty = the newest commit with a session. branch: optional branch, else the one unfolded or open, else the history of the base line.', parameters: T({ query: { type: 'STRING' }, branch: { type: 'STRING' } }) },
   { name: 'close_ai_session', description: 'Close the AI session panel.', parameters: T() },
   { name: 'look_deeper', description: 'The user wants the change looked at harder: launches a Deep review (up to 15 min, real cost). ASK FOR A YES FIRST.', parameters: T() },
+  { name: 'run_tests', description: 'The second way to settle a spot: back it with EXECUTABLE TESTS instead of agents. The full pipeline (contract, alternatives rebuilt from the base, attacks, a probe that runs) on the chosen functions; only this moves "% tested" on the bar. Only changed C# functions; takes minutes and real model cost, bounded by the depth: quick (90 s, cannot settle a spot), standard (5 min), deep (15 min). ASK FOR A YES FIRST. scope: "spot" (query, else the one open, else the next pending one), "all" (the whole change), "continue" (same contract, new budget, after a review that ended with not enough evidence). Use it for "test this", "back it with tests", "run the tests on this spot", "test the whole change", "continue the investigation".', parameters: T({ scope: { type: 'STRING', enum: ['spot', 'all', 'continue'] }, query: { type: 'STRING' }, depth: { type: 'STRING', enum: ['quick', 'standard', 'deep'], description: 'Optional: change the review depth first.' } }, ['scope']) },
+  { name: 'open_report', description: 'Open the report of the last full review of this pull request: the verdict card with the score, what was and was not checked and the evidence; it is where the person signs or sends it back. Use it for "show me the report / the verdict / the score", "I want to sign". If there is no review yet it says so (start_verification runs one).', parameters: T() },
+  { name: 'open_project', description: 'Switch to another project (repository), or with an empty query show the project picker with every project and how many branches each has to review. Use it for "open the project X", "change project", "show me the projects".', parameters: T({ query: { type: 'STRING', description: 'Project name or part of it; empty = show the picker.' } }) },
 );
 // Retired: the bubbles story. Agents are shown in one place only, the review tree (open_review); the raw
 // consensus page that the voice could open is gone.
-const RETIRED = new Set(['show_agent_debate', 'debate_step', 'open_agent', 'close_agent', 'leave_debate']);
+// show_code gave way to open_spot: the code now has its own panel.
+const RETIRED = new Set(['show_agent_debate', 'debate_step', 'open_agent', 'close_agent', 'leave_debate', 'show_code']);
 for (let i = TOOLS.length - 1; i >= 0; i--) if (RETIRED.has(TOOLS[i].name)) TOOLS.splice(i, 1);
 for (const t of TOOLS) t.behavior = 'BLOCKING';
 
@@ -55,16 +60,18 @@ function allPRs() {
 function prState(p) { try { return typeof state === 'function' ? state(p).label : (p.last?.laneName || 'Not verified'); } catch { return p.last?.laneName || 'Not verified'; } }
 const prBrief = (p, i) => ({ ordinal: i + 1, id: p.id, branch: p.branch, title: p.title, yours: !!p.yours, state: prState(p), verifying: !!p.running, linesForHuman: p.last ? `${p.last.residue} of ${p.last.total}` : null, commitsAhead: p.ahead, date: p.date });
 function view() {
-  const full = document.getElementById('full');
+  const full = document.getElementById('full'), landing = document.getElementById('landing');
+  if (landing && !landing.hidden) return 'projects';
   if (full && !full.hidden && call('treeOpen')) return 'review';
   if (full && !full.hidden && call('agentOpen')) return 'agent';
   if (full && !full.hidden && call('debateOpen')) return 'debate';
+  if (full && !full.hidden && call('codeInfo')) return 'code';
   if (full && !full.hidden) return 'graph';
   if (app()?.focus) return 'commits';
   if (app()?.zoom) return 'zoom';
   return 'home';
 }
-const inGraph = () => ['graph', 'review', 'debate', 'agent'].includes(view());
+const inGraph = () => ['graph', 'code', 'review', 'debate', 'agent'].includes(view());
 function graphSummary() {
   const g = typeof G !== 'undefined' ? G : null; if (!g) return null;
   return [...g.nodes.values()].slice(0, 40).map((n) => ({ label: n.label, kind: n.kind, file: n.file, state: n.info }));
@@ -81,6 +88,29 @@ function findPR(q) {
 }
 async function waitFor(cond, ms = 6000) { const t = performance.now(); while (!cond() && performance.now() - t < ms) await sleep(80); return cond(); }
 const clip = (s, n = 400) => (s && String(s).length > n ? String(s).slice(0, n) + '…' : s);
+const projectList = () => (app()?.projects || []).map((p) => ({ name: p.name, base: p.base, toReview: app().counts?.[p.id]?.review ?? null, current: p.id === app().pid }));
+/* The project picker covers the branch tree: step into the current project before pointing at its branches. */
+const leaveProjects = () => { if (view() === 'projects' && app()?.pid) call('pickProject', app().pid); };
+/* How much of the change executable tests back (only changed C# functions can be tested). */
+function tested() {
+  const t = app()?.math?.trust;
+  return t?.total ? { percent: t.percent, backed: t.verified, failing: t.failed, pending: t.pending, of: t.total, meaning: 'Share of the changed functions backed by tests that ran, weighted by impact. Not the odds that the change is right.' } : { possible: false, why: 'No changed C# function here: tests cannot back this change, the agents can still review it.' };
+}
+/* The changed function a query means, preferring product code over files and neighbours. */
+function findSpot(query) {
+  const hits = call('findNodes', query) || [];
+  return hits.find((n) => n.kind === 'sym' && n.m && n.m.verdict !== 'context') || hits.find((n) => n.m && n.m.verdict !== 'context') || hits.find((n) => n.kind === 'file') || hits.find((n) => n.m) || null;
+}
+/* Close whatever covers the graph (the old debate, the review tree) before acting on it. */
+async function toGraph() {
+  if (call('debateOpen')) { call('closeDebate'); await sleep(400); }
+  if (call('treeOpen')) { call('closeTree'); await sleep(700); }
+}
+function setDepth(depth) {
+  const s = app(); if (!s || !['quick', 'standard', 'deep'].includes(depth) || s.profile === depth) return;
+  s.profile = depth; try { store.set('katse.profile', depth); } catch { /* not kept */ }
+  call('renderBar');
+}
 function briefOf(b, section = 'summary') {
   if (!b) return null;
   const out = { lane: b.lane?.name || b.lane?.id, laneId: b.lane?.id, laneMeaning: b.lane?.summary, recommendation: b.recommendation?.name, linesForHuman: b.residue?.lines, totalLines: b.totals?.lines, minutes: b.timing?.totalMs ? Math.round(b.timing.totalMs / 6000) / 10 : null };
@@ -112,8 +142,10 @@ const TOOL_FN = {
     const f = v === 'commits' ? s.focus : v === 'zoom' ? s.zoom : null;
     return {
       view: v, project: project?.name, base: s?.base, pullRequest: p ? prBrief(p, allPRs().findIndex((x) => x.id === p.id)) : null, verification: p ? briefOf(s.run?.brief, 'summary') : null, verifyingNow: !!s?.es,
+      projects: v === 'projects' ? projectList() : undefined,
       graphNodes: v === 'graph' && !s?.math ? graphSummary() : undefined,
-      mathematics: v === 'graph' && s?.math ? { proved: s.math.summary.nodes.proved, cleared: s.math.summary.nodes.cleared, uncertain: s.math.summary.nodes.uncertain, risky: s.math.summary.nodes.risky, openNow: (call('mathQueue') || []).slice(0, 8).map((x) => ({ name: x.name, state: x.state, why: x.why })), selected: s.fixTarget?.label || null } : undefined,
+      mathematics: (v === 'graph' || v === 'code') && s?.math ? { proved: s.math.summary.nodes.proved, cleared: s.math.summary.nodes.cleared, uncertain: s.math.summary.nodes.uncertain, risky: s.math.summary.nodes.risky, openNow: (call('mathQueue') || []).slice(0, 8).map((x) => ({ name: x.name, state: x.state, why: x.why })), selected: s.fixTarget?.label || null, backedByTests: tested(), reviewDepth: s.profile } : undefined,
+      codePanel: v === 'code' ? call('codeInfo') : undefined,
       commitsShown: f ? { branch: allPRs().find((x) => x.id === f.id)?.branch, total: f.total, commits: f.commits.map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date, madeWith: c.ai?.[0]?.agent })) } : undefined,
       aiSessionOpen: !!call('aiSessionOpen') || undefined,
       agentsStory: v === 'debate' || v === 'agent' ? call('debateInfo') : undefined,
@@ -121,6 +153,7 @@ const TOOL_FN = {
     };
   },
   async list_pull_requests({ direction = 'all', include_old = false } = {}) {
+    leaveProjects();
     const all = allPRs();
     const active = (p) => p.yours || p.last || p.running || (!p.behind && Date.now() - new Date(p.date) < 30 * 864e5);
     let list = direction === 'incoming' ? all.filter((p) => !p.yours) : direction === 'outgoing' ? all.filter((p) => p.yours) : all;
@@ -136,6 +169,7 @@ const TOOL_FN = {
     const p = findPR(query);
     if (!p) return { error: `No pull request matches "${query}".`, available: allPRs().map((x) => x.branch).slice(0, 20) };
     const s = app();
+    leaveProjects();
     if (inGraph() && s?.cur?.id === p.id) { call('closeDebate'); return { alreadyOpen: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)) }; }
     if (inGraph()) { call('closeGraph'); await sleep(780); }
     if (s?.focus && s.focus.id !== p.id) { call('hideCommits'); await sleep(900); }
@@ -146,7 +180,7 @@ const TOOL_FN = {
     await waitFor(() => app()?.run?.brief || app()?.plan, 8000);
     return { opened: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)), verification: briefOf(app()?.run?.brief, 'summary'), notVerifiedYet: !app()?.run?.brief };
   },
-  async go_home() { const was = inGraph(); call('closeGraph'); if (!was) call('hideCommits'); act('Back home'); return { ok: true }; },
+  async go_home() { leaveProjects(); const was = inGraph(); call('closeGraph'); if (!was) call('hideCommits'); act('Back home'); return { ok: true }; },
   async show_commits({ query = '' } = {}) {
     const s = app();
     const p = query ? findPR(query) : allPRs().find((x) => x.id === (s?.focus?.id || s?.cur?.id));
@@ -199,6 +233,12 @@ const TOOL_FN = {
   async zoom_graph({ action }) {
     if (!inGraph()) return { error: 'No pull request is open.' };
     if (call('debateOpen')) { call('closeDebate'); await sleep(400); }
+    if (action === 'turn_left' || action === 'turn_right') { // the turn in 3D: a quarter of the way round each time
+      const r = typeof G !== 'undefined' ? G.rot : null; if (!r) return { error: 'This graph cannot turn.' };
+      r.tyaw = Math.max(-1.1, Math.min(1.1, r.tyaw + (action === 'turn_left' ? -0.5 : 0.5))); r.tpitch = r.tpitch || -0.18;
+      call('startLoop'); act('Turned the graph');
+      return { ok: true, tip: '"overview" brings it back flat.' };
+    }
     call('zoomGraph', action === 'overview' ? 'fit' : action);
     return { ok: true };
   },
@@ -231,12 +271,12 @@ const TOOL_FN = {
       if (!q.length) return { open: 0, note: 'Nothing is left: every changed spot is proved, cleared or settled.' };
       call('focusOn', q.slice(0, 6).map((x) => x.id), { noTip: true });
       act(`${q.length} spot${q.length === 1 ? '' : 's'} to review`);
-      return { open: q.length, spots: q.slice(0, 8).map((x) => ({ name: x.name, where: `${x.file}:${x.line}`, state: x.state, why: x.why, lines: x.lines, dependents: x.dependents })), tip: 'Say the first one in plain words. open_review reviews one with the agents; review_all sends them all.' };
+      return { open: q.length, spots: q.slice(0, 8).map((x) => ({ name: x.name, where: `${x.file}:${x.line}`, state: x.state, why: x.why, lines: x.lines, dependents: x.dependents })), tip: 'Say the first one in plain words. open_spot goes to it and opens its code; the agents only if the user asks (open_review for one, review_all for all).' };
     }
     const list = call('focusGraph', 'what I must read');
     if (!list) return { error: 'No red regions: nothing is left only for the human, or the branch is not verified yet.', nodes: graphSummary() };
     act(`${list.length} spot${list.length === 1 ? '' : 's'} to read`);
-    return { read: list.map((n) => ({ where: `${n.file || ''}:${n.start ?? ''}`, why: n.info })), tip: 'Explain the first one in plain words; show_code opens its code.' };
+    return { read: list.map((n) => ({ where: `${n.file || ''}:${n.start ?? ''}`, why: n.info })), tip: 'Explain the first one in plain words; open_spot opens its code.' };
   },
   async show_code({ query }) {
     if (!inGraph()) return { error: 'Open a pull request first.' };
@@ -269,7 +309,7 @@ const TOOL_FN = {
   },
   async look_deeper() {
     const s = app(); if (!s?.cur || !inGraph()) return { error: 'Open a pull request first.' };
-    s.profile = 'deep';
+    setDepth('deep');
     const started = (await call('verify')) !== false;
     if (started) act('Deep review started');
     return { started };
@@ -281,13 +321,38 @@ const TOOL_FN = {
     if (!s.run?.brief) return { verified: false, note: 'This pull request has not been verified yet.', plan: s.plan ? { files: s.plan.totals?.files, added: s.plan.totals?.added, removed: s.plan.totals?.removed } : null };
     return { pullRequest: s.cur.branch, ...briefOf(s.run.brief, section) };
   },
+  async open_spot({ query = '' } = {}) {
+    if (!inGraph()) return { error: 'Open a pull request first.' };
+    await toGraph();
+    const s = app(), g = typeof G !== 'undefined' ? G : null;
+    if (!s?.math) return TOOL_FN.show_code({ query }); // a graph without the mathematical pass: its code regions
+    const next = (call('mathQueue') || []).map((x) => g?.nodes.get(x.id)).find(Boolean);
+    const node = query ? findSpot(query) : s.fixTarget || next;
+    if (!node) return query ? { error: `Nothing in the graph matches "${query}".`, open: (call('mathQueue') || []).map((x) => x.name).slice(0, 12) } : { error: 'Say which spot: nothing is selected and nothing is left open.' };
+    if (!call('mathTap', node)) return { error: `"${node.label}" has nothing to open.` };
+    act(`Looking at ${node.label}`);
+    await waitFor(() => { const i = call('codeInfo'); return !i || !i.loading; }, 9000);
+    const info = call('codeInfo');
+    // No code to read (documentation, configuration, removed code, an unchanged neighbour): its evidence card instead.
+    if (!info) return { spot: node.m?.qname || node.label, panel: 'evidence card', colour: node.m?.verdict, why: node.m?.claim, note: 'This spot has no code panel: its evidence card is open next to it. Say what it is in one sentence. Agents do not review it.' };
+    return { panel: 'code, on the right', ...info, note: info.canReviewWithAgents
+      ? 'The code panel is open; the agents have NOT been started. Say in one or two sentences what this spot is and which lines deserve reading, then ask whether they want the agents to review it (open_review) or prefer to read it themselves (mark_read when they say they read it).'
+      : 'The code panel is open. Say in one or two sentences what it shows. Agents do not review this kind of spot.' };
+  },
+  async spot_tab({ tab }) {
+    const mode = { code: 'code', all_code: 'all', evidence: 'ev', dependencies: 'deps' }[tab];
+    if (!call('codeInfo')) return { error: 'No code panel is open. Call open_spot first.' };
+    if (!mode || !call('codeTab', mode)) return { error: `This spot has no "${tab}" tab.` };
+    act(tab === 'all_code' ? 'All code' : tab[0].toUpperCase() + tab.slice(1));
+    return { ...call('codeInfo'), note: tab === 'dependencies' ? 'Say which two chunks should be read together and through which name.' : tab === 'evidence' ? 'Say what was established and which criteria it misses, if any.' : undefined };
+  },
   async open_review({ query = '' } = {}) {
     if (!inGraph()) return { error: 'Open a pull request first.' };
     if (call('debateOpen')) call('closeDebate');
     let r;
     if (app()?.math) { // one function of the mathematical graph, reviewed alone by three agents
       const g = typeof G !== 'undefined' ? G : null;
-      const hit = query ? (call('findNodes', query) || []).find((n) => n.kind === 'sym') : null;
+      const found = query ? findSpot(query) : null, hit = found?.kind === 'sym' ? found : null;
       const next = (call('mathQueue') || []).find((x) => g?.nodes.get(x.id)?.kind === 'sym');
       const node = hit || (query ? null : app().fixTarget || (next && g.nodes.get(next.id)));
       if (!node) return query ? { error: `No changed function matches "${query}".`, open: (call('mathQueue') || []).map((x) => x.name).slice(0, 12) } : { error: 'There is no open spot left to review. For the whole pull request use start_verification.' };
@@ -315,7 +380,7 @@ const TOOL_FN = {
     const s = app(); if (!inGraph() || !s?.math) return { error: 'Open a pull request first.' };
     const m = s.math.summary, q = call('mathQueue') || [];
     return { settledByMathematics: { proved: m.nodes.proved, cleared: m.nodes.cleared }, open: { uncertain: m.nodes.uncertain, risky: m.nodes.risky, now: q.length }, lines: { total: m.lines.total, proved: m.lines.proved, cleared: m.lines.cleared, needSomeone: q.reduce((n, x) => n + x.lines, 0) },
-      first: q.slice(0, 5).map((x) => ({ name: x.name, where: `${x.file}:${x.line}`, state: x.state, why: x.why })), dependencyGraph: m.graph, decisionModel: m.routing?.status === 'used' ? `asked, raised ${m.routing.adopted.length} node(s)` : m.routing?.status,
+      first: q.slice(0, 5).map((x) => ({ name: x.name, where: `${x.file}:${x.line}`, state: x.state, why: x.why })), backedByTests: tested(), dependencyGraph: m.graph, decisionModel: m.routing?.status === 'used' ? `asked, raised ${m.routing.adopted.length} node(s)` : m.routing?.status,
       meaning: 'proved = a proof that the edit cannot change behaviour (same tokens, or only local variables renamed). cleared = nothing flagged and low exposure, NOT a proof. uncertain / risky = behaviour changed and mathematics cannot vouch for it: these go to the agents and to the person. Node size = how much code depends on it.', limits: s.math.limits };
   },
   async prove_it({ query = '' } = {}) {
@@ -340,10 +405,62 @@ const TOOL_FN = {
   async start_verification({ profile = 'standard' } = {}) {
     const s = app(); if (!s?.cur || !inGraph()) return { error: 'Open a pull request first.' };
     if (call('debateOpen')) call('closeDebate');
-    s.profile = ['quick', 'standard', 'deep'].includes(profile) ? profile : 'standard';
+    setDepth(['quick', 'standard', 'deep'].includes(profile) ? profile : 'standard');
     const started = (await call('verify')) !== false;
     if (started) act(`Reviewing (${s.profile})`);
     return started ? { started: true, profile: s.profile, note: 'Live progress shows in the bottom bar; when it ends the graph, the score and the agents story update with the real result.' } : { started: false, note: 'A verification is already running or starting, or no pull request is open.' };
+  },
+  async run_tests({ scope = 'spot', query = '', depth } = {}) {
+    const s = app(); if (!s?.cur || !inGraph() || !s.math) return { error: 'Open a pull request first.' };
+    if (s.es || s.starting) return { started: false, note: 'A review is already running: its progress is in the bottom bar.' };
+    if (depth) setDepth(depth);
+    if (scope === 'continue') {
+      if (!s.run?.brief?.contract || s.run.signoff) return { error: 'There is no unfinished review to continue. Use scope "spot" or "all".' };
+      await toGraph();
+      const ok = await call('continueReview');
+      if (ok) act('Continuing the investigation');
+      return ok ? { started: true, depth: s.profile, note: 'Same contract, new budget. It takes minutes; the tree grows live.' } : { started: false, note: 'It could not continue. The bar says why.' };
+    }
+    const t = s.math.trust;
+    if (!t?.total) return { error: 'Tests can only back changed C# functions, and this change has none. The agents (open_review) work in any language.' };
+    let focus = 'all', name = 'the whole change';
+    if (scope !== 'all') {
+      const asked = query ? findSpot(query) : s.fixTarget;
+      if (query && !asked) return { error: `No changed function matches "${query}".` };
+      const n = call('testTarget', asked?.m || null);
+      if (!n) return { started: false, note: 'Every function tests can reach is already backed by tests.', backedByTests: tested() };
+      if (query && n.id !== asked?.m?.id) return { error: `Tests cannot take "${asked.label}": it is not a changed C# function, or it is already backed.`, next: n.qname };
+      focus = [n.id]; name = n.qname || n.name;
+    }
+    await toGraph();
+    const r = await call('openTree', { force: true, focusNodes: focus });
+    if (!r || r.started === false || r.error) return { started: false, error: r?.error || 'The review could not start. The bar says why.' };
+    act(`Testing ${scope === 'all' ? 'the whole change' : name.split('.').pop()}`);
+    return { started: true, scope: name, depth: s.profile, note: `A real review is running now, up to ${{ quick: '90 seconds', standard: '5 minutes', deep: '15 minutes' }[s.profile]}: the tree grows live and ends in a verdict card.${s.profile === 'quick' ? ' At Quick depth it cannot settle the spot: say so.' : ''} "% tested" on the bar moves only if the tests back it.` };
+  },
+  async open_report() {
+    const s = app(); if (!s?.cur || !inGraph()) return { error: 'Open a pull request first.' };
+    const b = s.run?.brief;
+    if (!(b?.version >= 2) && !s.es) return { error: 'This pull request has no full review yet, so there is no report.', tip: 'start_verification runs one (ask for a yes first); run_tests backs single functions with tests.' };
+    await toGraph();
+    const r = await call('openReview', { full: true });
+    if (!r || r.error) return { error: r?.error || 'Could not open the report.' };
+    act(s.run?.signoff ? 'Sign-off' : 'Report');
+    return { ...r, summary: briefOf(b, 'summary'), scopedToSomeFunctions: !!b?.graphReview || undefined, note: r.live ? 'The review is still running: the tree grows live.' : 'The verdict card is on screen. Say the verdict and the score in one sentence and what blocks approval, if anything. Signing is done by the person in the card, never by you.' };
+  },
+  async open_project({ query = '' } = {}) {
+    const s = app(), list = s?.projects || [];
+    if (!list.length) return { error: 'There are no projects yet. One is added from the project picker, by hand.' };
+    const q = String(query).toLowerCase().trim();
+    const p = q ? list.find((x) => x.name.toLowerCase() === q) || list.find((x) => x.name.toLowerCase().includes(q)) || list.find((x) => q.split(/\s+/).filter((w) => w.length > 2).some((w) => x.name.toLowerCase().includes(w))) : null;
+    if (q && !p) return { error: `No project matches "${query}".`, projects: projectList() };
+    if (inGraph()) { call('closeGraph'); await sleep(780); }
+    if (!p) { call('showLanding'); act('Projects'); await sleep(500); return { shown: 'the project picker', projects: projectList() }; }
+    if (p.id === s.pid) { call('pickProject', p.id); return { alreadyOpen: true, project: p.name }; }
+    call('pickProject', p.id); act(`Project ${p.name}`);
+    await waitFor(() => app()?.pid === p.id && !!app()?.prsKey, 9000); // its branches have loaded
+    const all = allPRs();
+    return { opened: p.name, base: app()?.base, pullRequests: all.slice(0, 12).map((x, i) => prBrief(x, i)) };
   },
   async end_conversation() { end(); return { ok: true, note: 'Say a very short goodbye (2-4 words); the voice closes when you finish.' }; },
 };

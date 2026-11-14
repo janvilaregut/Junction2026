@@ -266,6 +266,46 @@ function paintCode(n, data) {
   if ($('cvUnread')) $('cvUnread').onclick = async () => { if (await markNode(d.id, 'none')) { const t = G.nodes.get(d.id); if (t) showCode(t); } };
 }
 
+/* ── For the voice assistant ──────────────────────────────────────────────
+   codeInfo(): what the panel shows right now, in words (null when it is closed).
+   codeTab(mode): switch its tab, exactly as a click on it would. */
+const CV_TAB = { code: 'code', all: 'all code', ev: 'evidence', deps: 'dependencies' };
+function codeInfo() {
+  if (!cvId) return null;
+  const n = G.nodes.get(cvId), d = n?.m, data = cvData, mark = d ? S.marks?.[d.id] : null;
+  const out = {
+    spot: d ? d.qname || d.name : base(String(cvId).slice(2)), where: d ? `${base(d.file)}:${d.start}` : String(cvId).slice(2), wholeFile: !d || undefined,
+    colour: d ? VWORD[nodeState(d)] : undefined, why: d ? mark?.note || d.claim : undefined, tab: CV_TAB[cvMode], loading: !data,
+    canReviewWithAgents: !!$('cvReview'), agentsAlreadyReviewedIt: ['reproduced', 'differs', 'unclear'].includes(mark?.state) || undefined, readByAPerson: mark?.state === 'read' || undefined,
+  };
+  if (data?.error) out.error = data.error;
+  const secs = data?.sections || [];
+  if (secs.length) {
+    const all = secs.flatMap((sec) => sec.chunks.map((c) => ({ c, sec }))), len = (c) => c.end - c.start + 1;
+    out.totalLines = all.reduce((k, x) => k + len(x.c), 0);
+    out.linesWorthReading = all.filter((x) => x.c.level >= 2).reduce((k, x) => k + len(x.c), 0);
+    out.readFirst = all.filter((x) => x.c.level === 3).sort((a, b) => b.c.heat - a.c.heat).slice(0, 4).map((x) => ({
+      lines: `${x.c.start}-${x.c.end}`, in: secs.length > 1 ? x.sec.name : undefined, because: [].concat(x.c.why || []).join(', '),
+      code: x.c.lines.filter((l) => l.changed).concat(x.c.lines).slice(0, 4).map((l) => l.text.trim()).filter(Boolean).join(' ⏎ ').slice(0, 260),
+    }));
+    out.attentionFrom = data.model?.status === 'used' ? `the decision model ${data.model.model}` : 'signals from the code only (no model)';
+    if (cvMode === 'deps' && all.length > 1) {
+      const D = depsModel(data);
+      out.dependencies = { readTogether: D.best ? [D.labels[D.best.i], D.labels[D.best.j]] : null, through: D.via, namesThatCarryTheMost: D.top.map((v) => v.w) };
+    }
+  }
+  if (cvMode === 'ev' && d) out.evidence = { checks: (d.evidence || []).map((r) => `${r.label}: ${r.value}`), stakes: d.sensitive?.label || null, criteriaMet: d.principleGate ? `${d.principleGate.passed} of ${d.principleGate.applicable}` : null, missing: (d.principles || []).filter((x) => !x.info && (x.state === 'warn' || x.state === 'fail')).map((x) => x.name) };
+  return out;
+}
+function codeTab(mode) {
+  if (!cvId || !CV_TAB[mode]) return false;
+  if (mode === 'all' && cvMode !== 'code' && cvMode !== 'all') CV.querySelector('.seg [data-m="code"]')?.click(); // "All code" sits beside Code
+  const b = CV.querySelector(`.seg [data-m="${mode}"]`);
+  if (!b) return false;
+  b.click();
+  return true;
+}
+
 addEventListener('keydown', (e) => {
   if (!cvId || e.target.closest?.('input, textarea') || !$('modal').hidden) return;
   if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); hideCode(); if (S.fixTarget) { S.fixTarget = null; renderBar(); } }
