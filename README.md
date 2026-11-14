@@ -2,9 +2,70 @@
 
 Valida cambios generados por IA mediante reconstrucción desde la base, ataques ejecutables y una decisión humana respaldada por evidencia. Proyecto para Junction 2026, reto Tieto «Earned Trust in AI Code».
 
+## Arranque en otro ordenador con Gemma (Windows)
+
+`main` reúne el panel de modelos y soporte de archivos nuevos de `ui-hud`, junto con el pipeline, la evidencia y la privacidad de `fabian`. Esta es la ruta para probar **#2283 con Gemma real**. Los informes y claves del ordenador de Fabián no se transfieren por Git.
+
+1. Instala Git, Node 22.15+ (recomendado Node 24), el **SDK de .NET 8** compatible con `global.json` de Tieto (8.0.402) y [Ollama](https://ollama.com/download/windows). Abre otra terminal tras instalarlos. El modelo Gemma descarga unos 4,3 GB; deja memoria libre adicional para el modelo, .NET y la web. Usa una carpeta fuera de OneDrive para reducir esperas de disco.
+
+2. Clona el repo, o actualiza tu copia existente en `main`:
+
+   ```powershell
+   git clone https://github.com/janvilaregut/Junction2026.git
+   cd Junction2026
+   git switch main
+   git pull --ff-only origin main
+   npm ci
+   powershell -File scripts/setup-tools.ps1
+   if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
+   ```
+
+   Si ya tienes la carpeta, empieza con `cd` a tu copia, sin repetir `git clone`. Si Git detecta cambios locales, consérvalos antes de actualizar. `setup-tools.ps1` instala Entire; OpenCode viene con `npm ci`.
+
+3. Edita `.env.local`. Rellena `GEMINI_API_KEY` con la clave del evento compartida por el equipo y, para probar NVIDIA, `VERDA_INFERENCE_KEY`. **No publiques este archivo ni las claves.** Mantén el resto de la plantilla y cambia:
+
+   ```dotenv
+   KATSE_PRIVACY_MODE=strict
+   KATSE_GEMMA_URL=http://127.0.0.1:11434
+   KATSE_GEMMA_MODEL=gemma4:e2b-it-qat
+   KATSE_PRIVATE_TERMS=
+   ```
+
+   Añade a `KATSE_PRIVATE_TERMS` nombres internos separados por comas si hace falta. `strict` es necesario para probar Gemma sobre el ejemplo público; `auto` exime ese caso concreto. Ollama debe ejecutarse en **el mismo ordenador que el backend**: no se admiten endpoints externos.
+
+4. Descarga y comprueba Gemma antes de iniciar la web:
+
+   ```powershell
+   powershell -File scripts/setup-gemma.ps1
+   npm run check:privacy
+   npm run check:decisions
+   npm start
+   ```
+
+   `check:privacy` debe mostrar `status: passed`, `mode: strict` y fragmentos escaneados. Usa datos sintéticos y comprueba que Gemma detecta un nombre interno no incluido en las reglas; no llama a la nube. Si muestra `blocked`, revisa Ollama y `ollama list`. Si el modelo tarda en arrancar, precaliéntalo con `ollama run gemma4:e2b-it-qat "Reply OK"` y repite el chequeo. `check:decisions` sí hace una petición pequeña a Google; si falla, el pipeline puede seguir con reglas deterministas. `npm run doctor` es un diagnóstico opcional de proveedores y Entire, no un requisito de arranque; puede fallar si Verda no responde.
+
+5. Abre **http://localhost:4173**. En el selector de proyecto elige **Or clone from a URL** e introduce `https://github.com/te-industry-tech-office/junction26-messagepack-csharp.git`. Katse crea tu copia local en `workspace/`. También puedes prepararla desde otra terminal con la web arrancada:
+
+   ```powershell
+   $project = Invoke-RestMethod http://localhost:4173/api/projects -Method Post -ContentType 'application/json' -Body (@{url='https://github.com/te-industry-tech-office/junction26-messagepack-csharp.git'} | ConvertTo-Json)
+   Invoke-RestMethod "http://localhost:4173/api/projects/$($project.id)" -Method Patch -ContentType 'application/json' -Body (@{name='Tieto - MessagePack'; base='dependabot/nuget/develop/PolySharp-1.15.0'; issueRepo='MessagePack-CSharp/MessagePack-CSharp'} | ConvertTo-Json)
+   ```
+
+   Recarga la página, selecciona el proyecto y abre **#2283**. En el engranaje deja Hydrogen y Carbon activados. **Nemotron está desactivado por defecto**; actívalo solo para probar Verda. El informe registra cuándo se sustituye por Google. Las preferencias se guardan localmente, no en Git.
+
+6. Ejecuta **Standard**. Para la primera prueba en otro equipo puedes usar el mismo perfil con diez minutos, sin subir su límite de 100.000 tokens, desde la terminal anterior (ejecuta primero los comandos del paso 5 para definir `$project`):
+
+   ```powershell
+   Invoke-RestMethod "http://localhost:4173/api/projects/$($project.id)/verify" -Method Post -ContentType 'application/json' -Body (@{pr='in:ju26-issue-2283'; options=@{mode='completo'; profile='standard'; budgetMs=600000; privacy='strict'}} | ConvertTo-Json -Depth 4)
+   ```
+
+   Elige una de las dos formas de iniciar la revisión; no lances ambas a la vez. Recargar la web recupera la ejecución. La primera compilación puede descargar dependencias. En **Review & sign → Local privacy gateway** confirma `strict` y `scannedChunks > 0`; revisa también pruebas del original, candidatos, límites y bloqueos. Los resultados quedan en `data/runs/` de ese equipo. Si modificas `.env.local`, reinicia `npm start`.
+
+**Qué está validado y qué falta:** los tests automatizados verifican la integración y el bloqueo cuando falta Gemma; el #2283 ya se ejecutó con modelos de Google y checkpoints de Entire en modo público. **Falta validar la revisión privada completa con Gemma real en este otro ordenador.** En modo estricto se envía texto saneado directamente al proveedor: no hay captura nueva de Entire y se bloquean voz, consensus y chat auxiliares que aún no pasan por Gemma. La detección no garantiza anonimización perfecta. Si Gemma no responde o agota su presupuesto, no se envía el texto sin escanear ni se fuerza una nota aprobatoria.
+
 ## Backend completo: reconstrucción y ataques ejecutables
 
-La rama `fabian` añade el pipeline v2 a `mode: completo`. Conserva la API, eventos y lectura de informes v1. El alcance ejecutable del MVP es Windows y C#/.NET, con el caso Tieto #2283.
+`main` incluye el pipeline v2 de `fabian` en `mode: completo`. Conserva la API, eventos y lectura de informes v1. El alcance ejecutable del MVP es Windows y C#/.NET, con el caso Tieto #2283.
 
 ### Preparación en Windows
 
@@ -13,7 +74,20 @@ La rama `fabian` añade el pipeline v2 a `mode: completo`. Conserva la API, even
 3. Ejecuta `powershell -File scripts/setup-tools.ps1` para instalar Entire 0.13.4 con verificación SHA256. También puedes indicar `KATSE_ENTIRE_PATH`.
 4. Copia `.env.example` a `.env.local` y rellena `GEMINI_API_KEY` y `VERDA_INFERENCE_KEY`. Este archivo está ignorado por Git. Las claves nunca se guardan en la configuración de OpenCode ni se pasan al runner .NET.
 5. Ejecuta `npm run doctor`: verifica los modelos, JSON, herramientas y un checkpoint real de Entire. Consume llamadas reales a los proveedores.
-6. Ejecuta `npm start` y abre `http://localhost:4173`. Abre la copia local de Tieto desde el selector de proyecto si aún no aparece. Selecciona `ju26-issue-2283` → **Standard** → **Verificar** (o **Verificar de nuevo**).
+6. Ejecuta `npm start` y abre `http://localhost:4173`. Abre la copia local de Tieto desde el selector de proyecto si aún no aparece. Pulsa el nodo **#2283**. Sin revisión previa, selecciona **Standard** y verifica; con una revisión guardada, abre **Review & sign → Standard** para ejecutarla de nuevo.
+
+### Revisar la evidencia en la nueva interfaz
+
+- **Versions** muestra alternativas, debate, ataques y resultados; **Replay** reproduce eventos guardados, sin ejecutar otra revisión. La coincidencia de regiones editadas solo ayuda a navegar: no demuestra equivalencia ni corrección.
+- **Review & sign** contiene la rúbrica, bloqueos, contrato con citas, contraste solicitado/implementado, tests por versión con logs/TRX y fallos concretos, checkpoints/transcripciones de Entire y detalles de compilación, mutación y rewind. Los tests de una alternativa se distinguen de los del original.
+- **Continue with Deep** reutiliza contrato, escenarios admitidos y parches conservados; vuelve a ejecutar pruebas y muestra consumo heredado y acumulado. Los checkpoints restaurados pertenecen a la sesión de origen, no a una nueva generación.
+- Recargar y abrir de nuevo la rama recupera la ejecución activa y su tiempo transcurrido. Una revisión nueva oculta el veredicto anterior. Sin pruebas suficientes no hay nota ni aprobación automática.
+
+Standard prepara su ataque final mientras termina la referencia .NET y reserva la conversación posterior para cuando las validaciones hayan terminado. No añade llamadas a modelos ni otro runner. Cinco minutos son un presupuesto, no una garantía de terminar en cualquier ordenador; una referencia lenta o falta de RAM puede dejar evidencia pendiente.
+
+Prueba desde la interfaz del 14/11: `ju26-issue-2283-mwgcicms`, continuación Deep de `ju26-issue-2283-mwgcb08g`, terminó en **11 min 31 s / 88.907 tokens nuevos**. Original: 175 tests correctos, cinco ataques superados y tres reproducciones rojo→verde. C1: dos ataques focalizados correctos y un fallo en la suite de 175; C2: dos ataques focalizados correctos, sin suite completa en esta ejecución. Mutación: 3/4 detectados; rewind: un grupo retirable sin fallos. Ambos checkpoints originales se conservaron. Resultado **7/10, evidencia insuficiente**: el juez dejó E3 como interpretación pendiente. Dos intervenciones del debate inicial agotaron su tiempo; la ronda posterior terminó. Las propuestas descendientes no aportaron ediciones: después de observarlo, se corrigió su tratamiento para conservarlas como duplicado/sin cambios y evitar una reparación inútil. Esa corrección no altera el informe histórico.
+
+El consumo informado de la continuación es parcial: suma 123.313 tokens conocidos incluyendo el intento heredado y conserva una reserva de 16.750 tokens por intentos sin uso confirmado. El intento Standard anterior agotó el tiempo de referencia y no recibió nota. Otro intento Standard de esta sesión pasó 171 tests del original pero dejó C2 pendiente. Estos casos demuestran la recuperación y los límites, no un tiempo garantizado. NVIDIA/Verda no estuvo disponible y se usó el sustituto Google, indicado en la web. Validación local del código: **86 tests correctos**.
 
 Se usan `gemini-4-hydrogen`, `gemini-4-carbon` y `nemotron-3.5-super-vl`; los identificadores y el endpoint son configurables. `KATSE_THINKING_LEVEL=low` mantiene acotada la latencia de Gemini. [Control de razonamiento de Gemini](https://aistudio.google.com/docs/thinking). Nemotron utiliza `chat_template_kwargs.enable_thinking=false` para propuestas JSON breves; `KATSE_VERDA_THINKING=true` lo activa explícitamente. Las sesiones de propuesta se vinculan a sus commits locales con `entire session attach`; el informe distingue propuesta del modelo y aplicación por el orquestador. El perfil está adaptado a la versión fijada de OpenCode; no se debe copiar una configuración v2 en una instalación v1 sin comprobar compatibilidad.
 
@@ -36,7 +110,7 @@ Los perfiles son Quick (90 s / 25.000 tokens presupuestados), Standard (300 s / 
 
 1. Fija hashes y fuentes; compila y ejecuta la suite relevante y reproducciones rojo→verde. Mutaciones y retirada de grupos se reservan para Deep.
 2. Hydrogen reconstruye un contrato breve. Se verifican citas literales; Carbon audita contrato y evidencia al final. Roslyn localiza símbolos y referencias. Se declaran los límites del análisis parcial.
-3. Standard genera dos propuestas independientes desde la base con Hydrogen y Nemotron. Los modelos reciben el ticket y bloques previos del código alrededor del cambio y de expresiones citadas en el requisito; devuelven ediciones literales; el backend comprueba rutas y coincidencias únicas antes de aplicarlas. Sin herramientas de lectura ni edición para el modelo. No se recupera un prompt histórico inexistente.
+3. La fórmula de complejidad propone de dos a cuatro alternativas; el presupuesto admite hasta dos en Standard y cuatro en Deep. Hydrogen y Nemotron reciben misiones asignadas a grupos concretos, el ticket y bloques previos del código alrededor del cambio y de expresiones citadas en el requisito; devuelven ediciones literales. El backend comprueba rutas y coincidencias únicas antes de aplicarlas. Sin herramientas de lectura ni edición para el modelo. No se recupera un prompt histórico inexistente.
 4. Los constructores intercambian decisiones y parches candidatos, sin ver el original. Una ronda produce fortalezas, riesgos y escenarios; otra puede rectificar tras las ejecuciones. El intercambio no constituye evidencia ni votos. Tras la construcción concurrente se eliminan árboles duplicados antes de volver a ejecutar pruebas; sus sesiones se conservan para auditoría.
 5. Los ataques reciben esas hipótesis y producen escenarios ejecutables. Standard valida estructura y fuentes localmente; Deep añade defensa semántica. El juicio final puede invalidar pruebas. Se ejecutan suites sobre el original y candidatos mientras quede presupuesto, y se reproducen fallos del original contra la base.
 6. El juez determina **Pedir cambios**, **Evidencia insuficiente** o **Lista para aprobación humana**, siempre sobre el original. Un fallo exclusivo de una alternativa y un checkpoint ausente son advertencias de auditoría, no defectos del original.
@@ -47,7 +121,40 @@ La nota 0–10 es una rúbrica heurística: contrato 4, regresiones 3, grupos de
 
 La disponibilidad se comprueba con reintento acotado y caché de cinco minutos para resultados correctos. Si Verda no responde, el flujo puede usar Hydrogen en su lugar y registra la sustitución; ya no representa diversidad entre familias de modelos. Si falta Entire, se registra la captura pendiente sin bloquear los tests.
 
-Gemini Decisions, Gemma local y entire-graph aún no forman parte del flujo. No se ofrece una garantía de anonimización de código privado. El alcance de ejecución local se limita al repositorio público de Tieto.
+### Asignación adaptativa, Decisions y privacidad local
+
+El orquestador es código que controla colas, presupuestos, hashes y admisión de pruebas. Los modelos proponen decisiones y Carbon interpreta el expediente final; ningún modelo puede saltarse las comprobaciones. No hay un superagente con autoridad ilimitada.
+
+- Demanda inicial: `min(4, 2 + ceil(log2(G)) + H)`, con cero alternativas si no hay grupos ejecutables. `G` son grupos de comportamiento y `H` los de alto impacto. Se acota por perfil, tiempo para construir **y probar**, y tokens disponibles. La estimación inicial reserva 60 s y 18.000 tokens para trabajo restante; es una heurística, no una garantía de coste.
+- Asignación: `R*(1+U+D)/(C*(1+N))`. Cada reserva incrementa `N` antes de lanzar la tarea concurrente. El constructor recibe el grupo, símbolo, expectativas y misión; ya no es solo una cifra del informe. `C` se actualiza con tiempos observados y solo las pruebas superadas respaldan expectativas. Deep admite hasta dos descendientes si quedan dudas y presupuesto, seis candidatos como máximo.
+- [Gemini Decisions](https://codelabs.developers.google.com/codelabs/discriminative-models): una petición agrupada a `gemini-decision-1` elige entre `repair`, `preserve` y `boundary`, con 3,5 s de plazo y sin reintento. Solo se adopta una elección válida con confianza >= 0,8; el resto usa reglas por riesgo. El umbral también es heurístico. No decide el veredicto, no puntúa la confianza del PR y no omite pruebas. Si no hay candidatos admitidos, no se llama. La petición también pasa por privacidad y contabiliza tokens.
+- La web muestra demanda/admisión, límites efectivos, misión de cada candidato y respuesta de Decisions. `allocation.json` conserva la asignación y las observaciones finales.
+
+**Gemma en el otro ordenador:** instala [Ollama para Windows](https://docs.ollama.com/windows), abre una nueva terminal en este repositorio y ejecuta:
+
+```powershell
+powershell -File scripts/setup-gemma.ps1
+npm run check:privacy
+```
+
+El script descarga [`gemma4:e2b-it-qat`](https://ollama.com/library/gemma4/tags), comprueba el servidor local y ejecuta una prueba sintética de detección y restauración, sin enviar datos a la nube. El modelo ocupa unos 4,3 GB de descarga; la memoria necesaria para ejecutarlo es adicional. Configura en `.env.local`:
+
+```dotenv
+KATSE_PRIVACY_MODE=strict
+KATSE_GEMMA_URL=http://127.0.0.1:11434
+KATSE_GEMMA_MODEL=gemma4:e2b-it-qat
+KATSE_PRIVATE_TERMS=NombreInterno,ClientePrivado,dominio.interno
+```
+
+Reinicia `npm start` tras cambiar la configuración. `strict` permite probar también el #2283 a través de Gemma. Con `auto`, únicamente el commit público #2283 y su base fijada quedan exentos de Gemma; un requisito propio o una transcripción de Entire exige modo estricto. La exención se indica en el informe.
+
+El gateway combina reglas para secretos y datos personales, un diccionario explícito y detección de nombres internos con Gemma. Sustituye coincidencias por alias estables; restaura las ediciones **localmente** antes de validarlas. Solo admite un endpoint de loopback, bloquea respuestas incompletas o inciertas, usa caché y limita los escaneos a 45 s por revisión y 12 s por fragmento, siempre dentro del plazo de la revisión. Si el ordenador no mantiene ese ritmo, conserva evidencia pendiente en vez de enviar texto sin escanear. La detección sigue siendo probabilística: no garantiza anonimización completa.
+
+**Límite de integración:** la protección cubre las llamadas del pipeline v2 (`mode: completo`). En modo estricto se usa transporte directo de texto saneado, sin OpenCode ni herramientas que puedan añadir contexto del repositorio. Eso implica que **no hay captura nueva de Entire para esos candidatos**; quedan sus artefactos y commits locales. El ejemplo público sigue usando OpenCode y checkpoints reales de Entire. Los módulos antiguos de voz/live, consensus y chat auxiliar no están cubiertos por este gateway: quedan bloqueados al configurar `KATSE_PRIVACY_MODE=strict`. El chat de un informe v2 privado también se bloquea aunque el servidor esté en `auto`. Para trabajar con información privada configura el servidor entero en `strict`. `entire-graph` sigue pendiente.
+
+Validación del 14/11: 97 tests automatizados correctos. Una llamada real a Decisions respondió en 1,06 s / 592 tokens dentro del #2283; sus tres elecciones quedaron por debajo de 0,8 y se mantuvieron las reglas deterministas. El transporte directo de Gemini respondió a una prueba sintética en 1,79 s. Gemma **no se ha ejecutado realmente en este ordenador** por falta de recursos: se verificaron el bloqueo sin modelo y la integración con respuestas simuladas. La ejecución privada completa necesita validación en el otro equipo.
+
+Último #2283: `ju26-issue-2283-mwgdn6hs`, perfil Standard con presupuesto temporal ampliado explícitamente a 600 s, terminó en **5 min 12 s / 43.598 tokens**, sin consumo desconocido. Demanda 4, admitidos 2. Original: 171 tests correctos y tres reproducciones rojo→verde. C1 y C2: 170 correctos y un fallo cada uno; ambos completaron la suite y tienen checkpoints reales. Resultado **7/10, lista para aprobación humana dentro del alcance declarado**, sin fallos confirmados en el original; falta más diversidad de ataques y repetición independiente. Mutación/retirada de cambios no se ejecutan en Standard. Verda agotó el timeout y se sustituyó por Hydrogen, por lo que esta ejecución no demuestra diversidad entre familias. Esta medición no demuestra que el perfil predeterminado de 300 s complete siempre.
 
 ### Evidencia y comprobación
 

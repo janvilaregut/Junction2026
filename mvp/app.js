@@ -1052,6 +1052,9 @@ function liveText(e) {
   if (e.type === 'debate') return `Debate: ${e.candidate} ${e.round === 'results' ? 'after the tests' : 'reviews the other proposal'}`;
   if (e.type === 'attack') return `Attack ${e.id}: ${e.status}`;
   if (e.type === 'result') return `${e.version}: ${e.status} · ${e.ran || 0} tests`;
+  if (e.type === 'intent') return `Requested / implemented: ${e.status}`;
+  if (e.type === 'privacy') return `Privacy: ${e.mode}`;
+  if (e.type === 'allocation') return `Orchestrator: ${e.population.admitted}/${e.population.proposed} alternatives within budget · Decisions ${e.routing.status}`;
   if (e.type === 'judgment') return `Judge: ${VERDICT[e.verdict?.status]?.[1] || e.verdict?.label || 'done'}`;
   return null;
 }
@@ -1061,6 +1064,12 @@ function attach(runId, seq = openSeq) {
   Object.assign(S, { stage: 'Starting in an isolated copy', t0: Date.now(), liveEv: [] });
   const es = new EventSource(`/api/projects/${S.pid}/runs/${runId}/events`);
   S.es = es; renderBar();
+  api(`/projects/${S.pid}/runs/${runId}`).then(meta => {
+    if (S.es !== es || !alive(seq)) return;
+    const started = Date.parse(meta.startedAt);
+    if (Number.isFinite(started)) S.t0 = started;
+    renderBar();
+  }).catch(() => {});
   S.timer = setInterval(() => { if (S.es === es && alive(seq)) renderBar(); }, 1000);
   es.onmessage = async (m) => {
     if (S.es !== es) return;

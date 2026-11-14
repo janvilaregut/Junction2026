@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { run, toolEnv, which } from './util.js';
+import { assertLegacyCloudAllowed } from './privacy.js';
 
 /**
  * Wording calls must not be able to change anything. They run in an empty temporary folder outside any
@@ -54,6 +55,7 @@ const OPENCODE_WORDING = ['opencode/deepseek-v4.1-flash-free', 'opencode/glm-5.3
 
 /** Ask a model for text. Returns { text, cost, via } or null when no model is available. */
 export async function ask(prompt, { cwd, timeout = 3 * 60_000, model } = {}) {
+  assertLegacyCloudAllowed();
   const have = await clis();
   if (have.claude) {
     const c = readOnly('claude', ['-p', prompt, '--model', model || 'sonnet', '--output-format', 'json', '--disallowedTools', 'Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,Task,NotebookEdit']);
