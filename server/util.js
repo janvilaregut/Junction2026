@@ -23,7 +23,9 @@ const DOTNET_HOME = path.join(os.homedir(), '.dotnet');
 export function toolEnv(extra = {}) {
   const env = { ...process.env, ...extra };
   const pathName = Object.keys(env).find(k => k.toLowerCase() === 'path') || 'PATH';
-  env[pathName] = [process.platform === 'win32' ? 'C:/Program Files/Git/bin' : '', path.join(ROOT, 'node_modules/opencode-ai/bin'), path.join(process.env.LOCALAPPDATA || os.homedir(), 'Katse/tools'), env[pathName] || ''].join(path.delimiter);
+  // No empty entries: an empty PATH entry means the current directory, and commands run with a reviewed repository
+  // as their directory, so a file named `git` committed there would be executed in place of git.
+  env[pathName] = [process.platform === 'win32' ? 'C:/Program Files/Git/bin' : '', path.join(ROOT, 'node_modules/opencode-ai/bin'), path.join(process.env.LOCALAPPDATA || os.homedir(), 'Katse/tools'), ...String(env[pathName] || '').split(path.delimiter)].filter(Boolean).join(path.delimiter);
   if (fs.existsSync(path.join(DOTNET_HOME, process.platform === 'win32' ? 'dotnet.exe' : 'dotnet'))) {
     env.DOTNET_ROOT = DOTNET_HOME;
     const pathKey = Object.keys(env).find(k => k.toLowerCase() === 'path') || 'PATH';

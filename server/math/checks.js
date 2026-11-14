@@ -75,6 +75,12 @@ function prep(ctx) {
     // The tree at the merge base is the tree at head with the diff undone.
     sideBase: lazy(() => { const t = new Set(tree); for (const d of diff) { if (d.status !== 'deleted') t.delete(d.path); } for (const d of diff) { if (d.status !== 'added') t.add(d.oldPath); } return sideOf(t, base); }),
     closed: new Map(),
+    // Source files of a language family that are in the tree but were not handed over parsed (too large, skipped
+    // folder, file limit): a declaration may hide there, so "declared nowhere" cannot be said for that family.
+    unread: (() => { const memo = new Map(); return (fam) => { if (!memo.has(fam)) { let n = 0; for (const f of tree) { const l = langOf(f); if (l && family(l) === fam && !head.has(f)) n++; } memo.set(fam, n); } return memo.get(fam); }; })(),
+    // `global using static X;` anywhere makes the members of X visible, unqualified, in every C# file.
+    globalStatic: lazy(() => { for (const F of head.values()) { if (!F || F.lang !== 'cs') continue; const T = F.tokens; for (let i = 0; i + 2 < T.length; i++) if (T[i].k === 'kw' && T[i].v === 'global' && T[i + 1].v === 'using' && T[i + 2].v === 'static') return true; } return false; }),
+    lowerTree: lazy(() => { const m = new Map(); for (const f of tree) m.set(f.toLowerCase(), f); return m; }),
   };
   // Does the pull request change code that is not a test? (An edited expectation only matters next to that.)
   P.changesSource = lazy(() => diff.some((d) => langOf(d.path) && !isTestFile(P, d) && d.hunks.some((h) => h.added.length || h.removed.length)));
@@ -136,7 +142,9 @@ function resolveJs(side, from, spec) {
   const dir = p ? `${p}/` : '';
   for (const e of JS_EXT) if (tree.has(`${dir}index${e}`)) return `${dir}index${e}`;
   if (tree.has(`${dir}package.json`)) return `${dir}package.json`;
-  if (side.stems().has(`${dir}index`)) return `${dir}index`; // index.vue, index.svelte: a bundler's business, but it is there
+  // Comp.vue for './Comp', index.svelte for './dir': a bundler's extension list decides, and a file of that name is there.
+  if (side.stems().has(`${dir}index`)) return `${dir}index.*`;
+  if (p && side.stems().has(p)) return `${p}.*`;
   return null;
 }
 
@@ -149,7 +157,8 @@ const EXPORTS = new WeakMap();
  */
 function jsExports(F) {
   if (EXPORTS.has(F)) return EXPORTS.get(F);
-  const T = F.tokens, M = F.match, names = new Set(), r = { names, open: /\.d\.[cm]?ts$/.test(F.path), esm: false, cjs: false };
+  // JSX is not tokenised as such, so brackets inside it cannot be trusted to balance: such a file's list stays open.
+  const T = F.tokens, M = F.match, names = new Set(), r = { names, open: /\.d\.[cm]?ts$|\.[jt]sx$/.test(F.path), esm: false, cjs: false };
   const op = (i, v) => isOpTok(T[i], v), word = (i) => (isWord(T[i]) ? T[i].v : null);
   const strip = (v) => v.replace(/^[`'"]|[`'"]$/g, '');
   const list = (a, b) => { // { x, y as z, type T }: the last word of each entry is the exported name
@@ -160,7 +169,12 @@ function jsExports(F) {
   let depth = 0;
   for (let i = 0; i < T.length; i++) {
     const t = T[i];
-    if (t.k === 'op') { if (t.v === '{' || t.v === '(' || t.v === '[' || t.v === '${') depth++; else if (t.v === '}' || t.v === ')' || t.v === ']') depth--; continue; }
+    if (t.k === 'op') {
+      if (t.v === '{' || t.v === '(' || t.v === '[' || t.v === '${') depth++; else if (t.v === '}' || t.v === ')' || t.v === ']') depth--;
+      else if ((t.v === '<' && op(i + 1, '/')) || (t.v === '/' && op(i + 1, '>'))) r.open = true; // a JSX tag in a .js file
+      continue;
+    }
+    if (t.k === 'kw' && t.v === 'export' && depth !== 0 && !op(i - 1, '.')) { r.open = true; continue; } // inside a namespace, or the depth is off
     if (t.k === 'kw' && t.v === 'export' && depth === 0 && !op(i - 1, '.')) {
       r.esm = true;
       let j = i + 1;
@@ -217,6 +231,7 @@ function jsExports(F) {
       } else r.open = true; // module.exports = factory(), exports[key] = …, Object.assign(exports, …)
     }
   }
+  if (depth !== 0) r.open = true;
   EXPORTS.set(F, r);
   return r;
 }
@@ -224,6 +239,8 @@ function jsExports(F) {
 // https://nodejs.org/api/module.html#modulebuiltinmodules, without the ones that only exist behind `node:`.
 const NODE_BUILTINS = new Set('assert async_hooks buffer child_process cluster console constants crypto dgram diagnostics_channel dns domain events fs http http2 https inspector module net os path perf_hooks process punycode querystring readline repl stream string_decoder sys timers tls trace_events tty url util v8 vm wasi worker_threads zlib'.split(' '));
 const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies', 'bundledDependencies', 'bundleDependencies'];
+// Modules the host program provides: never in a manifest.
+const HOST_PROVIDED = new Set(['bun', 'k6', 'vscode', 'atom']);
 /** The package a bare specifier names (`@scope/pkg/sub` → `@scope/pkg`), or null when it is not a package name (aliases like `@/x`, `~/x`, `#internal`). */
 const packageOf = (spec) => { const m = /^(@[a-z0-9][a-z0-9._~-]*\/[A-Za-z0-9][A-Za-z0-9._~-]*|[A-Za-z0-9][A-Za-z0-9._~-]*)(\/|$)/.exec(spec); return m ? m[1] : null; };
 
@@ -260,11 +277,31 @@ function looksLikeAlias(P, file, pkg) {
   }
 }
 
-/** A dynamic import or require of a template literal with holes: its first piece is not a specifier. */
-function partialSpecifier(F, imp) {
+/** Is token i inside a try block (at most four brackets up)? An import there is guarded: its failure is handled. */
+function inTry(F, i) {
   const T = F.tokens;
-  for (let i = firstAt(F, imp.line); i < T.length && T[i].l === imp.line; i++) if (T[i].k === 'str' && T[i].v[0] === '`' && !/`$/.test(T[i].v.slice(1)) && T[i].v.slice(1) === imp.source) return true;
+  for (let hops = 0; hops < 4; hops++) {
+    const g = enclosingOpen(F, i); if (g < 0) return false;
+    if (isOpTok(T[g], '{') && T[g - 1] && ((T[g - 1].k === 'kw' && T[g - 1].v === 'try') || (isOpTok(T[g - 1], ':') && T[g - 2] && T[g - 2].k === 'kw' && T[g - 2].v === 'try'))) return true;
+    i = g;
+  }
   return false;
+}
+
+/**
+ * The string token that carries an import's specifier: { partial, guarded }.
+ * `partial`: it is not the whole specifier (`require('./dir/' + name)`, a template with holes): symbols.js records
+ * the first piece as the source, and nothing can be resolved from a piece. `guarded`: the import is in a try block.
+ */
+function specifierShape(F, imp) {
+  const T = F.tokens;
+  for (let i = firstAt(F, imp.line), n = 0; i < T.length && n < 200; i++, n++) {
+    if (T[i].k !== 'str') continue;
+    const whole = unquote(T[i].v);
+    if ((whole == null ? T[i].v.slice(1) : whole) !== imp.source) continue;
+    return { partial: whole == null || (isOpTok(T[i - 1], '(') && !isOpTok(T[i + 1], ')')), guarded: inTry(F, i) };
+  }
+  return { partial: false, guarded: false };
 }
 
 /** TypeScript's `import x = require('./y')` binds the module object: it needs no default export. */
@@ -309,6 +346,16 @@ export function unresolvedImports(ctx) {
     dropped.set(dir, set);
   }
   const wasDropped = (file, pkg) => { for (const [dir, set] of dropped) if (set.has(pkg) && (!dir || file.startsWith(`${dir}/`))) return true; return false; };
+  // Package names and scopes that files at the merge base imported although no manifest (as read at head) declares them.
+  const undeclaredBefore = lazy(() => {
+    const set = new Set();
+    for (const [bp, BF] of P.base) {
+      if (!BF || !isJsLike(BF.lang)) continue;
+      for (const im of BF.imports || []) { const q = typeof im.source === 'string' ? packageOf(im.source) : null; if (q && !NODE_BUILTINS.has(q) && packageDeclared(P, bp, q, BF.lang === 'ts') === false) { set.add(q); if (q[0] === '@') set.add(q.split('/')[0]); } }
+    }
+    return set;
+  });
+  const aliasConfigTouched = P.diff.some((d) => /(^|\/)(tsconfig[^/]*\.json|jsconfig\.json|(vite|webpack|rollup|babel|next|nuxt)\.config\.[cm]?[jt]s|\.babelrc)$/.test(d.path));
 
   for (const [file, F] of P.head) {
     if (!F || !Array.isArray(F.imports) || !F.imports.length) continue;
@@ -317,18 +364,21 @@ export function unresolvedImports(ctx) {
       for (const imp of F.imports) {
         const spec = imp.source; if (typeof spec !== 'string' || !spec) continue;
         const before = bv ? bv.F.imports.filter((x) => x.source === spec) : [];
+        const shape = specifierShape(F, imp);
+        if (shape.partial) continue;
         if (/^\.\.?(\/|$)/.test(spec)) {
           const names = Array.isArray(imp.names) ? imp.names : [];
-          if ((imp.dynamic || !names.length) && partialSpecifier(F, imp)) continue;
           const r = resolveJs(H, file, spec);
           if (r === OUTSIDE) continue;
           const rb = before.length ? resolveJs(B, bv.path, spec) : undefined;
           if (r === null) {
-            if (before.length && rb === null) continue; // it pointed nowhere before this pull request as well
-            const want = px.normalize(px.join(px.dirname(file), spec));
-            out.push(mk(P, 'import.missing-file', 'bad', file, imp.line, 'Import of a file that does not exist',
-              `${file} imports '${spec}', but no file answers to ${want} at head${typeof rb === 'string' ? ` (${rb} existed at the merge base and this pull request removed or renamed it)` : ''}.`,
-              'The specifier was resolved against the complete file list of the head commit: the path itself, the JavaScript and TypeScript extensions and an index file. Not established: resolution through a bundler alias that happens to look like a relative path.'));
+            if ((before.length && rb === null) || shape.guarded) continue; // it pointed nowhere before this pull request as well, or its failure is caught
+            const want = px.normalize(px.join(px.dirname(file), spec.replace(/[?#].*$/, '')));
+            const built = /(^|\/)(dist|build|out|generated|__generated__|gen|\.next|target|bin|obj)\//.test(`${want}/`); // output folders are usually not committed
+            const twin = [want, ...JS_EXT.map((e) => want + e)].map((q) => P.lowerTree().get(q.toLowerCase())).find(Boolean);
+            out.push(mk(P, 'import.missing-file', built ? 'warn' : 'bad', file, imp.line, 'Import of a file that does not exist',
+              `${file} imports '${spec}', but no file answers to ${want} at head${typeof rb === 'string' ? ` (${rb} existed at the merge base and this pull request removed or renamed it)` : twin ? ` (${twin} differs only in letter case, which a case-sensitive file system does not forgive)` : ''}.`,
+              `The specifier was resolved against the complete file list of the head commit: the path itself, the JavaScript and TypeScript extensions and an index file. Not established: ${built ? 'that the file is missing after a build; the path points into an output folder, which is why this is a warning' : 'a file generated at build time and never committed'}.`));
             continue;
           }
           const target = P.head.get(r); if (!target || !isJsLike(target.lang)) continue;
@@ -349,17 +399,18 @@ export function unresolvedImports(ctx) {
           }
           continue;
         }
-        // A bare specifier: a package, unless it is a builtin, a URL-like scheme or an alias.
-        if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(spec) || hasImportMap) continue;
-        const pkg = packageOf(spec); if (!pkg || NODE_BUILTINS.has(pkg) || pkg === 'bun') continue;
+        // A bare specifier: a package, unless it is a builtin, a URL-like scheme, an alias or an optional require.
+        if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(spec) || hasImportMap || shape.guarded) continue;
+        const pkg = packageOf(spec); if (!pkg || NODE_BUILTINS.has(pkg) || HOST_PROVIDED.has(pkg)) continue;
         if (packageDeclared(P, file, pkg, F.lang === 'ts') !== false || looksLikeAlias(P, file, pkg)) continue;
         const was = !!bv && bv.F.imports.some((x) => typeof x.source === 'string' && packageOf(x.source) === pkg);
         const removed = was && wasDropped(file, pkg);
-        if (was && !removed) continue; // undeclared before as well: not introduced here
-        if (!was && !inDiff) continue;
-        out.push(mk(P, 'import.undeclared-package', 'bad', file, imp.line, removed ? 'Package no longer declared' : 'Package not declared',
+        // The repository already imported this undeclared name (or this undeclared scope) before the pull request:
+        // an alias or a transitive dependency it has been living with, not something introduced here.
+        if (!removed && (was || !inDiff || undeclaredBefore().has(pkg) || (pkg[0] === '@' && undeclaredBefore().has(pkg.split('/')[0])))) continue;
+        out.push(mk(P, 'import.undeclared-package', aliasConfigTouched ? 'warn' : 'bad', file, imp.line, removed ? 'Package no longer declared' : 'Package not declared',
           `${file} imports '${spec}', but no package.json between it and the repository root lists '${pkg}' in dependencies, devDependencies, peerDependencies or optionalDependencies${removed ? '; this pull request removed the declaration' : ''}.`,
-          'The manifests were read at head and the package name was looked up exactly; it is not a Node builtin. A package that is not declared is not installed by a clean install. Not established: whether a package of that name exists in the registry (Spracklen et al. 2025 measure how often a model invents one).'));
+          `The manifests were read at head and the package name was looked up exactly; it is not a Node builtin and no file imported it at the merge base. Nothing guarantees an undeclared package is installed. Not established: whether another dependency happens to bring it in, or whether a package of that name exists in the registry at all (Spracklen et al. 2025 measure how often a model invents one)${aliasConfigTouched ? '; this pull request also edits a resolver configuration that may define it as an alias, which is why this is a warning' : ''}.`));
       }
     } else if (F.lang === 'py' && inDiff) pyImports(P, file, F, bv, out);
     else if (F.lang === 'cs' && inDiff) csUsings(P, file, F, bv, out);
@@ -391,14 +442,17 @@ function pyImports(P, file, F, bv, out) {
   for (const imp of F.imports) {
     const src = imp.source; if (typeof src !== 'string' || !src) continue;
     const before = !!bv && bv.F.imports.some((x) => x.source === src);
+    let at = firstAt(F, imp.line); while (isOpTok(F.tokens[at], '{') && F.tokens[at].l === imp.line) at++; // the block's own opening brace sits on its first line
+    if (at < F.tokens.length && inTry(F, at)) continue; // try: import x / except ImportError: an optional import, handled
     if (src[0] === '.') {
       const m = pyModule(file, src); if (!m) continue;
       const mb = before ? pyModule(bv.path, src) : null;
       if (/[^.]/.test(src)) { // from .mod import x
         if (exists(H, m.stem) || (before && mb && !exists(B, mb.stem))) continue;
-        out.push(mk(P, 'import.missing-module', 'bad', file, imp.line, 'Import of a module that does not exist',
+        const built = /(^|\/)(_?version|_build\w*|_?generated\w*|\w+_pb2(_grpc)?)$/.test(m.stem); // written by setuptools_scm, protoc and the like
+        out.push(mk(P, 'import.missing-module', built ? 'warn' : 'bad', file, imp.line, 'Import of a module that does not exist',
           `${file} imports '${src}', but neither ${m.stem}.py nor a package ${m.stem}/ is in the tree at head.`,
-          'A relative import names a path inside the repository and the complete file list of the head commit has neither the module nor a package of that name. Not established: modules created at build or run time.'));
+          `A relative import names a path inside the repository and the complete file list of the head commit has neither the module nor a package of that name. Not established: ${built ? 'that it is missing after a build; the name is one build tools generate, which is why this is a warning' : 'modules created at build or run time'}.`));
         continue;
       }
       // from . import a, b: each name is a submodule or something the package's __init__ defines
@@ -480,6 +534,10 @@ const UBIQUITOUS = new Set(`toString ToString equals Equals hashCode GetHashCode
   Sum Min Max TryGetValue ContainsKey GetEnumerator MoveNext AddRange Substring IndexOf StartsWith EndsWith Split Join Trim Replace GetValue SetValue GetAwaiter GetResult ConfigureAwait Wait
   ReadAsync WriteAsync FlushAsync Dispose dispose DisposeAsync CopyTo CopyToAsync Seek SetLength TryParse ToUpper ToLower Equals Reverse Sort sort reverse concat match exec item Item`.split(/\s+/).filter(Boolean));
 const skipName = (n) => typeof n !== 'string' || n.length < 3 || UBIQUITOUS.has(n) || /^__\w+__$/.test(n) || !ID.test(n);
+
+// Names a JavaScript runtime or Python itself defines: a call to one resolves whether or not the repository declares it.
+const JS_GLOBALS = new Set('fetch setTimeout setInterval setImmediate clearTimeout clearInterval clearImmediate queueMicrotask requestAnimationFrame cancelAnimationFrame requestIdleCallback structuredClone atob btoa alert confirm prompt parseInt parseFloat isNaN isFinite encodeURIComponent decodeURIComponent encodeURI decodeURI escape unescape eval Symbol BigInt String Number Boolean Array Object Date RegExp Error Promise Map Set WeakMap WeakSet Proxy Reflect URL URLSearchParams Blob File FormData Headers Request Response AbortController TextEncoder TextDecoder beforeEach afterEach beforeAll afterAll before after'.split(' '));
+const PY_BUILTINS = new Set('abs aiter all anext any ascii bin bool breakpoint bytearray bytes callable chr classmethod compile complex delattr dict dir divmod enumerate eval exec filter float format frozenset getattr globals hasattr hash help hex id input int isinstance issubclass iter len list locals map max memoryview min next object oct open ord pow print property range repr reversed round set setattr slice sorted staticmethod str sum super tuple type vars zip'.split(' '));
 
 const CHECKED = new Set(['js', 'py', 'cs', 'java']); // language families whose call and binding rules are modelled here
 const ANGLE = new Set(['cs', 'java', 'ts']);
@@ -566,6 +624,13 @@ function occurrenceKind(F, i, name) {
   if (fam === 'js' && isOpTok(after, '{')) return { kind: 'hidden' }; // name(a) { … }: a method the symbol table did not record
   if (owner && owner.kind === 'type' && !(pk === 'op' && !';{}*?'.includes(pv))) return { kind: 'hidden' }; // a signature in a class or interface body
   return { kind: 'call', open, recv: null, owner, body };
+}
+
+/** `Type name` at the level of a type body in C# or Java: a field or event of that name, which `name(` would invoke. */
+function fieldLike(x) {
+  if (x.o.kind !== 'ref' || (x.o.owner && x.o.owner.kind !== 'type')) return false;
+  const p = x.F.tokens[x.i - 1];
+  return !!p && (p.k === 'id' || (p.k === 'kw' && !EXPR_KW.has(p.v)) || (p.k === 'op' && (p.v === '>' || p.v === ']' || p.v === '?')));
 }
 
 /** The opening bracket that encloses token i, looking back at most `max` tokens. -1 at the top level. */
@@ -696,7 +761,22 @@ function arityOf(F, s) {
       }
     }
     if (F.lang === 'ts' && s.paramNames && s.paramNames[0] === 'this') { lo = Math.max(0, lo - 1); hi -= 1; }
-    for (let i = s.bodyA; i < s.bodyB; i++) if (T[i].k === 'id' && T[i].v === 'arguments') { hi = Infinity; break; }
+    for (let i = s.bodyA; i < s.bodyB; i++) if (T[i].k === 'id' && T[i].v === 'arguments') { lo = 0; hi = Infinity; break; }
+    // Plain JavaScript has no way to mark a parameter optional except a default. A trailing parameter that the body
+    // tests for absence (!p, typeof p, p ||, p ??, p === …, p ?, p &&, if (p)) is optional by intent: omitting it is no defect.
+    if (F.lang === 'js' && Array.isArray(s.paramNames)) {
+      const tested = (name) => {
+        for (let i = s.bodyA; i < s.bodyB; i++) {
+          if (T[i].k !== 'id' || T[i].v !== name || op(i - 1, '.')) continue;
+          const p = T[i - 1], n = T[i + 1];
+          if (isOpTok(p, '!') || (p && p.k === 'kw' && p.v === 'typeof')) return true;
+          if (n && n.k === 'op' && ['||', '??', '===', '==', '!==', '!=', '?', '&&', '||=', '??='].includes(n.v)) return true;
+          if (isOpTok(p, '(') && isOpTok(n, ')') && T[i - 2] && T[i - 2].k === 'kw' && T[i - 2].v === 'if') return true;
+        }
+        return false;
+      };
+      while (lo > 0 && s.paramNames[lo - 1] && tested(s.paramNames[lo - 1])) lo--;
+    }
   } else if (fam === 'py') {
     let open = -1; for (let i = s.a; i < Math.min(s.b, s.a + 6); i++) if (T[i].k === 'kw' && T[i].v === 'def' && op(i + 2, '(')) { open = i + 2; break; }
     if (open < 0 || M[open] < 0) return null;
@@ -758,7 +838,7 @@ function bindCall(P, side, here, F, x, name, decls, sites, needClosed) {
   const member = o.owner && o.owner.kind !== 'type' ? o.owner : null;
   if (fam === 'cs' || fam === 'java') {
     if (o.recv && !(o.recv.k === 'kw' && (o.recv.v === 'this' || o.recv.v === 'base' || o.recv.v === 'super'))) return null;
-    if (!member || !member.container || hasStaticImport(F)) return null;
+    if (!member || !member.container || hasStaticImport(F) || (fam === 'cs' && P.globalStatic()) || P.unread(fam)) return null;
     if (!member.container.split('.').every((c) => closedHierarchy(P, c))) return null;
     for (const y of sites) if (y.F === F && y.o.kind === 'ref' && y.i >= member.a && y.i < member.b && !isOpTok(T[y.i - 1], '.')) return 'foreign'; // a local, a parameter or a method group of that name
     return { syms: decls, how: `an unqualified call inside ${member.container}, whose base types are all declared in this repository` };
@@ -770,6 +850,8 @@ function bindCall(P, side, here, F, x, name, decls, sites, needClosed) {
       const syms = decls.filter((s) => s.file === here && s.container === member.container);
       if (!syms.length) return null;
       if (needClosed && !closedHierarchy(P, member.container.split('.').pop())) return null;
+      const cls = F.symbols.find((s) => s.kind === 'type' && s.qname === member.container);
+      for (const y of sites) if (y.F === F && y.o.kind === 'ref' && (!cls || (y.i >= cls.a && y.i < cls.b)) && isOpTok(T[y.i + 1], '=')) return 'foreign'; // this.name = something: the member is reassigned
       return { syms, how: `a call on ${rv} inside ${member.container}, which declares it` };
     }
     if (o.recv.k !== 'id' || isOpTok(T[x.i - 3], '.')) return null;
@@ -804,9 +886,10 @@ function bindCall(P, side, here, F, x, name, decls, sites, needClosed) {
     if (!n) continue;
     const pm = fam === 'py' ? pyModule(here, imp.source) : null;
     const hit = fam === 'js' ? jsReaches(side, here, imp.source, n.imported, name, targets) : (n.imported === name && [...targets].find((t) => pyIs(pm, t))) || null;
-    if (hit) return { syms: top.filter((s) => s.file === hit), how: `this file imports ${name} from ${hit}` };
+    if (hit) return { syms: top.filter((s) => s.file === hit), how: `this file imports ${name} from ${hit}`, source: imp.source };
   }
   if (importsIt) return 'foreign'; // the name is imported from somewhere else
+  if (fam === 'py' && (F.imports || []).some((m) => (m.names || []).some((n) => n.imported === '*'))) return null; // from x import *: the name may come from there
   const own = top.filter((s) => s.file === here);
   if (own.length) return { syms: own, how: `${name} is declared at the top level of the same file` };
   return null;
@@ -856,13 +939,16 @@ export function arityMismatches(ctx) {
     if ([...range.values()].some((r) => !r)) continue;
     const sites = (occ.get(name) || []).filter((x) => family(x.F.lang) === fam).map((x) => ({ F: x.F, i: x.i, o: occurrenceKind(x.F, x.i, name) }));
     if (sites.some((x) => x.o.kind === 'hidden')) continue;
+    // A field of the same name somewhere: `name(` inside its type may invoke the field, so no call is taken as bound.
+    const hasField = (fam === 'cs' || fam === 'java') && sites.some(fieldLike);
     const wasRanges = lazy(() => (P.baseNames().get(name) || []).filter(inFam(P.base)).map((s) => arityOf(P.base.get(s.file), s)).filter(Boolean));
     const found = [];
     for (const x of sites) {
       if (x.o.kind !== 'call') continue;
       const n = argCount(x.F, x.o.open); if (n < 0) continue;
-      const b = bindCall(P, side, x.F.path, x.F, x, name, all, sites, false);
+      let b = bindCall(P, side, x.F.path, x.F, x, name, all, sites, false);
       if (b === 'foreign') continue;
+      if (hasField) b = null;
       const cands = b ? b.syms : all, rs = cands.map((s) => range.get(s));
       // A Python method may also be called on the class with the instance passed explicitly.
       if (rs.some((r, k) => n >= r.lo && n <= r.hi + (fam === 'py' && cands[k].container && x.o.recv ? 1 : 0))) continue;
@@ -878,13 +964,18 @@ export function arityMismatches(ctx) {
       const detail = `${name}(…) at ${x.F.path}:${line} passes ${plural(n, 'argument')}, but ${decl}${fam === 'js' && tooMany ? '; JavaScript drops the extra ones silently' : ''}.`;
       const basis = b
         ? `The call binds to the declaration by the text alone (${b.how}); both counts are read from the tokens${matchedBefore && !fresh ? ', and a declaration at the merge base accepted this count' : ''}. Not established: argument types.`
-        : `All ${plural(all.length, 'declaration')} named ${name} in the repository at head were read and none accepts ${plural(n, 'argument')}${matchedBefore ? '; one at the merge base did' : ''}. Not established: that the receiver is one of them, because its type is not resolved; a library method of the same name would not be an error.`;
+        : `${all.length === 1 ? `The only declaration named ${name} in the source read at head does not accept` : `All ${all.length} declarations named ${name} in the source read at head were counted and none accepts`} ${plural(n, 'argument')}${matchedBefore ? '; one at the merge base did' : ''}. Not established: that the call resolves to ${all.length === 1 ? 'it' : 'one of them'}, because the receiver's type is not resolved; a library method of the same name would not be an error.`;
       found.push({ sev: SEVERITY[severity], f: mk(P, 'arity.mismatch', severity, x.F.path, line, title, detail, basis) });
     }
-    found.sort((a, b) => a.sev - b.sev || (a.f.file < b.f.file ? -1 : a.f.file > b.f.file ? 1 : a.f.line - b.f.line));
-    for (const { f } of found.slice(0, 10)) out.push(f);
+    pushCapped(out, found);
   }
   return out;
+}
+
+/** At most ten findings for one name, the bound ones first; when more exist each one says how many. */
+function pushCapped(out, found) {
+  found.sort((a, b) => a.sev - b.sev || (a.f.file < b.f.file ? -1 : a.f.file > b.f.file ? 1 : a.f.line - b.f.line));
+  for (const { f } of found.slice(0, 10)) { if (found.length > 10) f.detail = `${f.detail.replace(/\.$/, '')} (one of ${found.length} such calls; the first 10 are listed).`; out.push(f); }
 }
 
 /**
@@ -908,6 +999,7 @@ export function danglingReferences(ctx) {
     const B = P.base.get(d.oldPath); if (!B || !CHECKED.has(family(B.lang))) continue;
     for (const s of B.symbols) {
       if ((s.kind !== 'function' && s.kind !== 'method') || s.isTest || skipName(s.name) || P.headNames().has(s.name)) continue;
+      if ((isJsLike(B.lang) && JS_GLOBALS.has(s.name)) || (B.lang === 'py' && PY_BUILTINS.has(s.name))) continue; // removing a local stand-in leaves the built-in
       const k = `${family(B.lang)}\u0001${s.name}`;
       if (gone.has(k)) gone.get(k).push(s); else gone.set(k, [s]);
     }
@@ -922,7 +1014,7 @@ export function danglingReferences(ctx) {
     const stillDefined = sites.some((x) => {
       if (x.o.kind === 'hidden' || x.o.kind === 'decl') return true;
       if (x.o.kind !== 'ref' || (x.o.owner && x.o.owner.kind !== 'type')) return false;
-      if (fam === 'cs' || fam === 'java') { const p = x.F.tokens[x.i - 1]; return !!p && (p.k === 'id' || (p.k === 'kw' && !EXPR_KW.has(p.v)) || (p.k === 'op' && (p.v === '>' || p.v === ']' || p.v === '?'))); }
+      if (fam === 'cs' || fam === 'java') return fieldLike(x);
       return binderKind(x.F, x.i) === 'local' || (fam === 'js' && jsExports(x.F).names.has(name));
     });
     if (stillDefined) continue;
@@ -930,17 +1022,20 @@ export function danglingReferences(ctx) {
     for (const x of sites) {
       if (x.o.kind !== 'call') continue;
       const bv = P.baseOf(x.F.path), here = bv ? bv.path : x.F.path;
-      const b = bindCall(P, side, here, x.F, x, name, decls, sites, true);
+      let b = bindCall(P, side, here, x.F, x, name, decls, sites, true);
       if (b === 'foreign') continue;
+      if (b && b.source && fam === 'js') { // the module is still there: if its export list is open, the name may still come out of it
+        const rh = resolveJs(P.sideHead(), x.F.path, b.source), TH = typeof rh === 'string' ? P.head.get(rh) : null;
+        if (TH && isJsLike(TH.lang) && jsExports(TH).open) b = null;
+      }
       const line = x.F.tokens[x.i].l, was = decls[0], severity = b ? 'bad' : 'warn';
       const basis = b
-        ? `The call binds to the removed declaration by the text alone (${b.how}), and no file at head declares anything named ${name}. Not established: nothing further; the name resolves to nothing.`
-        : `A function named ${name} was declared at the merge base and no file at head declares that name, yet this call remains. Not established: that the receiver is a type of this repository, because its type is not resolved; a library method of the same name would still resolve.`;
+        ? `The call binds to the removed declaration by the text alone (${b.how}), and no source file read at head declares anything named ${name}. Not established: a declaration produced by a code generator at build time.`
+        : `A function named ${name} was declared at the merge base and no source file read at head declares that name, yet this call remains. Not established: that the call resolved to the removed function, because the receiver's type is not resolved; a library method of the same name would still resolve.`;
       found.push({ sev: SEVERITY[severity], f: mk(P, 'dangling.call', severity, x.F.path, line, 'Still called, no longer defined',
         `${name}(…) is called at ${x.F.path}:${line}, but ${was.qname} (${was.file}:${was.start} at the merge base) was removed and nothing named ${name} is declared at head.`, basis) });
     }
-    found.sort((a, b) => a.sev - b.sev || (a.f.file < b.f.file ? -1 : a.f.file > b.f.file ? 1 : a.f.line - b.f.line));
-    for (const { f } of found.slice(0, 10)) out.push(f);
+    pushCapped(out, found);
   }
   return out;
 }
@@ -1048,6 +1143,12 @@ export function testWeakening(ctx) {
     tally(P.base, 0); tally(P.head, 1); return m;
   });
   const sig = (F, s) => signature(F.tokens.slice(s.bodyA, s.bodyB));
+  // Bodies of the tests that are new at head (their name is more frequent at head than at the merge base), in the files of the diff.
+  const newBodies = lazy(() => {
+    const set = new Set();
+    for (const d of P.diff) { const H = d.status === 'deleted' ? null : P.head.get(d.path); for (const s of testsOf(H)) { const g = everywhere().get(s.qname); if (g && g[1] > g[0] && s.bodyB - s.bodyA >= 6) set.add(sig(H, s)); } }
+    return set;
+  });
   const rows = (s) => s.attrs.filter((a) => /^(InlineData|TestCase|DataRow)$/.test(a)).length;
 
   for (const d of P.diff) {
@@ -1096,13 +1197,13 @@ export function testWeakening(ctx) {
     }
 
     // Tests that are gone.
-    const fresh = ht.filter((s) => !paired.has(s)), freshBodies = new Set(fresh.map((s) => sig(H, s)));
+    const fresh = ht.filter((s) => !paired.has(s));
     const lineOf = (F, s, k) => F.tokens[Math.min(Math.max(k, s.a), F.tokens.length - 1)].l;
     for (const sb of bt) {
       if (pairedBase.has(sb) || disabled.has(sb.qname)) continue;
       const g = everywhere().get(sb.qname);
       if (g && g[1] >= g[0]) continue; // the same test lives on in another file
-      if (H && sb.bodyB - sb.bodyA >= 6 && freshBodies.has(sig(B, sb))) continue; // renamed, body untouched
+      if (sb.bodyB - sb.bodyA >= 6 && newBodies().has(sig(B, sb))) continue; // renamed or moved to another class, body untouched
       if (H) { // rewritten in place: a hunk replaces its declaration line with the declaration line of a new test
         const a0 = sb.start, a1 = lineOf(B, sb, sb.bodyA);
         const h = d.hunks.find((x) => x.oldLines > 0 && x.newLines > 0 && x.oldStart <= a1 && x.oldStart + x.oldLines - 1 >= a0);
@@ -1113,7 +1214,7 @@ export function testWeakening(ctx) {
       const extra = H && fresh.length ? `; the file gains ${plural(fresh.filter((s) => !paired.has(s)).length, 'other new test')}` : '';
       out.push(mk(P, 'test.removed', 'bad', file, H ? Math.max(1, cut ? cut.newStart : 1) : sb.start, 'Test removed',
         `Test ${sb.qname} (${d.oldPath}:${sb.start} at the merge base) ${H ? 'is no longer in the file' : 'was deleted with its file'} and no test of that name exists at head${extra}.`,
-        'A test with this name is declared at the merge base and in no file at head; no new test in the file has the same body and none replaced its declaration line. Not established: whether another test covers the same behaviour.',
+        'A test with this name is declared at the merge base and in no file at head; no new test in the changed files has the same body and none replaced its declaration line. Not established: whether another test covers the same behaviour.',
         (H && H.symbols.find((s) => s.kind === 'type' && s.qname === sb.container)) || null)); // the class it was in, never a neighbouring test
     }
 
@@ -1151,6 +1252,8 @@ export function testWeakening(ctx) {
 // ───────────────────────────────────────────────────────────── practices
 
 const SECRET_NAME = /(password|passwd|secret|token|api[_-]?key|private[_-]?key)(?:[_-]?(?:key|value|string|str))?\d*$/i;
+// PublicKeyToken identifies a .NET assembly; cancellation, continuation and paging tokens are not credentials.
+const NOT_SECRET = /public[_-]?key|cancellation|continuation|page[_-]?token|next[_-]?token|sync[_-]?token/i;
 const SECRET_FORMAT = [
   [/\bAKIA[0-9A-Z]{16}\b/, 'an AWS access key id'],
   [/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/, 'a JSON Web Token'],
@@ -1336,7 +1439,7 @@ export function practices(ctx) {
       for (const [line, text] of A) {
         if (moved.has(line) || text.length > 1000) continue;
         const m = /(?:^|[\s"'{,;])["']?([A-Za-z0-9_.-]*)["']?\s*[:=]\s*["']?([^\s"',;#]{8,})/.exec(text);
-        if (m && SECRET_NAME.test(m[1]) && credentialLike(m[2]) && (!/token/i.test(m[1]) || (/\d/.test(m[2]) && /[A-Za-z]/.test(m[2])))) add('practice.secret', 'bad', line, 'Secret in the source',
+        if (m && SECRET_NAME.test(m[1]) && !NOT_SECRET.test(m[1]) && credentialLike(m[2]) && (!/token/i.test(m[1]) || (/\d/.test(m[2]) && /[A-Za-z]/.test(m[2])))) add('practice.secret', 'bad', line, 'Secret in the source',
           `${file}:${line} sets ${m[1]} to a literal value: ${mask(m[2])}.`, 'The key is named as a secret and its value is a literal with digits or symbols, not a placeholder or a reference. Not established: that it is a live credential.');
       }
       continue;
@@ -1383,7 +1486,7 @@ export function practices(ctx) {
       const now = s ? swallows(F, s.a, s.b).length : swallows(F).length;
       const was = !bv ? 0 : s ? (sb ? swallows(bv.F, sb.a, sb.b).length : 0) : swallows(bv.F).length;
       if (now <= was) continue;
-      add('practice.error-swallowed', 'warn', c.line, 'Error swallowed', `${c.what} at ${file}:${c.line} has no code, so ${c.type ? clip(c.type, 50) : 'any error'} is discarded${s ? ` in ${s.qname}` : ''}.`,
+      add('practice.error-swallowed', 'warn', c.line, 'Error swallowed', `${c.what} at ${file}:${c.line} has no code, so ${c.type ? `what it catches (${clip(c.type, 50)})` : 'any error'} is discarded${s ? ` in ${s.qname}` : ''}.`,
         `The handler body holds no token (comments are not code), and ${s ? 'the symbol' : 'the file'} has ${now} such ${now === 1 ? 'handler' : 'handlers'} at head against ${was} at the merge base. Not established: whether ignoring the error is intended.`);
     }
 
@@ -1397,7 +1500,7 @@ export function practices(ctx) {
         if (nt && nt.k === 'str') name = unquote(nt.v);
         else if (op(i - 2, ']') && T[i - 3] && T[i - 3].k === 'str') name = unquote(T[i - 3].v);
         else if (isWord(nt)) name = op(i - 3, ':') && isWord(T[i - 4]) ? T[i - 4].v : nt.v; // name: Type = "…"
-        if (!name || !SECRET_NAME.test(name) || !credentialLike(v)) continue;
+        if (!name || !SECRET_NAME.test(name) || NOT_SECRET.test(name) || !credentialLike(v)) continue;
         if (/token\d*$/i.test(name) && !(/\d/.test(v) && /[A-Za-z]/.test(v))) continue; // "token" also names lexer and paging tokens
         add('practice.secret', 'bad', line, 'Secret in the source', `${file}:${line} assigns a string literal to ${name}: ${mask(v)}.`,
           'The name says the value is a secret and the value is a literal with digits or symbols, not a placeholder, a path or a reference. Not established: that it is a live credential.');

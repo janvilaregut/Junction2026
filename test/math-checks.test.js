@@ -278,7 +278,7 @@ test('arity: a call bound to something else in the file is not a call to the cha
   const f = arityMismatches(pr({ head }));
   // Only the method call on an unknown receiver remains, and only as a name-only warning.
   assert.deepEqual(brief(f), ['warn arity.mismatch src/member.js:2']);
-  assert.match(f[0].basis, /Not established: that the receiver is one of them/);
+  assert.match(f[0].basis, /Not established: that the call resolves to it, because the receiver's type is not resolved/);
 });
 
 test('arity: C# overloads, optional and params parameters, and extension methods are counted conservatively', () => {
@@ -511,7 +511,7 @@ test('practices: an empty catch is a warning; a catch that rethrows, logs, or wa
   const f = practices(pr({ base: { 'src/Io.cs': cs(...plain) }, head: { 'src/Io.cs': cs(...empty) } }));
   assert.deepEqual(brief(f), ['warn practice.error-swallowed src/Io.cs:5']);
   assert.equal(f[0].title, 'Error swallowed');
-  assert.match(f[0].detail, /IOException is discarded in Io\.Run/);
+  assert.match(f[0].detail, /has no code, so what it catches \(IOException\) is discarded in Io\.Run/);
   assert.equal(f[0].symbol, 'src/Io.cs::Io.Run');
   assert.deepEqual(brief(practices(pr({ base: { 'src/Io.cs': cs(...plain) }, head: { 'src/Io.cs': cs(...commented) } }))), ['warn practice.error-swallowed src/Io.cs:5']);
   assert.deepEqual(practices(pr({ base: { 'src/Io.cs': cs(...plain) }, head: { 'src/Io.cs': cs(...rethrow) } })), []);

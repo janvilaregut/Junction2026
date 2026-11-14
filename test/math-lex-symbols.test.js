@@ -13,13 +13,13 @@ test('comments and layout are not tokens; the same program gives the same signat
 });
 
 test('JavaScript: template holes are code, regular expressions are not division', () => {
-  assert.equal(kv('`x${a + `y${b}`}z`', 'js'), 'str:x op:${ id:a op:+ str:y op:${ id:b op:} str:` op:} str:z`');
+  assert.equal(kv('`x${a + `y${b}`}z`', 'js'), 'str:`x op:${ id:a op:+ str:`y op:${ id:b op:} str:` op:} str:z`');
   assert.equal(kv('r = /a[/]b/g.test(s) ? 1 / 2 : 3', 'js'), 'id:r op:= str:/a[/]b/g op:. id:test op:( id:s op:) op:? num:1 op:/ num:2 op:: num:3');
   assert.equal(kv('return\nx', 'js', { nl: true }), 'kw:return nl:\n id:x');
 });
 
 test('C#: verbatim, interpolated and raw strings, directives that matter and directives that do not', () => {
-  assert.equal(kv('var s = $"a{b.C(1)}d{{e}}";', 'cs'), 'kw:var id:s op:= str:$ str:a op:{ id:b op:. id:C op:( num:1 op:) op:} str:d{{e}}" op:;');
+  assert.equal(kv('var s = $"a{b.C(1)}d{{e}}";', 'cs'), 'kw:var id:s op:= str:$"a op:{ id:b op:. id:C op:( num:1 op:) op:} str:d{{e}}" op:;');
   assert.equal(kv('x(@"[47,""" + b + @"""]");', 'cs'), 'id:x op:( str:@"[47,""" op:+ id:b op:+ str:@"""]" op:) op:;');
   assert.equal(kv('#if DEBUG\nint x;\n#endif\n#region r\n#pragma warning disable\n', 'cs'), 'pp:#if DEBUG kw:int id:x op:; pp:#endif');
   assert.equal(kv('List<List<int>> y = a >> 2;', 'cs'), 'id:List op:< id:List op:< kw:int op:> op:> id:y op:= id:a op:> op:> num:2 op:;');

@@ -38,6 +38,13 @@ import { lexicon, decide, merge } from './sensitivity.js';
 export const VERSION = 2; // part of the cache key: raise it whenever a measurement or the model changes
 const MAX_UNITS = 44, MAX_CONTEXT = 22;
 // A call that can fail a test: assert/expect/should/verify/ensure/check families, and the Roslyn verifier runs (VerifyCS.Test.RunDefaultAsync).
+// Things a function can do that no static graph can follow, per language. A changed function that does one of
+// them gets a note: what it reaches cannot be established (reflection is where published call graphs miss edges).
+const DYNAMIC_LOOKUP = /\b(eval\s*\(|new\s+Function\s*\(|Reflect\.|require\s*\(\s*[^'"`)\s]|import\s*\(\s*[^'"`)\s]|Type\.GetType\s*\(|Activator\.CreateInstance|\.GetMethod\s*\(|\.GetProperty\s*\(|\.Invoke\s*\(|MethodInfo\b|getattr\s*\(|setattr\s*\(|__import__\s*\(|importlib\.|Class\.forName\s*\()/;
+// A line that exists to stop bad input or a broken state. Losing one is exactly what an approver must see.
+const GUARD = /\b(throw\b|raise\b|assert\w*\s*[(.]|ArgumentNullException|ArgumentException|ArgumentOutOfRange|ThrowIf\w*\s*\(|invariant\s*\(|Guard\.|Debug\.Assert|Contract\.Requires|panic\s*\(|Objects\.requireNonNull)/;
+// Files that decide how the same source text is compiled.
+const BUILD_CONFIG = { cs: /(\.csproj|\.props|\.targets|(^|\/)Directory\.Build\.[a-z]+|(^|\/)global\.json)$/i, js: /(^|\/)(tsconfig[^/]*\.json|jsconfig\.json|babel\.config\.[cm]?js|\.babelrc(\.json)?|\.swcrc|webpack\.config\.[cm]?[jt]s|vite\.config\.[cm]?[jt]s|rollup\.config\.[cm]?[jt]s)$/i };
 const ASSERT = /^(assert|expect|should|verify|ensure|check|must|throws|rejects|is|ok|equal|deepequal|strictequal|tobe|toequal|rundefaultasync|runasync|verifyanalyzerasync|verifycodefixasync)/i;
 
 /** The methods behind the colours, for the interface's legend and the report. */
@@ -186,7 +193,18 @@ export async function analyze(project, pr, { force = false, decisions = true } =
           u.assertions = n;
         }
       }
-      u.excerpt = f.hunks.filter((h) => t.head && h.newStart <= t.head.end && h.newStart + Math.max(h.newLines, 1) - 1 >= t.head.start).flatMap((h) => h.added).join('\n').slice(0, 400);
+      const mine = f.hunks.filter((h) => (t.head && h.newStart <= t.head.end && h.newStart + Math.max(h.newLines, 1) - 1 >= t.head.start) || (t.base && h.oldStart <= t.base.end && h.oldStart + Math.max(h.oldLines, 1) - 1 >= t.base.start));
+      const addedText = mine.flatMap((h) => h.added), removedText = mine.flatMap((h) => h.removed);
+      u.excerpt = addedText.join('\n').slice(0, 400);
+      if (!u.isTest && t.head) {
+        const lost = removedText.filter((l) => GUARD.test(l)).length - addedText.filter((l) => GUARD.test(l)).length;
+        if (t.base && lost > 0) u.findings.push({ id: 'guard-removed', severity: 'warn', title: lost === 1 ? 'A guard was removed' : `${lost} guards were removed`, detail: `${lost === 1 ? 'A line that threw or asserted was' : `${lost} lines that threw or asserted were`} removed from this function and not replaced.`, line: t.head.start, basis: 'Counted on the removed and added lines of the diff.' });
+        if (addedText.some((l) => DYNAMIC_LOOKUP.test(l))) u.findings.push({ id: 'dynamic-lookup', severity: 'info', title: 'Dynamic lookup', detail: 'The added code looks something up at run time (reflection, eval or a computed import): what it reaches cannot be seen in the dependency graph.', line: t.head.start, basis: 'Matched on the added lines.' });
+        if (t.base && s.exported && s.kind !== 'property') {
+          const sigOf = (F, sym) => F.tokens.slice(sym.a, sym.bodyA > sym.a ? sym.bodyA : sym.b).filter((x) => x.k !== 'nl').map((x) => x.v).join(' ');
+          if (sigOf(H, t.head) !== sigOf(B, t.base)) u.findings.push({ id: 'signature-changed', severity: 'warn', title: 'Public signature changed', detail: `The signature of ${s.qname} changed and it is public: callers outside this repository cannot be seen.`, line: t.head.start, basis: 'Token comparison of the declaration before and after.' });
+        }
+      }
       units.push(u); unitBySymbol.set(s.id, u);
     }
     // What changed outside every function: imports, fields, signatures of types.
@@ -213,6 +231,18 @@ export async function analyze(project, pr, { force = false, decisions = true } =
       u.proof = { proved: true, level: 'identical', claim: `Same tokens as the function removed from ${path.basename(from.file)}: moved, not changed.` }; u.change = { kind: 'identical' };
     }
   });
+  // A proof that the text is the same program holds for one way of compiling it. If this pull request also
+  // changes how the code is compiled, the proof is withdrawn wherever that could matter.
+  const buildChanged = (re) => diffFiles.filter((f) => re.test(f.path)).map((f) => path.basename(f.path));
+  const csBuild = buildChanged(BUILD_CONFIG.cs), jsBuild = buildChanged(BUILD_CONFIG.js);
+  for (const u of units) {
+    if (!u.proof?.proved) continue;
+    const why = u.lang === 'cs' && csBuild.length && u._H?.tokens.some((t) => t.k === 'pp') ? csBuild : (u.lang === 'js' || u.lang === 'ts') && jsBuild.length ? jsBuild : null;
+    if (!why) continue;
+    u.proof = null; u.change = { kind: 'logic' };
+    u.findings.push({ id: 'proof-withdrawn', severity: 'warn', title: 'Proof withdrawn', detail: `The text of this function did not change in a way that matters, but ${why.slice(0, 2).join(' and ')} did: the same text may now compile differently${u.lang === 'cs' ? ' (this file has preprocessor conditions)' : ''}.`, line: u.start, basis: 'A token-equality proof assumes the same build configuration.' });
+  }
+  if (csBuild.length || jsBuild.length) limits.push(`This pull request changes build configuration (${[...csBuild, ...jsBuild].slice(0, 3).join(', ')}): its effect on the program is not modelled.`);
   const live = units.filter((u) => !u.moved);
 
   // ── Facts and measurements per unit ─────────────────────────────────────────────────────────────────
@@ -237,13 +267,24 @@ export async function analyze(project, pr, { force = false, decisions = true } =
   for (const u of live) {
     const H = u._H, s = u._h;
     if (s && H && models.model && models.baseline && !u.proof?.proved) guard('entropy', () => {
-      const lex = lexemes(H.tokens); let bits = 0, n = 0;
-      if (u.status === 'added') { const r = models.model.crossEntropy(lex, { from: s.a, to: s.b }); bits = r.total; n = r.tokens; }
-      else { // only the tokens on lines this pull request added, each with its real left context
-        const f = code.find((x) => x.path === u.file), set = changedLines(f).added;
+      const lex = lexemes(H.tokens);
+      const score = () => {
+        if (u.status === 'added') { const r = models.model.crossEntropy(lex, { from: s.a, to: s.b }); return { bits: r.total, n: r.tokens, whole: true }; }
+        // Only the tokens on lines this pull request added, each with its real left context.
+        const f = code.find((x) => x.path === u.file), set = changedLines(f).added; let bits = 0, n = 0;
         let i = s.a; while (i < s.b) { if (!set.has(H.tokens[i].l)) { i++; continue; } let j = i; while (j < s.b && set.has(H.tokens[j].l)) j++; const r = models.model.crossEntropy(lex, { from: i, to: j }); bits += r.total; n += r.tokens; i = j; }
+        return { bits, n, whole: false };
+      };
+      // The model was trained on the base, which holds the old version of this very file: score with it held out,
+      // or the function would look more usual than it is to a project that has never seen it.
+      const B = u._B, held = B && typeof models.model.heldOut === 'function';
+      const r = held ? models.model.heldOut(lexemes(B.tokens), score) : score();
+      if (r.n >= 12) {
+        const b = r.bits / r.n;
+        // A handful of added lines is compared with fragments of that length, not with whole functions (short samples spread more).
+        const sp = r.whole ? surprise(b, models.baseline) : surprise(b, models.baseline, { tokens: r.n });
+        if (sp && Number.isFinite(sp.z)) u.entropy = { bits: b, tokens: r.n, z: sp.z, percentile: sp.percentile, window: sp.window ?? null };
       }
-      if (n >= 12) { const b = bits / n; u.entropy = { bits: b, tokens: n, ...surprise(b, models.baseline) }; }
     });
     if (s && H && models.clones && !u.proof?.proved && s.bodyB - s.bodyA >= 40) guard('clones', () => {
       const q = (F, sym) => models.clones.query(F.tokens.slice(sym.bodyA, sym.bodyB), { exclude: new Set([u._b?.id, s.id].filter(Boolean)) });

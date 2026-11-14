@@ -95,6 +95,7 @@ export function parseDiff(text) {
 }
 
 export async function diff(repo, from, to, paths = []) {
-  const r = await git(repo, ['diff', '-U0', '--no-color', '--no-ext-diff', '-M', from, ...(to ? [to] : []), '--', ...paths], { timeout: 180_000 });
+  // core.quotePath=false: paths with non-ASCII characters come out as they are, not as quoted octal escapes that match nothing.
+  const r = await git(repo, ['-c', 'core.quotePath=false', 'diff', '-U0', '--no-color', '--no-ext-diff', '-M', from, ...(to ? [to] : []), '--', ...paths], { timeout: 180_000 });
   return parseDiff(r.stdout);
 }

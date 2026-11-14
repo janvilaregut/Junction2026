@@ -81,8 +81,7 @@ export function tokenize(text, lang, opts = {}) {
     return n;
   };
   /** Template literal / interpolated string body from position j (just after the opening quote or a closing hole). */
-  const readChunk = (j, close, startLine, raw, holeOpen = '${') => {
-    const from = j;
+  const readChunk = (j, close, startLine, raw, holeOpen = '${', from = j) => { // `from`: where the token text starts (the opening quote of the first chunk)
     while (j < n) {
       const c = s[j];
       if (c === '\\' && !raw) { j += 2; continue; }
@@ -149,7 +148,7 @@ export function tokenize(text, lang, opts = {}) {
         push('str', s.slice(i, end), l0); i = end; continue;
       }
       const verbatim = prefix.includes('@');
-      if (prefix.includes('$')) { push('str', prefix, l0); readChunk(i + prefix.length + 1, '"', l0, verbatim, '{'); continue; }
+      if (prefix.includes('$')) { readChunk(i + prefix.length + 1, '"', l0, verbatim, '{', i); continue; }
       const save = i; i += prefix.length; const end = readQuoted('"', verbatim, verbatim); push('str', s.slice(save, end), l0); i = end; continue;
     }
     if (c === '"' || (c === "'" && !py)) {
@@ -159,7 +158,7 @@ export function tokenize(text, lang, opts = {}) {
     }
     if (c === '`' && (js || lang === 'go' || lang === 'kt' || lang === 'dart' || lang === 'scala')) {
       if (!js) { const e = s.indexOf('`', i + 1); const end = e < 0 ? n : e + 1; const l0 = line; for (let k = i; k < end; k++) if (s[k] === '\n') line++; push('str', s.slice(i, end), l0); i = end; continue; }
-      readChunk(i + 1, '`', line, false, '${'); continue;
+      readChunk(i + 1, '`', line, false, '${', i); continue;
     }
     // Regular expression literal (JavaScript)
     if (c === '/' && js) {

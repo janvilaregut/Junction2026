@@ -173,6 +173,7 @@ export function provesAlpha(A, B, lang) {
     const at = []; for (let i = 0; i < n; i++) if (T[i].k === 'id' && T[i].v === name) at.push(i);
     const scopes = []; // [from, to): token ranges where a binder of this name is in scope
     for (const i of at) {
+      if (i === 0) return no(`\`${name}\` is the first token of the snippet: it is being declared here, not used`);
       // 4. plain variable only
       if (is(i - 1, '.') || is(i - 1, '?.') || is(i - 1, '->') || is(i - 1, '::')) return no(`\`${name}\` is also used as a member name`);
       const declared = (js && (kw(i - 1, 'let') || kw(i - 1, 'const') || kw(i - 1, 'var')));
