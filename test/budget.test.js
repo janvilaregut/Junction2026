@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { TokenBudget, execution } from '../server/execution.js';
 import { resolveProfile } from '../server/profiles.js';
-import { session, configuration, attachSession, providerPreflight, clearPreflightCache, models } from '../server/agents.js';
+import { session, configuration, setupCapture, attachSession, providerPreflight, clearPreflightCache, models } from '../server/agents.js';
 import { run } from '../server/util.js';
 
 const testCredentials = Object.fromEntries(['GEMINI_API_KEY','VERDA_INFERENCE_KEY'].map(k=>[k,process.env[k]]));
@@ -188,4 +188,10 @@ test('partial preflight does not call a provider with missing credentials', asyn
     assert.equal(calls,1);assert.equal(result.available.fast,true);assert.equal(result.available.diverse,false);
     assert.match(result.errors[0],/missing VERDA_INFERENCE_KEY/);
   } finally {process.env.VERDA_INFERENCE_KEY=original;}
+});
+
+test('manual capture refuses non-scratch directories before creating any files', async()=>{
+  const dir=path.join(os.tmpdir(),'katse-outside-capture-'+Date.now());
+  await assert.rejects(()=>setupCapture(dir,{manual:true}),/Refusing/);
+  assert.equal(fs.existsSync(dir),false);
 });

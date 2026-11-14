@@ -61,6 +61,30 @@ Las copias locales de Windows y las restricciones de herramientas no son un sand
 
 `entire-graph` es opcional y no es una dependencia de este MVP: el análisis local funciona con Roslyn. No se consulta ningún grafo de la propuesta desde los constructores.
 
+## Contraste entre encargo e implementación
+
+El contrato sigue saliendo del ticket, tests anteriores y mensajes originales de Entire cuando existen. Los constructores no reciben el parche propuesto ni la interpretación del juez. La llamada final ya existente a Carbon contrasta ese contrato con un extracto acotado del diff original: no se añade una ronda de modelos ni se amplía el límite de cinco minutos de Standard. El máximo de salida del juez pasa de 2.500 a 6.000 tokens, incluyendo razonamiento interno; se compactan sus fuentes y resultados para reducir consumo efectivo; el diff añadido se limita a 6.000 caracteres y la truncación queda registrada. Se acortan las intervenciones del debate para reducir respuestas truncadas.
+
+El informe y la web muestran, por expectativa, lo solicitado, la implementación interpretada, citas literales comprobadas y preguntas pendientes. `intent-comparison.json` vincula contrato, base, commit y hash del parche completo `original-change.patch`; ambos forman parte del manifiesto de integridad. Una coincidencia no añade puntos, una posible desviación no confirma un bug y una interpretación ausente o sin citas válidas queda pendiente. Las citas acreditan procedencia textual, no garantizan la interpretación semántica del modelo. Los tests siguen decidiendo el soporte ejecutable. Las nuevas preguntas del juez final se muestran para revisión; no disparan automáticamente otra generación de pruebas en esta ejecución.
+
+Entire separa mensajes del original y checkpoints de candidatos. En #2283 no hay mensajes originales registrados: no se presenta una descripción inferida como un prompt recuperado. Este contraste se inspira en [Round-Trip Correctness, Allamanis et al., ICML 2024](https://proceedings.mlr.press/v235/allamanis24a.html); no implementa su benchmark ni presenta una equivalencia funcional demostrada. La comparación con revisión directa sigue siendo necesaria para medir valor adicional.
+
+Validación final desde la API: `ju26-issue-2283-mwgbdpvz`, **3 min 49 s / 42.365 tokens**, sin ampliar Standard ni añadir llamadas al juez. Frente al registro previo de 4 min 31 s / 40.859 tokens, esta ejecución usa ~3,7 % más tokens; los tiempos varían con compilación, caché y modelos y no son un benchmark controlado. Las tres expectativas tienen contraste con citas verificadas. Original: 171 tests correctos y tres casos rojo→verde; C1 y C2: 171 tests ejecutados por versión, un fallo de regresión existente cada una, sin timeout. Dos checkpoints reales de Entire. Resultado: **7/10, listo para aprobación humana en el alcance declarado**, sin defectos confirmados del original. Una intervención posterior de C1 se truncó; la ronda inicial, la ejecución de ambas alternativas y el juez sí terminaron. No se interpreta esa intervención ausente como una aprobación.
+
+`npm test`: **81/81**. Se verifican citas inventadas, filas ausentes o duplicadas, diferencias entre procedencia original y candidatos, vinculación de hashes y ausencia de puntos por coincidencia. El primer intento del juez agotó 3.200 tokens en razonamiento; queda conservado como evidencia insuficiente. La llamada ajustada se comprobó primero con evidencia guardada y después en la ejecución completa anterior. El diagnóstico autenticado de Verda volvió a agotar catálogo e inferencia mínima; el flujo final registra Google como sustituto. No se ha validado Nemotron en esta ejecución.
+
+## Corrección del tiempo de C2 y diagnóstico de Verda (14/11/2026)
+
+La captura de las propuestas se vincula después de la sesión mediante `entire session attach`. En las copias desechables se conserva el plugin generado fuera de las rutas de carga automática: la importación explícita evita cargarlo también durante la exportación de OpenCode. Los debates usan una copia de revisión sin hooks y solo el contexto suministrado. [Adjuntar sesiones existentes en Entire](https://docs.entire.com/cli-reference/session).
+
+La fase de tests reserva ahora 30 segundos para el informe, manteniendo Standard en cinco minutos. Una validación de candidato incompleta queda explícitamente pendiente. Se registran los tiempos anteriores al primer evento de ejecución de OpenCode y la duración de sus pasos observados.
+
+Validación real `ju26-issue-2283-mwg90r70`: **4 min 31 s, 40.859 tokens, 171 tests por versión**. El original pasa; C1 y C2 completan la suite y fallan un test cada uno. Ambos conservan checkpoints de Entire. La preparación de cada candidato fue de unos 38 segundos frente a unos 77 en la ejecución anterior. Resultado: **5/10, evidencia insuficiente** porque E2 no quedó asociado a una prueba admitida. Una respuesta de la ronda posterior del debate se truncó; la ejecución de tests de C2 sí terminó. La puntuación no se fuerza para que el demo aparezca aprobado.
+
+**Verda continúa sin responder con las credenciales recibidas.** URL y modelo coinciden con las instrucciones del evento. GET /models y POST /chat/completions autenticados agotan el plazo, también mediante comprobaciones fuera de OpenCode; una comprobación larga agotó 90 segundos. Las peticiones sin clave y con una clave deliberadamente inválida devuelven HTTP 404 rápidamente. Esto no permite confirmar el estado del despliegue ni de la autenticación sin una respuesta del proveedor. No se ha cambiado de endpoint ni se afirma que Nemotron esté arreglado. La web muestra la sustitución por Google.
+
+`npm run check:verda` reproduce el diagnóstico sin enviar código y guarda un JSON sin credenciales en `data/diagnostics`. `-- --timeout=90000` amplía cada comprobación hasta 90 segundos. El comando devuelve un código de error mientras catálogo e inferencia no estén disponibles.
+
 ## Validación del flujo optimizado (14/11/2026)
 
 - `npm test`: **76/76** pruebas superadas. Los controles .NET preparados detectan la regresión y descartan la acusación falsa.
