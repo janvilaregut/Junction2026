@@ -20,6 +20,9 @@ import { startConsensus, getConsensus, listConsensus, subscribeConsensus, isLive
 import { verifyIntegrity } from './integrity.js';
 import { resolveProfile } from './profiles.js';
 import { session, models } from './agents.js';
+import { analyze as mathAnalyze } from './math/index.js';
+import { marksOf, setMark } from './math/marks.js';
+import { reviewNode, savedReview } from './math/nodereview.js';
 
 const PORT = Number(process.env.PORT || 4173);
 const UI = path.join(ROOT, 'mvp');
@@ -208,6 +211,24 @@ async function api(req, res, url) {
       const pr = await findPullRequest(project, url.searchParams.get('pr'));
       const list = await commits(project.path, await resolveRef(project.path, project.base), pr.ref);
       return send(res, 200, { total: list.length, commits: list.slice(-40).map(({ sha, author, date, subject }) => ({ sha, author, date, subject })) });
+    }
+    if (sub === 'math') { // the mathematical pass: proofs, checks and measurements per changed function, no model and no execution
+      if (seg[3] === 'mark' && method === 'POST') {
+        const body = await readBody(req);
+        const pr = await findPullRequest(project, body.pr);
+        const m = await mathAnalyze(project, pr);
+        return send(res, 200, { marks: setMark(project.id, m.head, String(body.node || ''), body.state, String(body.by || '').slice(0, 80)) });
+      }
+      if (seg[3] === 'review') { // one node, reviewed by agents: rebuilt blind from the requirement and compared
+        const body = method === 'POST' ? await readBody(req) : { pr: url.searchParams.get('pr'), node: url.searchParams.get('node') };
+        const pr = await findPullRequest(project, body.pr);
+        if (method === 'POST') return send(res, 200, await reviewNode(project, pr, String(body.node || ''), { force: !!body.force }));
+        const m = await mathAnalyze(project, pr);
+        return send(res, 200, savedReview(project.id, m.head, String(body.node || '')) || { none: true });
+      }
+      const pr = await findPullRequest(project, url.searchParams.get('pr'));
+      const m = await mathAnalyze(project, pr, { force: url.searchParams.get('force') === '1' });
+      return send(res, 200, { ...m, marks: marksOf(project.id, m.head) });
     }
     if (sub === 'plan') {
       const pr = await findPullRequest(project, url.searchParams.get('pr'));
