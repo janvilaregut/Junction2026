@@ -100,6 +100,7 @@ async function planFor(project, pr, mode, profileId = 'standard') {
 }
 
 async function askModel(question, brief) {
+  if (process.env.KATSE_PRIVACY_MODE === 'strict' || brief.privacy?.mode === 'strict') return 'La privacidad estricta bloquea este chat auxiliar, que todavía no pasa por Gemma. Puedes consultar las pruebas y el informe local de la revisión.';
   const slim = { verdict: brief.verdict, contract: brief.contract?.expectations, candidates: brief.candidates?.map(c => ({id:c.id,status:c.status,checkpoint:c.checkpoint?.status})), lane: brief.lane, rules: brief.rules.fired, claims: brief.claims.map(({ evidence, ...c }) => c), questions: brief.questions, residue: { lines: brief.residue.lines, total: brief.residue.total, items: brief.residue.items.map(({ code, ...i }) => i) }, notChecked: brief.notChecked, requirement: brief.requirement, totals: brief.totals, replicas: brief.l3?.replicas?.map((r) => ({ label: r.label, ok: r.ok, summary: r.summary, decisions: r.decisions })) };
   const prompt = `Eres el asistente de una herramienta de verificación de pull requests. Responde en español, en 2 a 5 frases, sin formato, usando SOLO los datos de este informe. Si el informe no lo dice, di que no está comprobado. Nunca digas que el cambio está bien, es correcto o se puede aprobar: eso lo decide la persona.\n\nINFORME:\n${JSON.stringify(slim).slice(0, 24_000)}\n\nPREGUNTA: ${question.slice(0, 600)}`;
   if (process.env.GEMINI_API_KEY) {

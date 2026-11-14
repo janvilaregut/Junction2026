@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { run, sha256, writeJSON, redact, ROOT } from '../util.js';
 import { git, out, parseDiff } from '../git.js';
-import { within, initialPopulation, priority, execution, TokenBudget } from '../execution.js';
+import { within, execution, TokenBudget } from '../execution.js';
 import { resolveProfile } from '../profiles.js';
 import { loadContinuation } from './resume.js';
 import { applyProposal, deduplicateCandidates } from './proposals.js';
@@ -16,6 +16,9 @@ import { blindCopy } from './sandbox.js';
 import { analyzeSymbols, reconstructContract, behaviorGroups } from './contract.js';
 import { evaluate, runnerQueue, validateAttack, attackOutcome, chooseCandidates, adjudicate, isGrounded } from './evidence.js';
 import { harnessPath, harnessContent, scenarioInstructions, materializeScenario } from './messagepack-harness.js';
+import { PrivacyGateway, privacyMode } from '../privacy.js';
+import { populationPlan, allocateGroup, groupMission, updateGroups } from '../planner.js';
+import { decisionMissions } from '../decisions.js';
 
 const ID = ['-c', 'user.name=Katse', '-c', 'user.email=katse@localhost', '-c', 'commit.gpgsign=false'];
 const attackContent = a => Object.fromEntries(['hypothesis','scenario','expected','expectations','test','names','files'].filter(k=>k in a).map(k=>[k,a[k]]));
@@ -33,6 +36,7 @@ export function verifyComplete(args, dependencies) {
 async function executeComplete(args, { intake, verifyBaseline }) {
   const { project, pr, options, runDir, emit } = args;
   const profile = resolveProfile(options);
+  const runContext = execution.getStore();
   const started = Date.now(), budgetMs = profile.budgetMs;
   const deadline = started + budgetMs, generationEnd = started + budgetMs * 2 / 3, finalEnd = deadline - Math.min(30000, budgetMs / 5);
   const artifacts = path.join(runDir, 'artifacts'); fs.mkdirSync(artifacts, { recursive: true });
@@ -45,7 +49,10 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   const call = async opts => recordSession(await session({ artifacts, ...opts }));
   const test = async (v, full = false, force = false) => {
     const r = await evaluate({ version: v, attacks: state.attacks, contract: state.contract, tc: it.toolchain, environment: state.environment, artifacts, emit, full, force, suiteOverlay: [...(state.harness || []), ...(full ? state.suiteOverlay || [] : [])] });
-    state.evidence.push(r); save(); return r;
+    state.evidence.push(r);
+    const candidate=state.candidates.find(c=>c.id===v.id), group=state.groups.find(g=>g.id===candidate?.group);
+    if(group && r.ms>0){group.estimatedMs=(candidate.ms || 0)+r.ms;group.costSource='observed construction plus validation';}
+    save(); return r;
   };
 
   const coalesce = () => {
@@ -56,15 +63,19 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   const availableModel = requested => requested === models().diverse && state.providers?.available?.diverse === false && state.providers?.available?.fast ? models().fast : requested;
   async function candidate(index, parent = null) {
     const id = `C${index + 1}`, dir = path.join(tempRoot, id), requestedModel = index % 2 ? models().diverse : models().fast, model = availableModel(requestedModel);
-    const group = [...state.groups].sort((a, b) => priority(b) - priority(a))[0];
+    const group = allocateGroup(state.groups);
     const c = { id, dir, version: 1, generation: parent ? 2 : 1, parents: parent ? [parent.id] : [], model, requestedModel, modelFallback: model !== requestedModel, group: group?.id, strategy: strategies[index % strategies.length], status: 'pending', reason: parent ? 'Correct observed failures or explore an unresolved decision in a surviving strategy' : 'Independent reconstruction from the historical base', isolation: { base: it.mergeBase, history: 'fresh single commit, no remotes', proposedPatchVisible: false, changedLocationsVisible: true, excerptSelection: 'prior source at changed locations and expressions cited in the requirement', osSandbox: false } };
     state.candidates.push(c); emit({ type: 'candidate', id, status: c.status }); save(); const begin = Date.now();
+    c.mission = groupMission(group,state.contract,state.routing?.missions?.[group?.id]);
+    c.priority = group?.priority;
     try {
       await blindCopy(it.repo, dir, it.mergeBase);
       fs.appendFileSync(path.join(dir,'.git','info','exclude'),'\n.opencode/\n.entire/\n.replica-trx/\n');
       if (parent) await git(dir, ['apply', '--whitespace=nowarn', path.join(artifacts, parent.patch)]);
       const blocks = parent ? sourceBlocks(state.sourceChanges.map(f=>({...f,text:fs.readFileSync(path.join(dir,f.path),'utf8')})), state.requirementContext) : state.baseBlocks;
       const context = JSON.stringify(blocks);
+      // The allocation changes the builder's task, not just its metadata.
+      c.strategy += `\nAssigned investigation: ${c.mission}`;
       const feedback = parent ? state.evidence.filter(e => e.version === parent.id).map(e => ({ status: e.status, failures: e.tests?.filter(t => t.outcome === 'Failed'), log: e.log && fs.readFileSync(path.join(artifacts, e.log), 'utf8').slice(-7000) })) : [];
       let result = await session({ dir, artifacts, role: `build-${id}`, model, timeout: 75000, noTools: true, maxOutputTokens: 4096, maxInputTokens: 14000,
         prompt: `Independently solve this contract from PRE-CHANGE source. The proposed patch is hidden. NO tools, commands or full file rewrites. Return at most 4 block replacements as JSON {"summary":"brief","decisions":["brief"],"unresolved":[],"edits":[{"block":"B1","new":"COMPLETE replacement for that block, including its unchanged context lines"}]}. Select only supplied block IDs. Copy unchanged lines within each edited block exactly. Do NOT include block labels in new. Do not invent or edit methods outside these blocks. Return the complete replacement block. Preserve indentation. Strategy: ${c.strategy}. For descendants edit the current parent source. Original requirement (independent of the proposed patch): ${state.requirementContext}\nContract: ${JSON.stringify(state.contract.expectations.map(({testIdeas,symbols,...e})=>e))}\nSource excerpts: ${context}\nParent feedback: ${JSON.stringify(feedback)}`, validate: x => typeof x.summary === 'string' && Array.isArray(x.edits) });
@@ -97,13 +108,13 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       const duplicate = state.candidates.find(other => other.id !== id && other.tree === c.tree && other.status === 'built');
       if (duplicate) { c.status = 'duplicate'; c.duplicateOf = duplicate.id; return; }
       // Link the recorded proposal after generation. No capture hooks delay the model request.
-      if(state.providers?.tools?.entire !== false) await setupCapture(dir, {manual:true});
+      if(state.providers?.tools?.entire !== false && result.sessionId) await setupCapture(dir, {manual:true});
       await git(dir, [...ID, 'commit', '-m', `Katse candidate ${id}`]);
-      c.capture = state.providers?.tools?.entire === false ? {status:'unavailable',reason:'Entire preflight failed'} : await attachSession(dir, result.sessionId);
+      c.capture = state.providers?.tools?.entire === false || !result.sessionId ? {status:'unavailable',reason:'No OpenCode session (strict text-only privacy) or Entire unavailable'} : await attachSession(dir, result.sessionId);
       c.commit = await out(dir, ['rev-parse', 'HEAD']);
-      c.checkpoint = state.providers?.tools?.entire === false ? {status:'unavailable'} : await checkpoint(dir, c.commit, artifacts, id); c.status = 'built';
+      c.checkpoint = state.providers?.tools?.entire === false || !result.sessionId ? {status:'unavailable'} : await checkpoint(dir, c.commit, artifacts, id); c.status = 'built';
     } catch (e) { if (e.sessionRecord) state.sessions.push(e.sessionRecord); c.status = e.name === 'DeadlineError' || /timeout/.test(e.message) ? 'timeout' : 'failed'; c.error = redact(e.message); }
-    finally { c.ms = Date.now() - begin; if (group) { group.explored++; group.estimatedMs = (group.estimatedMs + c.ms) / 2; } emit({ type: 'candidate', id, status: c.status, tree: c.tree }); save(); }
+    finally { c.ms = Date.now() - begin; const liveGroup=state.groups.find(g=>g.id===group?.id); if (liveGroup) liveGroup.estimatedMs = (liveGroup.estimatedMs + c.ms) / 2; emit({ type: 'candidate', id, status: c.status, tree: c.tree }); save(); }
   }
 
   async function attack(mission, index, final = false) {
@@ -170,6 +181,9 @@ async function executeComplete(args, { intake, verifyBaseline }) {
     await within(generationEnd, async () => {
       state.providers = await providerPreflight({allowPartial:true}); emit({ type: 'log', text: state.providers.errors?.length ? `Disponibilidad parcial: ${state.providers.errors.join('; ')}. Se conserva el alcance ejecutable y se registra cualquier sustitución de modelo.` : 'Proveedores y herramientas accesibles' }); save();
       it = await intake(project, pr); state.input = { proposed: it.headSha, proposedRef: pr.ref, target: it.baseSha, targetRef: project.base, historicalBase: it.mergeBase, requirement: it.requirement };
+      const mode=it.provenance.checkpoints?.length ? 'strict' : privacyMode(state.input,options.privacy || 'auto');
+      runContext.privacy = execution.getStore().privacy = new PrivacyGateway({mode,terms:(process.env.KATSE_PRIVATE_TERMS || '').split(',').map(s=>s.trim()).filter(Boolean)});
+      state.privacy=execution.getStore().privacy.snapshot(); emit({type:'privacy',...state.privacy});
       if(options.resumeRunId) { resume = loadContinuation(project.id, options.resumeRunId, state.input, artifacts); state.continuation = {runId:resume.runId,reuse:resume.reuse}; state.attacks = resume.state.attacks.filter(a=>a.status==='admitted' && !resume.state.verdict?.semantic?.invalidAttacks?.some(x=>x.id===a.id)); state.debate = resume.state.debate || []; }
       // Pin input refs even if the user's branches move while agents are working.
       const frozenProject = { ...project, base: it.baseSha }, frozenPr = { ...pr, ref: it.headSha };
@@ -179,7 +193,14 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       const preparation = await Promise.allSettled([resume ? Promise.resolve(resume.state.contract) : reconstructContract(it, contractDir, artifacts, emit), analyzeSymbols(it, contractDir, artifacts)]);
       const failedPreparation = preparation.find(r=>r.status==='rejected'); if(failedPreparation) throw failedPreparation.reason;
       const [contract, analysis] = preparation.map(r=>r.value);
-      state.contract = contract; state.analysis = analysis; state.groups = behaviorGroups(it, analysis, contract); state.budget.initialCandidates = state.groups.length ? profile.initialCandidates : 0;
+      state.contract = contract; state.analysis = analysis; state.groups = behaviorGroups(it, analysis, contract);
+      state.budget.population = populationPlan(state.groups,profile,{remainingMs:finalEnd-Date.now(),tokens:execution.getStore().tokenBudget.snapshot().remaining});
+      state.budget.initialCandidates = state.budget.population.admitted;
+      state.budget.maxCandidates = state.budget.initialCandidates + profile.maxDescendants;
+      state.budget.formula = state.budget.population.formula;
+      state.routing = state.budget.initialCandidates ? await decisionMissions(state.groups,contract) : {model:'gemini-decision-1',status:'skipped',missions:{},reason:'No candidate budget; no routing call needed',ms:0};
+      writeJSON(path.join(artifacts,'allocation.json'),{population:state.budget.population,routing:state.routing,groups:state.groups});
+      emit({type:'allocation',population:state.budget.population,routing:state.routing});
       state.sourcePaths = it.files.filter(f => f.kind === 'source' && f.path.endsWith('.cs')).map(f=>f.path);
       if (!resume) state.sessions.push(...(contract.sessionRecords || []));
       state.reviewContext = ''; state.baseContext = ''; state.baseBlocks = []; state.testInventory = [];
@@ -241,16 +262,14 @@ async function executeComplete(args, { intake, verifyBaseline }) {
         for (const c of initial) await test(c);
       }
       const survivors = chooseCandidates(initial, state.evidence, state.attacks); state.survivors = survivors.map(c => c.id);
-      for (const g of state.groups) {
-        const tested = new Set(state.attacks.filter(a => a.status === 'admitted').filter(a => state.evidence.some(e => e.version === 'original' && attackOutcome(a, e) !== 'pending')).flatMap(a => a.expectations));
-        g.unverified = g.expectations.filter(id => !tested.has(id)).length / Math.max(1, g.expectations.length);
-        const compared = state.attacks.filter(a => a.status === 'admitted');
-        g.disagreement = compared.length ? compared.filter(a => new Set(state.evidence.map(e => attackOutcome(a, e)).filter(x => x !== 'pending')).size > 1).length / compared.length : null;
-      }
+      updateGroups(state.groups,state.attacks,state.evidence,attackOutcome);
       const wantsExploration = state.groups.some(g => g.unverified > 0 || g.disagreement > 0);
-      if (profile.maxDescendants && wantsExploration && survivors.length && Date.now() + 60000 < generationEnd) {
+      const measured = state.evidence.filter(e=>e.ms>0).map(e=>e.ms);
+      state.budget.descendants = populationPlan(state.groups,profile,{remainingMs:generationEnd-Date.now(),tokens:execution.getStore().tokenBudget.snapshot().remaining,validationMs:measured.length?Math.max(...measured):40000,buildMs:Math.max(45000,...state.candidates.map(c=>c.ms||0))});
+      const descendantCount=Math.min(profile.maxDescendants,state.budget.descendants.admitted,6-state.candidates.length);
+      if (descendantCount && wantsExploration && survivors.length && Date.now() + 60000 < generationEnd) {
         const lastIndex = Math.max(0,...state.candidates.map(c=>Number(c.id.slice(1))));
-        const descendants = await Promise.allSettled(survivors.slice(0, profile.maxDescendants).map((p, i) => candidate(lastIndex + i, p)));
+        const descendants = await Promise.allSettled(survivors.slice(0, descendantCount).map((p, i) => candidate(lastIndex + i, p)));
         for (const r of descendants) if (r.status === 'rejected') pending('descendant', r.reason);
         coalesce();
         for (const c of state.candidates.filter(c => c.generation === 2 && c.status === 'built')) await test(c);
@@ -266,7 +285,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       await within(finalEnd, async () => {
         if (!finalAttackTask) await prepareFinalAttacks();
         const originalResult = await test(original, true);
-        for (const c of state.candidates.filter(c=>c.status==='built').slice(0,profile.id==='deep'?1:2)) {
+        for (const c of state.candidates.filter(c=>c.status==='built' && (profile.id!=='deep' || c.id===state.frozen.selected)).slice(0,2)) {
           if(Date.now()+20000<finalEnd) await test(c,true);
           else state.pending.push({where:`validation-${c.id}`,text:'Candidate validation was not started: execution budget insufficient'});
         }
@@ -276,7 +295,8 @@ async function executeComplete(args, { intake, verifyBaseline }) {
           const baseDir = path.join(tempRoot, 'repro-base'); await blindCopy(it.repo, baseDir, it.mergeBase);
           await test({ id: 'historical-base', dir: baseDir, tree: await out(it.repo, ['rev-parse', `${it.mergeBase}^{tree}`]) });
         }
-        const unchecked = state.candidates.filter(c=>c.status==='built').slice(0,profile.id==='deep'?1:2).filter(c=>!state.evidence.some(e=>e.version===c.id&&e.scope==='relevant-suite'&&e.executionComplete));
+        const required=profile.id==='deep'?[state.frozen.selected]:state.candidates.filter(c=>c.status==='built').slice(0,2).map(c=>c.id);
+        const unchecked = state.candidates.filter(c=>required.includes(c.id)).filter(c=>!state.evidence.some(e=>e.version===c.id&&e.scope==='relevant-suite'&&e.executionComplete));
         state.budget.candidateValidation = {complete:unchecked.length===0,pending:unchecked.map(c=>c.id)};
         for(const c of unchecked) if(!state.pending.some(p=>p.where===`validation-${c.id}`)) state.pending.push({where:`validation-${c.id}`,text:'Candidate validation did not complete; the full comparison remains pending'});
         await deliberate(true);
@@ -310,10 +330,18 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   if (resume) state.budget.inheritedTokens = resume.state.budget?.cumulativeTokens ?? resume.state.budget?.tokens ?? 0;
   state.budget.cumulativeTokens = (state.budget.inheritedTokens || 0) + state.budget.tokens;
   state.budget.accounting = execution.getStore().tokenBudget.snapshot();
+  // Include decision calls in the observed total; session transcripts alone omit them.
+  state.budget.tokens = state.budget.accounting.observed;
+  state.budget.cumulativeTokens = (state.budget.inheritedTokens || 0) + state.budget.tokens;
+  state.privacy = execution.getStore().privacy?.snapshot() || state.privacy;
+  updateGroups(state.groups,state.attacks,state.evidence,attackOutcome);
+  state.allocation = {population:state.budget.population,routing:state.routing,groups:state.groups};
+  writeJSON(path.join(artifacts,'allocation.json'),state.allocation);
   state.budget.usageIncomplete = state.budget.accounting.usageIncomplete || state.sessions.some(s => s.error && !s.history?.some(h => h.usage?.length));
   const fallback = { version: 1, createdAt: new Date().toISOString(), project: { id: project.id, name: project.name }, provenance: { status: 'none' }, pr: { id: pr.id, branch: pr.branch, direction: pr.direction, title: pr.title, head: it?.headSha || pr.sha || '', base: project.base, baseSha: it?.baseSha, commits: [] }, totals: it?.totals || { lines: 0, files: 0, added: 0, removed: 0 }, kinds: it?.kinds || {}, files: [], claims: [], questions: [], residue: { lines: it?.totals.lines || 0, total: it?.totals.lines || 0, items: [] }, notChecked: [], rules: { fired: [] }, timing: { stages: [] }, areas: [], toolchain: { kind: it?.toolchain.kind || 'none' }, options, cost: { usd: 0 } };
   const brief = { ...(baseline || fallback), version: 2, contract: state.contract, candidates: state.candidates.map(stripCandidate), attacks: state.attacks, evidence: state.evidence, budget: state.budget, verdict: state.verdict, input: state.input, environment: state.environment, finalMissions: state.finalMissions, analysis: state.analysis, providers: state.providers, continuation: state.continuation, debate: state.debate, intentComparison: state.intentComparison };
   brief.options = options; brief.timing.totalMs = Date.now() - started; brief.pr.base = project.base;
+  brief.privacy = state.privacy; brief.allocation = state.allocation;
   brief.claims = brief.claims.filter(c => c.id !== 'replicas');
   brief.notChecked = brief.notChecked.filter(c => c.what !== 'Réplicas independientes');
   for (const item of brief.residue.items) item.why = (item.why || []).map(reason => reason.includes('sin réplicas') ? 'zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados' : reason);

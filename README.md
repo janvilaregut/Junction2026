@@ -49,7 +49,7 @@ Los perfiles son Quick (90 s / 25.000 tokens presupuestados), Standard (300 s / 
 
 1. Fija hashes y fuentes; compila y ejecuta la suite relevante y reproducciones rojo→verde. Mutaciones y retirada de grupos se reservan para Deep.
 2. Hydrogen reconstruye un contrato breve. Se verifican citas literales; Carbon audita contrato y evidencia al final. Roslyn localiza símbolos y referencias. Se declaran los límites del análisis parcial.
-3. Standard genera dos propuestas independientes desde la base con Hydrogen y Nemotron. Los modelos reciben el ticket y bloques previos del código alrededor del cambio y de expresiones citadas en el requisito; devuelven ediciones literales; el backend comprueba rutas y coincidencias únicas antes de aplicarlas. Sin herramientas de lectura ni edición para el modelo. No se recupera un prompt histórico inexistente.
+3. La fórmula de complejidad propone de dos a cuatro alternativas; el presupuesto admite hasta dos en Standard y cuatro en Deep. Hydrogen y Nemotron reciben misiones asignadas a grupos concretos, el ticket y bloques previos del código alrededor del cambio y de expresiones citadas en el requisito; devuelven ediciones literales. El backend comprueba rutas y coincidencias únicas antes de aplicarlas. Sin herramientas de lectura ni edición para el modelo. No se recupera un prompt histórico inexistente.
 4. Los constructores intercambian decisiones y parches candidatos, sin ver el original. Una ronda produce fortalezas, riesgos y escenarios; otra puede rectificar tras las ejecuciones. El intercambio no constituye evidencia ni votos. Tras la construcción concurrente se eliminan árboles duplicados antes de volver a ejecutar pruebas; sus sesiones se conservan para auditoría.
 5. Los ataques reciben esas hipótesis y producen escenarios ejecutables. Standard valida estructura y fuentes localmente; Deep añade defensa semántica. El juicio final puede invalidar pruebas. Se ejecutan suites sobre el original y candidatos mientras quede presupuesto, y se reproducen fallos del original contra la base.
 6. El juez determina **Pedir cambios**, **Evidencia insuficiente** o **Lista para aprobación humana**, siempre sobre el original. Un fallo exclusivo de una alternativa y un checkpoint ausente son advertencias de auditoría, no defectos del original.
@@ -60,7 +60,40 @@ La nota 0–10 es una rúbrica heurística: contrato 4, regresiones 3, grupos de
 
 La disponibilidad se comprueba con reintento acotado y caché de cinco minutos para resultados correctos. Si Verda no responde, el flujo puede usar Hydrogen en su lugar y registra la sustitución; ya no representa diversidad entre familias de modelos. Si falta Entire, se registra la captura pendiente sin bloquear los tests.
 
-Gemini Decisions, Gemma local y entire-graph aún no forman parte del flujo. No se ofrece una garantía de anonimización de código privado. El alcance de ejecución local se limita al repositorio público de Tieto.
+### Asignación adaptativa, Decisions y privacidad local
+
+El orquestador es código que controla colas, presupuestos, hashes y admisión de pruebas. Los modelos proponen decisiones y Carbon interpreta el expediente final; ningún modelo puede saltarse las comprobaciones. No hay un superagente con autoridad ilimitada.
+
+- Demanda inicial: `min(4, 2 + ceil(log2(G)) + H)`, con cero alternativas si no hay grupos ejecutables. `G` son grupos de comportamiento y `H` los de alto impacto. Se acota por perfil, tiempo para construir **y probar**, y tokens disponibles. La estimación inicial reserva 60 s y 18.000 tokens para trabajo restante; es una heurística, no una garantía de coste.
+- Asignación: `R*(1+U+D)/(C*(1+N))`. Cada reserva incrementa `N` antes de lanzar la tarea concurrente. El constructor recibe el grupo, símbolo, expectativas y misión; ya no es solo una cifra del informe. `C` se actualiza con tiempos observados y solo las pruebas superadas respaldan expectativas. Deep admite hasta dos descendientes si quedan dudas y presupuesto, seis candidatos como máximo.
+- [Gemini Decisions](https://codelabs.developers.google.com/codelabs/discriminative-models): una petición agrupada a `gemini-decision-1` elige entre `repair`, `preserve` y `boundary`, con 3,5 s de plazo y sin reintento. Solo se adopta una elección válida con confianza >= 0,8; el resto usa reglas por riesgo. El umbral también es heurístico. No decide el veredicto, no puntúa la confianza del PR y no omite pruebas. Si no hay candidatos admitidos, no se llama. La petición también pasa por privacidad y contabiliza tokens.
+- La web muestra demanda/admisión, límites efectivos, misión de cada candidato y respuesta de Decisions. `allocation.json` conserva la asignación y las observaciones finales.
+
+**Gemma en el otro ordenador:** instala [Ollama para Windows](https://docs.ollama.com/windows), abre una nueva terminal en este repositorio y ejecuta:
+
+```powershell
+powershell -File scripts/setup-gemma.ps1
+npm run check:privacy
+```
+
+El script descarga [`gemma4:e2b-it-qat`](https://ollama.com/library/gemma4/tags), comprueba el servidor local y ejecuta una prueba sintética de detección y restauración, sin enviar datos a la nube. El modelo ocupa unos 4,3 GB de descarga; la memoria necesaria para ejecutarlo es adicional. Configura en `.env.local`:
+
+```dotenv
+KATSE_PRIVACY_MODE=strict
+KATSE_GEMMA_URL=http://127.0.0.1:11434
+KATSE_GEMMA_MODEL=gemma4:e2b-it-qat
+KATSE_PRIVATE_TERMS=NombreInterno,ClientePrivado,dominio.interno
+```
+
+Reinicia `npm start` tras cambiar la configuración. `strict` permite probar también el #2283 a través de Gemma. Con `auto`, únicamente el commit público #2283 y su base fijada quedan exentos de Gemma; un requisito propio o una transcripción de Entire exige modo estricto. La exención se indica en el informe.
+
+El gateway combina reglas para secretos y datos personales, un diccionario explícito y detección de nombres internos con Gemma. Sustituye coincidencias por alias estables; restaura las ediciones **localmente** antes de validarlas. Solo admite un endpoint de loopback, bloquea respuestas incompletas o inciertas, usa caché y limita los escaneos a 45 s por revisión y 12 s por fragmento, siempre dentro del plazo de la revisión. Si el ordenador no mantiene ese ritmo, conserva evidencia pendiente en vez de enviar texto sin escanear. La detección sigue siendo probabilística: no garantiza anonimización completa.
+
+**Límite de integración:** la protección cubre las llamadas del pipeline v2 (`mode: completo`). En modo estricto se usa transporte directo de texto saneado, sin OpenCode ni herramientas que puedan añadir contexto del repositorio. Eso implica que **no hay captura nueva de Entire para esos candidatos**; quedan sus artefactos y commits locales. El ejemplo público sigue usando OpenCode y checkpoints reales de Entire. Los módulos antiguos de voz/live, consensus y chat auxiliar no están cubiertos por este gateway: quedan bloqueados al configurar `KATSE_PRIVACY_MODE=strict`. El chat de un informe v2 privado también se bloquea aunque el servidor esté en `auto`. Para trabajar con información privada configura el servidor entero en `strict`. `entire-graph` sigue pendiente.
+
+Validación del 14/11: 97 tests automatizados correctos. Una llamada real a Decisions respondió en 1,06 s / 592 tokens dentro del #2283; sus tres elecciones quedaron por debajo de 0,8 y se mantuvieron las reglas deterministas. El transporte directo de Gemini respondió a una prueba sintética en 1,79 s. Gemma **no se ha ejecutado realmente en este ordenador** por falta de recursos: se verificaron el bloqueo sin modelo y la integración con respuestas simuladas. La ejecución privada completa necesita validación en el otro equipo.
+
+Último #2283: `ju26-issue-2283-mwgdn6hs`, perfil Standard con presupuesto temporal ampliado explícitamente a 600 s, terminó en **5 min 12 s / 43.598 tokens**, sin consumo desconocido. Demanda 4, admitidos 2. Original: 171 tests correctos y tres reproducciones rojo→verde. C1 y C2: 170 correctos y un fallo cada uno; ambos completaron la suite y tienen checkpoints reales. Resultado **7/10, lista para aprobación humana dentro del alcance declarado**, sin fallos confirmados en el original; falta más diversidad de ataques y repetición independiente. Mutación/retirada de cambios no se ejecutan en Standard. Verda agotó el timeout y se sustituyó por Hydrogen, por lo que esta ejecución no demuestra diversidad entre familias. Esta medición no demuestra que el perfil predeterminado de 300 s complete siempre.
 
 ### Evidencia y comprobación
 

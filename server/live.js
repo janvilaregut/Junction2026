@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ROOT } from './util.js';
+import { assertLegacyCloudAllowed } from './privacy.js';
 
 export const LIVE_MODEL = process.env.KATSE_LIVE_MODEL || 'gemini-3.8-live';
 export const LIVE_VOICE = process.env.KATSE_LIVE_VOICE || 'Puck';
@@ -26,6 +27,7 @@ function apiKey() {
 }
 
 export async function liveToken() {
+  assertLegacyCloudAllowed();
   const key = apiKey();
   if (!key) throw new Error('GEMINI_API_KEY missing: put it in .env');
   const now = Date.now();

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { ROOT, run, toolEnv, which, redact, sha256, writeJSON } from './util.js';
 import { Queue, remaining, execution, TokenBudgetError } from './execution.js';
 import { assertScratch } from './pipeline/sandbox.js';
+import { privateGenerate } from './private-generation.js';
 
 export const modelQueue = new Queue(2);
 export const usageTokens = t => Number.isFinite(t.total) ? t.total : (t.input || 0) + (t.output || 0) + (t.reasoning || 0) + (t.cache?.read || 0) + (t.cache?.write || 0);
@@ -76,11 +77,12 @@ export async function session({ dir, role, model, prompt, artifacts, validate = 
   return modelQueue.use(async () => {
     const begin = Date.now();
     const deadline = begin + Math.min(timeout, remaining(timeout));
+    const prepared = execution.getStore()?.privacy ? await execution.getStore().privacy.prepare(prompt) : {text:prompt,restore:x=>x,strict:false};
     const id = `${role}-${begin}-${Math.random().toString(36).slice(2, 6)}`;
     let formatRetry = 0, transientRetry = 0, lastError = '', result;
     const history = [];
     while (Date.now() < deadline) {
-      const message = prompt + (formatRetry ? '\nYour previous response was not valid for the requested JSON schema. Return ONLY valid JSON matching the schema.' : '');
+      const message = prepared.text + (formatRetry ? '\nYour previous response was not valid for the requested JSON schema. Return ONLY valid JSON matching the schema.' : '');
       const inputEstimate = estimateInputTokens(message);
       if (inputEstimate > maxInputTokens) { lastError = `context-limit: ${inputEstimate} estimated input tokens exceeds ${maxInputTokens}`; break; }
       const outputLimit = Math.max(256, Math.min(8192, Math.floor(maxOutputTokens)));
@@ -98,7 +100,7 @@ export async function session({ dir, role, model, prompt, artifacts, validate = 
       catch (e) { if (!(e instanceof TokenBudgetError)) throw e; lastError = e.message; break; }
       let r;
       try {
-        r = await execute(opencodeBin(), ['run', '--auto', '--format', 'json', '--agent', 'katse', '-m', model, '--title', `Katse ${role}`], { cwd: dir, input: message, timeout: deadline - Date.now(), env: toolEnv({ OPENCODE_CONFIG_CONTENT: JSON.stringify(config), GOOGLE_GENERATIVE_AI_API_KEY: process.env.GEMINI_API_KEY, ENTIRE_TELEMETRY: 'false' }) });
+        r = prepared.strict ? await privateGenerate(model,message,outputLimit,deadline-Date.now()) : await execute(opencodeBin(), ['run', '--auto', '--format', 'json', '--agent', 'katse', '-m', model, '--title', `Katse ${role}`], { cwd: dir, input: message, timeout: deadline - Date.now(), env: toolEnv({ OPENCODE_CONFIG_CONTENT: JSON.stringify(config), GOOGLE_GENERATIVE_AI_API_KEY: process.env.GEMINI_API_KEY, ENTIRE_TELEMETRY: 'false' }) });
       } catch (e) {
         if (reservation !== undefined) tokenBudget.settle(reservation, null);
         history.push({ code: -1, ms: Date.now() - begin, usage: [], usageIncomplete: true, reservedTokens: (inputEstimate + outputLimit) * (noToolSession ? 1 : config.agent.katse.steps) });
@@ -121,7 +123,7 @@ export async function session({ dir, role, model, prompt, artifacts, validate = 
         if (!r.timedOut && /50[0234]|ECONN|temporar|overloaded/i.test(lastError) && transientRetry++ < 1) continue;
         break;
       }
-      try { result = parseObject(text); if (!validate(result)) throw new Error('invalid-schema'); }
+      try { result = prepared.restore(parseObject(text)); if (!validate(result)) throw new Error('invalid-schema'); }
       catch (e) {
         const truncated = events.some(e => e.type === 'step_finish' && e.part?.reason === 'length');
         lastError = truncated ? 'session-output-limit' : e.message;
@@ -130,7 +132,8 @@ export async function session({ dir, role, model, prompt, artifacts, validate = 
         break;
       }
       const record = { id, role, model, sessionId, result, history, ms: Date.now() - begin, promptHash: sha256(prompt), limits: { noTools: noToolSession, maxOutputTokens: outputLimit, maxInputTokens, ...(model.startsWith('verda-nemotron/') ? { thinking: process.env.KATSE_VERDA_THINKING === 'true' } : {}) }, artifact: `${id}.json` };
-      writeJSON(path.join(artifacts, record.artifact), { ...record, prompt: redact(prompt) });
+      record.transport = prepared.strict ? 'direct-sanitized-text' : 'opencode';
+      writeJSON(path.join(artifacts, record.artifact), { ...record, prompt: redact(prepared.text) });
       return record;
     }
     const sessionRecord = { id, role, model, history, ms: Date.now() - begin, error: lastError || 'session-timeout', artifact: `${id}.json` };

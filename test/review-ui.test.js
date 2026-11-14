@@ -43,3 +43,11 @@ test('mutation and rewind claims expose their limits and link executable artifac
   ]);
   for(const text of ['Not run','Disabled for this profile','Partial','One group can be removed','rewind.json']) assert.ok(html.includes(text));
 });
+
+test('allocation and privacy expose effective budgets and public demo limits',()=>{
+  const b=brief();
+  b.allocation={population:{formula:'min(4, 2 + ceil(log2(G)) + H)',G:3,H:3,proposed:4,admitted:2,caps:{profile:2,time:3,tokens:7}},routing:{model:'gemini-decision-1',status:'used',ms:1000}};
+  b.privacy={mode:'public-tieto-demo',model:'gemma4:e2b-it-qat',scannedChunks:0,replacements:0,blocked:0,ms:0,limitation:'Not a proof of anonymity'};
+  const html=ctx.reviewEvidenceHTML(b);
+  for(const text of ['Demand: 4; admitted: 2','gemini-decision-1','never approve the PR','allocation.json','Gemma is not required and was not run','Not a proof of anonymity']) assert.ok(html.includes(text),text);
+});
