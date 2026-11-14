@@ -9,13 +9,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="projects.css">
 <link rel="stylesheet" href="voice/voice.css">
 </head>
 <body>
 
 <main id="home">
 <header class="top">
-  <div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z"/><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z" transform="translate(32) scale(-1 1)"/><circle cx="16" cy="16" r="3.5"/></svg>Katse</div>
+  <div class="topl"><button class="sidebtn" id="sideBtn" aria-label="Show projects" aria-controls="side" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button><div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z"/><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z" transform="translate(32) scale(-1 1)"/><circle cx="16" cy="16" r="3.5"/></svg>Katse</div></div>
   <div class="topr"><button class="proj" id="proj" title="Switch project"><i></i><span id="projName">…</span></button><button class="gear" id="gear" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9c.26.6.86 1 1.51 1H21a2 2 0 1 1 0 4h-.09c-.65 0-1.25.4-1.51 1Z"/></svg></button></div>
 </header>
 
@@ -56,6 +57,33 @@
   </section>
 </section>
 
+
+<!-- Projects sidebar: hidden until the button before the logo opens it; it slides over the home without moving it -->
+<div class="sscrim" id="sideScrim"></div>
+<nav class="side" id="side" aria-label="Projects" inert>
+  <div class="shead"><div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z"/><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z" transform="translate(32) scale(-1 1)"/><circle cx="16" cy="16" r="3.5"/></svg>Katse</div><button class="sicon" id="sideX" aria-label="Hide projects"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg></button></div>
+  <div class="slabel"><span>Projects</span><button class="sicon sm" id="sideAdd" aria-label="Add a project"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
+  <ul class="slist" id="slist"></ul>
+  <button class="sall" id="sideAll"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>All projects</button>
+</nav>
+
+<!-- Landing: the first page. Pick a project; the home opens on it -->
+<section class="landing" id="landing" hidden aria-label="Pick a project">
+  <header class="top"><div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z"/><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z" transform="translate(32) scale(-1 1)"/><circle cx="16" cy="16" r="3.5"/></svg>Katse</div></header>
+  <div class="lwrap">
+    <div class="lhead">
+      <div><h1 class="ltitle">Pick a project<span>.</span></h1><p class="llead">Katse works on a git repository. It never writes inside it: it uses throwaway copies.</p></div>
+      <div class="lsearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><label for="lq" class="vh">Search projects</label><input id="lq" type="text" placeholder="Search projects" autocomplete="off"></div>
+    </div>
+    <div class="lgrid" id="lgrid"></div>
+    <p class="lnone" id="lnone" hidden></p>
+    <div class="ladd" id="ladd" hidden>
+      <div class="ltabs" role="tablist" aria-label="Where the project comes from"><button role="tab" data-m="url" aria-selected="true">Clone from URL</button><button role="tab" data-m="path" aria-selected="false">Local folder</button></div>
+      <div class="lrow"><div class="lfield"><label for="lsrc" id="lsrcl">Repository URL</label><input id="lsrc" type="text" placeholder="https://github.com/org/repo" autocomplete="off"></div><button class="cta" id="lgo">Clone</button></div>
+      <div class="err" id="lerr"></div>
+    </div>
+  </div>
+</section>
 
 <div class="modal" id="modal" hidden><div class="sheet"><button class="x" id="mx" aria-label="Close">×</button><div id="mbody"></div></div></div>
 <div class="tip" id="tip"></div>
