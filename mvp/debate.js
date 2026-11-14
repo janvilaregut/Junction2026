@@ -22,7 +22,58 @@
     const g = {}; Object.keys(par).forEach((id) => (g[find(id)] = g[find(id)] || []).push(id));
     return Object.values(g).sort((x, y) => y.length - x.length);
   }
+  /* The real review run (server/pipeline/complete.js): alternatives rebuilt from the base, their debate,
+     attacks on the PR and the judge. Same shape as the sample, so the story plays the same way. */
+  function realDebate(b) {
+    const cut = (t, n = 130) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > n ? x.slice(0, n - 1) + '…' : x; };
+    const ev = (v) => (b.evidence || []).filter((e) => e.version === v).pop();
+    const COL = ['#cde4ee', '#e3dcf4', '#bfe3d0', '#f2c6d9'];
+    const cands = (b.candidates || []).filter((c) => c.status !== 'duplicate').slice(0, 4);
+    const nm = cands.map((c) => modelName(c.model));
+    const agents = cands.map((c, i) => {
+      const e = ev(c.id), m = nm[i], st = CAND[c.status] || c.status;
+      return { id: c.id, name: nm.filter((x) => x === m).length > 1 ? `${c.id} ${m}` : m, color: COL[i % COL.length], role: 'solver', meta: `Alternative ${c.id} · rebuilt from the base without seeing the PR · ${m}`,
+        subA: 'from the base', subB: `${st}${e ? ` · ${e.ran} tests` : ''}`, stats: [[e?.ran ?? '–', 'tests run'], [e?.status || '–', 'its suite'], [st, 'patch']] };
+    });
+    const orig = ev('original'), finds = b.verdict?.findings || [];
+    agents.push({ id: 'PR', name: 'The PR', color: '#f5f5f7', role: 'advocate', meta: 'The change under review, as written', subA: 'as written', subB: orig ? `${orig.status} · ${orig.ran} tests` : '', stats: [[orig?.ran ?? '–', 'tests run'], [orig?.status || '–', 'its suite'], [finds.length, finds.length === 1 ? 'attack faced' : 'attacks faced']] });
+    const atk = (b.attacks || [])[0];
+    if (atk) agents.push({ id: 'ATK', name: 'Attacker', color: '#f2a99f', role: 'attacker', meta: `Writes tests to break the PR · ${modelName(atk.attacker)}${atk.modelFallback ? ' (stand-in model)' : ''}`, subA: 'attacks', subB: modelName(atk.attacker), quote: cut(atk.hypothesis, 220),
+      stats: [[b.attacks.length, b.attacks.length === 1 ? 'attack' : 'attacks'], [b.attacks.filter((a) => a.status === 'admitted').length, 'admitted'], [finds.filter((f) => f.classification === 'confirmed-original').length, 'landed']] });
+    const sc = b.verdict?.score?.value, judge = b.providers?.models?.review || 'carbon';
+    agents.push({ id: 'JDG', name: 'Judge', color: '#f3e2a6', role: 'judge', meta: `Audits the contract and the evidence · ${modelName(judge)}`, subA: 'judges', subB: modelName(judge), quote: b.verdict?.semantic?.explanation ? cut(b.verdict.semantic.explanation.split(/(?<=\.)\s/)[0], 220) : null,
+      stats: [[sc ?? '–', 'score / 10'], [(b.verdict?.pending || []).length, 'blockers'], [(b.contract?.expectations || []).length, 'expectations']] });
+    const rounds = [];
+    const deb = (Array.isArray(b.debate) ? b.debate : b.debate?.entries || []).filter((d) => d.status !== 'incomplete');
+    for (const phase of ['proposals', 'results']) {
+      const [x, y] = deb.filter((d) => (d.round || 'proposals') === phase);
+      if (x && y && x.candidate !== y.candidate && agents.some((a) => a.id === x.candidate) && agents.some((a) => a.id === y.candidate)) {
+        const say = (d) => cut(phase === 'results' ? d.revision || d.risk : d.risk || d.strength);
+        rounds.push({ pair: [x.candidate, y.candidate], kind: 'talk', phase, arguments: { [x.candidate]: { argument: say(x) }, [y.candidate]: { argument: say(y) } } });
+      }
+    }
+    if (atk) for (const f of finds) {
+      const o = (f.outcomes || []).find((x) => x.version === 'original');
+      const kind = f.classification === 'confirmed-original' ? 'convinced' : f.classification === 'refuted' ? 'hold' : 'talk';
+      rounds.push({ pair: ['ATK', 'PR'], kind, winner: kind === 'convinced' ? 'ATK' : null, loser: kind === 'convinced' ? 'PR' : null, attack: f.attack,
+        arguments: { ATK: { argument: cut(f.hypothesis) }, PR: { argument: !o ? 'Not run on the PR.' : o.outcome === 'passed' ? 'Passes on the PR: refuted.' : o.outcome === 'failed' ? 'Fails on the PR.' : 'Not run in time.' } } });
+    }
+    rounds.forEach((r, i) => (r.round = i + 1));
+    const stv = b.verdict?.status, ids = agents.map((a) => a.id);
+    const camp = stv === 'ready-for-human' ? ['PR', 'JDG'] : stv === 'request-changes' && atk ? ['ATK', 'JDG'] : ['JDG'];
+    const groups = [camp, ...ids.filter((i) => !camp.includes(i)).map((i) => [i])];
+    const label = VERDICT[stv]?.[1] || b.verdict?.label || 'Pending';
+    const pend = (b.verdict?.pending || []).length;
+    return {
+      real: true, sample: false, runId: S.run?.id, agents, rounds, agreement: 0, pre: ids.map((i) => [i]),
+      text: { agents: [`${agents.length} agents.`, 'One real review.'], agentsSub: `${cands.length} rebuild it from the base without seeing the PR.${atk ? ' One attacks it.' : ''} One judges.`, solve: ['Each one rebuilt', 'the change.'], solveSub: cands.map((c) => `${c.id}: ${CAND[c.status] || c.status}`).join(' · ') },
+      verdict: { verdict: stv === 'ready-for-human' ? 'coincide' : stv === 'request-changes' ? 'difiere' : 'dudoso', leader: 'JDG', members: camp, groups, prConceded: stv === 'request-changes',
+        lines: sc != null ? [`${sc}/10`, `${label}.`] : ['No score.', `${label}.`], big: sc != null,
+        summary: `${finds.length} ${finds.length === 1 ? 'attack' : 'attacks'}, ${finds.filter((f) => f.classification === 'refuted').length} refuted · ${pend ? `${pend} open ${pend === 1 ? 'blocker' : 'blockers'}` : 'no open blockers'} · ${PROFILE[b.options?.profile]?.[0] || 'Review'} in ${secs(b.timing?.totalMs || 0)}.` },
+    };
+  }
   function debateFor(p) {
+    if (S.run?.brief?.version >= 2 && S.cur?.id === p.id) return realDebate(S.run.brief);
     const r = rng(p.id); const pick = (a) => a[Math.floor(r() * a.length)];
     const fs = (S.run?.brief?.files || S.plan?.files || []).filter((f) => f.kind === 'source' || f.kind === 'test').map((f) => base(f.path));
     const f1 = fs[0] || 'the main file', f2 = fs[1] || f1;
@@ -53,6 +104,12 @@
   }
   const agentName = (id) => D.data.agents.find((a) => a.id === id)?.name || id;
   function chapters(d) {
+    if (d.real) return [
+      { id: 'agents', dur: 4300, lines: d.text.agents, sub: d.text.agentsSub },
+      { id: 'solve', dur: 4300, lines: d.text.solve, sub: d.text.solveSub },
+      ...(d.rounds.length ? [{ id: 'debate', dur: d.rounds.length * ROUND, lines: [], sub: '' }] : []),
+      { id: 'verdict', dur: 0, lines: d.verdict.lines, sub: d.verdict.summary, big: d.verdict.big },
+    ];
     const n = d.agents.length, m = d.verdict.members.length, lead = agentName(d.verdict.leader);
     const V = { coincide: [`${m} of ${n}`, 'agree with the PR.'], difiere: [`${m} of ${n}`, `side with ${lead}.`], dudoso: ['No clear', 'majority.'] }[d.verdict.verdict];
     return [
@@ -114,8 +171,8 @@
     if (ch.id === 'agents' || ch.id === 'solve') {
       ringOf(D.B, g, g.ring * (ch.id === 'solve' ? 1.14 : 1));
       D.B.forEach((b) => Object.assign(b, {
-        tr: g.R0 * (b.id === 'PR' ? 0.9 : 1), sat: 6.5, pulse: 3, orbit: ch.id === 'solve' ? 2.4 : 1,
-        sub: ch.id === 'agents' ? (b.a.role === 'advocate' ? 'for the PR' : `temp ${b.a.temperature}`) : b.a.role === 'advocate' ? 'the real PR' : `${b.a.files} files · ${b.a.tests} tests`,
+        tr: g.R0 * (b.id === 'PR' ? 0.9 : 1), sat: b.a.role === 'solver' || !D.data.real ? 6.5 : 0, pulse: 3, orbit: ch.id === 'solve' ? 2.4 : 1,
+        sub: ch.id === 'agents' ? b.a.subA ?? (b.a.role === 'advocate' ? 'for the PR' : `temp ${b.a.temperature}`) : b.a.subB ?? (b.a.role === 'advocate' ? 'the real PR' : `${b.a.files} files · ${b.a.tests} tests`),
       }));
       setGlow(ch.id === 'agents' ? '#e3dcf4' : '#cde4ee');
     } else if (ch.id === 'compare') {
@@ -131,7 +188,9 @@
   }
   /* The debate chapter plays its rounds one after another: meet, argue, outcome. */
   function debateTick(t) {
-    const d = D.data, k = Math.min(d.rounds.length - 1, Math.floor(t / ROUND)), u = t - k * ROUND;
+    // A frame's timestamp can be a few ms older than the chapter start: never a round −1.
+    const d = D.data; if (!d.rounds.length) return;
+    const k = Math.max(0, Math.min(d.rounds.length - 1, Math.floor(t / ROUND))), u = Math.max(0, t - k * ROUND);
     if (k !== D.sub) startRound(k);
     const rd = d.rounds[k], rs = D.rs;
     if (!rs.s1 && u > 600) { rs.s1 = true; say(rd.pair[0], rd.arguments[rd.pair[0]].argument, 'l'); }
@@ -142,7 +201,7 @@
     D.sub = k; D.rs = {}; clearMsgs();
     const g = geom(), rd = D.data.rounds[k], cols = colorsUpTo(k);
     reset(cols);
-    headline([agentName(rd.pair[0]), `vs ${agentName(rd.pair[1])}.`], `Round ${k + 1} of ${D.data.rounds.length}`);
+    headline(rd.attack ? ['The attacker', `tests the PR.`] : rd.kind === 'talk' ? [`${agentName(rd.pair[0])} and`, `${agentName(rd.pair[1])}.`] : [agentName(rd.pair[0]), `vs ${agentName(rd.pair[1])}.`], rd.attack ? `Attack ${rd.attack}` : `Round ${k + 1} of ${D.data.rounds.length}`);
     const others = D.B.filter((b) => !rd.pair.includes(b.id));
     ringOf(others, g, g.ring * 1.32, 0.95, Math.PI / others.length);
     others.forEach((b) => Object.assign(b, { tr: g.R0 * 0.55, dim: true }));
@@ -150,20 +209,25 @@
     setGlow(cols[rd.pair[0]]);
   }
   function outcome(rd, k) {
-    const g = geom(), [a, b] = rd.pair.map(bub), sub = `Round ${k + 1} of ${D.data.rounds.length}`;
+    const g = geom(), [a, b] = rd.pair.map(bub);
+    let sub = `Round ${k + 1} of ${D.data.rounds.length}`;
     a.pulse = b.pulse = 0;
-    if (rd.kind === 'convinced') {
+    if (rd.attack) sub = `Attack ${rd.attack}`;
+    if (rd.kind === 'talk') {
+      a.tx = g.cx - g.R0 * 0.62; b.tx = g.cx + g.R0 * 0.62; a.touch = b.touch = 'm';
+      headline(rd.attack ? ['Not settled', 'in time.'] : rd.phase === 'results' ? ['They revised', 'after the tests.'] : ['They traded', 'risks.'], sub);
+    } else if (rd.kind === 'convinced') {
       const w = bub(rd.winner), l = bub(rd.loser);
       Object.assign(w, { tr: g.R0 * 1.3, touch: 'm' });
       Object.assign(l, { tx: w.tx + Math.sign(l.tx - w.tx) * g.R0 * 0.75, tr: g.R0 * 0.9, touch: 'm', col: w.col });
-      headline([`${w.a.name} convinced`, `${l.a.name}.`], sub);
+      headline(rd.attack ? ['The attack', 'landed.'] : [`${w.a.name} convinced`, `${l.a.name}.`], sub);
       setGlow(w.col);
     } else if (rd.kind === 'equivalent') {
       a.tx = g.cx - g.R0 * 0.62; b.tx = g.cx + g.R0 * 0.62; a.touch = b.touch = 'm';
       headline([`${a.a.name} and ${b.a.name}:`, 'the same fix.'], sub);
     } else {
       a.tx = g.cx - g.R0 * 2.9; b.tx = g.cx + g.R0 * 2.9; a.vx = -9; b.vx = 9;
-      headline(['Nobody', 'gave in.'], sub);
+      headline(rd.attack ? ['The PR', 'held.'] : ['Nobody', 'gave in.'], sub);
     }
   }
 
@@ -237,7 +301,12 @@
       b.lab.setAttribute('transform', `translate(${b.x.toFixed(1)},${b.y.toFixed(1)})`);
       b.lab.classList.toggle('tiny', r < 30); b.lab.classList.toggle('dim', b.dim);
     });
-    D.msgs.forEach((m) => { m.el.style.left = m.b.x + 'px'; m.el.style.top = m.b.y - Math.max(0, m.b.r) - 12 + 'px'; });
+    const SW = sec.clientWidth;
+    D.msgs.forEach((m) => { // follows its bubble, kept inside the screen
+      const w = m.w || (m.w = m.el.offsetWidth), r = m.el.classList.contains('r');
+      const x = r ? Math.min(m.b.x, SW - 12 - w + 30) : Math.max(m.b.x, 12 + w - 30);
+      m.el.style.left = x + 'px'; m.el.style.top = m.b.y - Math.max(0, m.b.r) - 12 + 'px';
+    });
   }
   const run = () => { if (!D.raf) { D.t = 0; D.raf = requestAnimationFrame(frame); } };
 
@@ -266,23 +335,25 @@
     const d = D.data, mine = d.rounds.filter((r) => r.pair.includes(a.id));
     const story = mine.map((r) => {
       const other = agentName(r.pair.find((x) => x !== a.id));
-      const t = r.kind === 'convinced' ? (r.winner === a.id ? `Convinced ${other}` : `Was convinced by ${other}`) : r.kind === 'equivalent' ? `Same fix as ${other}` : `Held firm against ${other}`;
+      const t = r.attack ? (r.kind === 'convinced' ? (a.id === 'ATK' ? `Broke the PR (${r.attack})` : `Broken by attack ${r.attack}`) : r.kind === 'hold' ? (a.id === 'ATK' ? `Attack ${r.attack} refuted` : `Held against attack ${r.attack}`) : `Attack ${r.attack}: not settled`)
+        : r.kind === 'talk' ? (r.phase === 'results' ? `Revised after the tests, with ${other}` : `Traded risks with ${other}`)
+        : r.kind === 'convinced' ? (r.winner === a.id ? `Convinced ${other}` : `Was convinced by ${other}`) : r.kind === 'equivalent' ? `Same fix as ${other}` : `Held firm against ${other}`;
       return `<li><span>Round ${r.round}</span>${esc(t)}</li>`;
     }).join('');
     const best = mine.find((r) => r.winner === a.id) || mine.find((r) => r.kind !== 'convinced') || mine[0];
-    const quote = best?.arguments[a.id]?.argument;
-    const stats = a.role === 'advocate'
+    const quote = a.quote ?? best?.arguments[a.id]?.argument;
+    const stats = a.stats ? a.stats : a.role === 'advocate'
       ? [[a.files, a.files === 1 ? 'file changed' : 'files changed'], [mine.length, mine.length === 1 ? 'debate' : 'debates'], [d.verdict.prConceded ? 'Yes' : 'No', 'conceded']]
       : [[a.files, a.files === 1 ? 'file' : 'files'], [a.tests, a.tests === 1 ? 'test run' : 'tests run'], [a.steps, 'steps']];
     const win = d.verdict.members.includes(a.id);
     $('agent').innerHTML = `<button class="ax" id="ax" aria-label="Back to all agents">×</button>
-      <div class="ak">${a.role === 'advocate' ? 'Advocate · argues for the PR as written' : `Agent ${esc(a.id)} · solved it blind`}</div>
+      <div class="ak">${d.real ? `Live run · ${esc(d.runId || '')}` : a.role === 'advocate' ? 'Advocate · argues for the PR as written' : `Agent ${esc(a.id)} · solved it blind`}</div>
       <div class="an">${esc(a.name)}</div>
-      ${a.role === 'solver' ? `<div class="am">temperature ${a.temperature} · top-p ${a.topP}</div>` : '<div class="am">It never writes code. It defends the PR’s.</div>'}
+      ${a.meta ? `<div class="am">${esc(a.meta)}</div>` : a.role === 'solver' ? `<div class="am">temperature ${a.temperature} · top-p ${a.topP}</div>` : '<div class="am">It never writes code. It defends the PR’s.</div>'}
       <div class="as">${stats.map(([v, l]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('')}</div>
       ${quote ? `<blockquote>“${esc(quote)}”</blockquote>` : ''}
       <ul class="ar">${story}</ul>
-      <div class="af">${d.verdict.verdict === 'dudoso' ? 'No camp won.' : win ? `In the winning camp${d.verdict.leader === a.id ? ', as its leader' : ''}.` : 'Outside the winning camp.'}</div>`;
+      <div class="af">${d.real ? esc(d.verdict.lines.join(' ')) : d.verdict.verdict === 'dudoso' ? 'No camp won.' : win ? `In the winning camp${d.verdict.leader === a.id ? ', as its leader' : ''}.` : 'Outside the winning camp.'}</div>`;
     $('ax').onclick = (e) => { e.stopPropagation(); closeAgent(); };
   }
 
@@ -294,6 +365,7 @@
     clearTimeout(D.hideT);
     D.data = debateFor(S.cur); D.chs = chapters(D.data); D.open = true; D.agent = null; D.ch = -1;
     $('dtitle').textContent = `Agents · ${name(S.cur)}`;
+    sec.querySelector('.dbar em').textContent = D.data.real ? `Live run · ${D.data.runId}` : 'Preview · sample data';
     $('drawer').hidden = true;
     focusOn(['pr'], { k: 5.5, K: 0.03, noTip: true, still: true });
     full.classList.add('indebate');
@@ -324,25 +396,31 @@
   function debateGo(to) {
     if (!D.open) return false;
     if (to === 'next') go(1); else if (to === 'previous' || to === 'back') go(-1);
-    else { if (D.agent) closeAgent(); enter(to === 'restart' ? 0 : CH[to] ?? D.ch); }
+    else {
+      if (D.agent) closeAgent();
+      const want = { meet: 'agents', blind: 'solve', rounds: 'debate', argue: 'debate', attacks: 'debate', consensus: 'verdict', result: 'verdict' }[to] || to;
+      const i = D.chs.findIndex((c) => c.id === want);
+      enter(to === 'restart' ? 0 : i >= 0 ? i : D.ch);
+    }
     return D.chs[D.ch]?.id;
   }
   function debateInfo() {
     if (!D.data) return null;
     const d = D.data;
     return {
-      sample: true, note: 'Design preview with sample data; the real consensus engine will feed this view.',
+      sample: !d.real, note: d.real ? `Real review run ${d.runId}: alternatives rebuilt from the base, their debate, attacks on the PR and the judge.` : 'Design preview with sample data: this PR has no real review run yet.',
       chapter: D.chs[D.ch]?.id, openAgent: D.agent ? agentName(D.agent) : null,
       agents: d.agents.map((a) => ({ id: a.id, name: a.name, role: a.role, temperature: a.temperature })),
-      rounds: d.rounds.map((r) => ({ round: r.round, pair: r.pair.map(agentName), outcome: r.kind === 'convinced' ? `${agentName(r.winner)} convinced ${agentName(r.loser)}` : r.kind === 'equivalent' ? 'same fix' : 'nobody gave in', arguments: Object.fromEntries(Object.entries(r.arguments).map(([k, v]) => [agentName(k), v.argument])) })),
-      verdict: { kind: d.verdict.verdict, leader: agentName(d.verdict.leader), camp: d.verdict.members.map(agentName), prConceded: d.verdict.prConceded, summary: d.verdict.summary },
+      rounds: d.rounds.map((r) => ({ round: r.round, pair: r.pair.map(agentName), attack: r.attack, outcome: r.attack ? { convinced: 'the attack landed: the PR fails', hold: 'refuted: the PR passes', talk: 'not settled' }[r.kind] : r.kind === 'talk' ? (r.phase === 'results' ? 'revised after the tests' : 'traded risks') : r.kind === 'convinced' ? `${agentName(r.winner)} convinced ${agentName(r.loser)}` : r.kind === 'equivalent' ? 'same fix' : 'nobody gave in', arguments: Object.fromEntries(Object.entries(r.arguments).map(([k, v]) => [agentName(k), v.argument])) })),
+      verdict: d.real ? { headline: d.verdict.lines.join(' '), summary: d.verdict.summary } : { kind: d.verdict.verdict, leader: agentName(d.verdict.leader), camp: d.verdict.members.map(agentName), prConceded: d.verdict.prConceded, summary: d.verdict.summary },
     };
   }
   function findAgent(q) {
     const s = String(q || '').toLowerCase().trim(); if (!D.data) return null;
     return D.data.agents.find((a) => a.id.toLowerCase() === s || a.name.toLowerCase() === s)
       || D.data.agents.find((a) => s.includes(a.name.toLowerCase()) || a.name.toLowerCase().includes(s))
-      || (/\bpr\b|advocate|abogado|defens/.test(s) ? D.data.agents.find((a) => a.id === 'PR') : null);
+      || (/\bpr\b|advocate|abogado|defens|original/.test(s) ? D.data.agents.find((a) => a.id === 'PR') : null)
+      || (/judge|juez/.test(s) ? D.data.agents.find((a) => a.id === 'JDG') : null) || (/attack|atac/.test(s) ? D.data.agents.find((a) => a.id === 'ATK') : null);
   }
 
   /* ── Input ─────────────────────────────────────────────────────────── */
@@ -351,7 +429,7 @@
   $('dprev').onclick = (e) => { e.stopPropagation(); go(-1); };
   $('dnext').onclick = (e) => { e.stopPropagation(); go(1); };
   sec.addEventListener('click', (e) => { // like a story: tap the right side for next, the left edge for back
-    if (D.agent || e.target.closest('button, .agent, .blob')) return;
+    if (D.agent || e.target.closest('button, .dagent, .blob')) return;
     go(e.clientX < sec.clientWidth * 0.25 ? -1 : 1);
   });
   addEventListener('keydown', (e) => {

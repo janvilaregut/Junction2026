@@ -8,6 +8,8 @@ import { assertScratch } from './pipeline/sandbox.js';
 export const modelQueue = new Queue(2);
 export const usageTokens = t => Number.isFinite(t.total) ? t.total : (t.input || 0) + (t.output || 0) + (t.reasoning || 0) + (t.cache?.read || 0) + (t.cache?.write || 0);
 export const models = () => ({ fast: `google/${process.env.KATSE_GEMINI_FAST || 'gemini-4-hydrogen'}`, review: `google/${process.env.KATSE_GEMINI_REVIEW || 'gemini-4-carbon'}`, diverse: 'verda-nemotron/nemotron', ...execution.getStore()?.models });
+/** The pinned OpenCode (its postinstall writes bin/opencode.exe on every OS); a global one may be another version. */
+const opencodeBin = () => { const pinned = path.join(ROOT, 'node_modules/opencode-ai/bin/opencode.exe'); return fs.existsSync(pinned) ? pinned : 'opencode'; };
 export const entirePath = () => process.env.KATSE_ENTIRE_PATH || path.join(process.env.LOCALAPPDATA || os.homedir(), 'Katse/tools', process.platform === 'win32' ? 'entire.exe' : 'entire');
 
 export function configuration({ maxOutputTokens = 4096 } = {}) {
@@ -87,7 +89,7 @@ export async function session({ dir, role, model, prompt, artifacts, validate = 
       catch (e) { if (!(e instanceof TokenBudgetError)) throw e; lastError = e.message; break; }
       let r;
       try {
-        r = await execute(process.platform === 'win32' ? path.join(ROOT, 'node_modules/opencode-ai/bin/opencode.exe') : 'opencode', ['run', '--auto', '--format', 'json', '--agent', 'katse', '-m', model, '--title', `Katse ${role}`], { cwd: dir, input: message, timeout: deadline - Date.now(), env: toolEnv({ OPENCODE_CONFIG_CONTENT: JSON.stringify(config), GOOGLE_GENERATIVE_AI_API_KEY: process.env.GEMINI_API_KEY, ENTIRE_TELEMETRY: 'false' }) });
+        r = await execute(opencodeBin(), ['run', '--auto', '--format', 'json', '--agent', 'katse', '-m', model, '--title', `Katse ${role}`], { cwd: dir, input: message, timeout: deadline - Date.now(), env: toolEnv({ OPENCODE_CONFIG_CONTENT: JSON.stringify(config), GOOGLE_GENERATIVE_AI_API_KEY: process.env.GEMINI_API_KEY, ENTIRE_TELEMETRY: 'false' }) });
       } catch (e) {
         if (reservation !== undefined) tokenBudget.settle(reservation, null);
         history.push({ code: -1, ms: Date.now() - begin, usage: [], usageIncomplete: true, reservedTokens: (inputEstimate + outputLimit) * (noToolSession ? 1 : config.agent.katse.steps) });
@@ -210,7 +212,7 @@ export async function providerPreflight({ fetchImpl = fetch, execute = run, now 
   const settled = await Promise.allSettled([
     process.env.GEMINI_API_KEY ? fetchModels('Google', 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', { 'x-goog-api-key': process.env.GEMINI_API_KEY }) : Promise.reject(new Error('Google: missing GEMINI_API_KEY')),
     process.env.VERDA_INFERENCE_KEY ? fetchModels('Verda/Nemotron', `${verdaURL}/models`, { Authorization: `Bearer ${process.env.VERDA_INFERENCE_KEY}` }) : Promise.reject(new Error('Verda/Nemotron: missing VERDA_INFERENCE_KEY')),
-    Promise.resolve().then(() => execute(process.platform === 'win32' ? path.join(ROOT, 'node_modules/opencode-ai/bin/opencode.exe') : 'opencode', ['--version'], { timeout: 10000 })),
+    Promise.resolve().then(() => execute(opencodeBin(), ['--version'], { timeout: 10000 })),
     Promise.resolve().then(() => execute(entirePath(), ['version'], { timeout: 10000 })),
   ]);
   const errors = settled.flatMap((r, i) => r.status === 'rejected' ? [i < 2 ? r.reason.message : `${names[i]}: version check failed`] : i >= 2 && r.value.code !== 0 ? [`${names[i]}: version check failed (exit ${r.value.code})`] : []);

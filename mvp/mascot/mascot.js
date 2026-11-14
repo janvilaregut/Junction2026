@@ -159,7 +159,7 @@ const TOOLS = [
   { name: 'go_home', description: 'Close the pull request and go back to the branch tree.', parameters: T() },
   { name: 'get_verification_details', description: 'Details of the current pull request verification, for explaining it: verdict lane, recommendation, what was checked and how (tests red-before/green-after, seeded defects, rewind, blind replicas), what was NOT checked and why, the lines the human must read, and the open questions.', parameters: T({ section: { type: 'STRING', enum: ['summary', 'checked', 'not_checked', 'residue', 'questions', 'all'] } }) },
   { name: 'open_review', description: 'Open the review & sign drawer of the current (verified) pull request.', parameters: T() },
-  { name: 'start_verification', description: 'Start verifying the current pull request. Slow (minutes). Ask the user to confirm first.', parameters: T({ mode: { type: 'STRING', enum: ['quick', 'full'] } }) },
+  { name: 'start_verification', description: 'Start the real review of the current pull request: contract, alternatives rebuilt from the base by AI agents, their debate, attacks on the PR and a judge with a 0-10 score. Profiles: quick (90 s, no alternatives), standard (5 min, default), deep (15 min). Ask the user to confirm first.', parameters: T({ profile: { type: 'STRING', enum: ['quick', 'standard', 'deep'] } }) },
   { name: 'get_consensus', description: 'Results of the multi-agent consensus for the current pull request: several Gemini agents solved the same requirement blind, a heatmap compared their code zone by zone with the PR, then they debated in pairs until a consensus. Returns agents, where they agreed/disagreed, each debate argument and who convinced whom, and the verdict (coincide = PR matches the consensus, difiere = the consensus proposes something else, dudoso = no clear majority).', parameters: T() },
   { name: 'start_consensus', description: 'Start a multi-agent consensus check on the current pull request (takes ~15 minutes). Ask the user to confirm first.', parameters: T() },
   { name: 'open_consensus', description: 'Open the raw technical consensus report page (heatmap, full arguments) for the current pull request. For the visual story of the agents use show_agent_debate instead.', parameters: T() },
@@ -167,9 +167,9 @@ const TOOLS = [
   { name: 'show_all_branches', description: 'Fold the commits back and show every branch in the tree again.', parameters: T() },
   { name: 'focus_graph', description: 'Inside the open pull request graph: fly the camera to a node or group and light it up while you talk about it. query: a file name, "Tests", "Builds", "Mutation", a line like "Foo.cs:120", an agent, or a group: "what I must read" (red), "decisions" (yellow), "reproduced" (green), "checks", "files", "agents", "whole" (the core). Call it EVERY time you start explaining a specific part of the graph.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
   { name: 'zoom_graph', description: 'Move the graph camera: "in" (closer), "out" (further), "overview" (back to the whole graph, clears the highlight).', parameters: T({ action: { type: 'STRING', enum: ['in', 'out', 'overview'] } }, ['action']) },
-  { name: 'show_agent_debate', description: 'Dive into the animated story of the AI agents for the open pull request: bubbles that solve it blind, compare, argue round by round (they meet, merge when they agree, the convinced one takes the winner\'s colour) and reach a consensus. Use when the user asks how the agents are doing, how they debated, who convinced whom, or to see the agents. It plays by itself; returns the story so you can narrate it. Sample data for now (design preview).', parameters: T() },
+  { name: 'show_agent_debate', description: 'Dive into the animated story of the AI agents for the open pull request: bubbles that solve it blind, compare, argue round by round (they meet, merge when they agree, the convinced one takes the winner\'s colour) and reach a consensus. Use when the user asks how the agents are doing, how they debated, who convinced whom, or to see the agents. It plays by itself; returns the story so you can narrate it. Uses the REAL review run of the PR when it has one (alternatives from the base, their debate, the attacks on the PR and the judge); otherwise a sample (say so).', parameters: T() },
   { name: 'debate_step', description: 'Move through the agents story: next, previous, restart, or jump to a chapter: agents, solve, compare, debate, verdict.', parameters: T({ to: { type: 'STRING', enum: ['next', 'previous', 'restart', 'agents', 'solve', 'compare', 'debate', 'verdict'] } }, ['to']) },
-  { name: 'open_agent', description: 'In the agents story: dive into one agent (its bubble fills the screen with its details, arguments and how its debates went). name: Precise, Steady, Balanced, Curious, Bold, or "the PR" (the advocate).', parameters: T({ name: { type: 'STRING' } }, ['name']) },
+  { name: 'open_agent', description: 'In the agents story: dive into one agent (its bubble fills the screen with its details, arguments and how its debates went). name as shown: in a real run "C1 Hydrogen"/"Hydrogen", "Attacker", "Judge", "The PR"; in a sample run Precise, Steady, Balanced, Curious, Bold.', parameters: T({ name: { type: 'STRING' } }, ['name']) },
   { name: 'close_agent', description: 'Leave the agent detail and go back to all the agents.', parameters: T() },
   { name: 'leave_debate', description: 'Leave the agents story and go back to the pull request graph.', parameters: T() },
   { name: 'express', description: 'Show an emotion with the goat for a moment, to make the conversation lively (e.g. happy when a PR is fine, surprised at a bug).', parameters: T({ mood: { type: 'STRING', enum: ['happy', 'surprised', 'sad', 'confused', 'love', 'bleating', 'thinking'] } }, ['mood']) },
@@ -216,7 +216,19 @@ function briefOf(b, section = 'summary') {
   if (want('not_checked')) out.notChecked = (b.notChecked || []).slice(0, 10).map((n) => ({ what: n.what, why: clip(n.why, 240) }));
   if (want('questions')) out.questions = (b.questions || []).map((q) => ({ question: clip(q.text, 300), options: q.options }));
   if (want('residue') || section === 'summary') out.toRead = (b.residue?.items || []).slice(0, section === 'summary' ? 4 : 10).map((i) => ({ where: `${i.file}:${i.start}${i.end !== i.start ? '-' + i.end : ''}`, lines: i.lines, why: clip(i.reason || i.why || '', 200), code: section === 'summary' ? undefined : clip((i.code || []).map((c) => [...c.removed.map((l) => '- ' + l), ...c.added.map((l) => '+ ' + l)].join('\n')).join('\n'), 700) }));
-  const known = new Set(['lane', 'recommendation', 'residue', 'totals', 'timing', 'claims', 'notChecked', 'questions', 'pr', 'cost']);
+  if (b.version >= 2 && b.verdict) { // the real review pipeline: judge, attacks, debate, alternatives
+    const v = b.verdict;
+    out.review = {
+      verdict: v.status, label: v.label, score: v.score?.value ?? null, scoreParts: (v.score?.components || []).map((c) => `${c.label}: ${c.earned}/${c.max} (${clip(c.reason, 160)})`), caps: (v.score?.caps || []).map((c) => `max ${c.max}: ${clip(c.reason, 160)}`),
+      blockers: (v.pending || []).map((x) => clip(x, 200)), judge: clip(v.semantic?.explanation, 600),
+      attacks: (v.findings || []).map((f) => ({ id: f.attack, result: f.classification, hypothesis: clip(f.hypothesis, 260), outcomes: (f.outcomes || []).map((o) => `${o.version}: ${o.outcome}`) })),
+      debate: (Array.isArray(b.debate) ? b.debate : []).filter((d) => d.status !== 'incomplete').map((d) => ({ by: d.candidate, model: d.model, round: d.round, strength: clip(d.strength, 220), risk: clip(d.risk, 220), revision: clip(d.revision, 220) })),
+      alternatives: (b.candidates || []).map((c) => ({ id: c.id, model: c.model, status: c.status })),
+      budget: b.budget ? { profile: b.options?.profile, seconds: Math.round((b.budget.elapsedMs || 0) / 1000), tokens: b.budget.accounting?.observed ?? b.budget.tokens } : null,
+      models: b.providers?.models, unavailable: b.providers?.errors,
+    };
+  }
+  const known = new Set(['lane', 'recommendation', 'residue', 'totals', 'timing', 'claims', 'notChecked', 'questions', 'pr', 'cost', 'version', 'verdict', 'contract', 'candidates', 'attacks', 'evidence', 'budget', 'debate', 'input', 'environment', 'finalMissions', 'analysis', 'providers', 'continuation', 'artifactManifest']);
   out.otherSections = Object.keys(b).filter((k) => !known.has(k)).slice(0, 20);
   return out;
 }
@@ -324,10 +336,10 @@ const TOOL_FN = {
   async open_agent({ name: who }) {
     if (!call('debateOpen')) { if (!inGraph()) return { error: 'Open a pull request first.' }; call('openDebate'); await sleep(900); }
     const a = call('openAgent', who);
-    if (!a) return { error: `No agent called "${who}". Agents: Precise, Steady, Balanced, Curious, Bold, and the PR's advocate.` };
+    if (!a) return { error: `No agent called "${who}".`, agents: call('debateInfo')?.agents?.map((x) => x.name) };
     act(`Inside ${a.name}`);
     const info = call('debateInfo');
-    return { agent: a.name, role: a.role, temperature: a.temperature, files: a.files, tests: a.tests, steps: a.steps, debates: info.rounds.filter((r) => r.pair.includes(a.name)), sample: true };
+    return { agent: a.name, role: a.role, about: a.meta, stats: a.stats, says: a.quote, temperature: a.temperature, debates: info.rounds.filter((r) => r.pair.includes(a.name)), sample: info.sample };
   },
   async close_agent() { return { ok: !!call('closeAgent') }; },
   async leave_debate() { call('closeDebate'); act('Back to the graph'); return { ok: true }; },
@@ -341,12 +353,13 @@ const TOOL_FN = {
     const s = app(); if (!s?.run?.brief) return { error: 'Open a verified pull request first.' };
     call('openReview'); act('Opened review'); return { ok: true };
   },
-  async start_verification({ mode = 'quick' } = {}) {
-    const s = app(); if (!s?.cur || view() === 'home') return { error: 'Open a pull request first.' };
-    s.mode = mode;
+  async start_verification({ profile = 'standard' } = {}) {
+    const s = app(); if (!s?.cur || !inGraph()) return { error: 'Open a pull request first.' };
+    if (call('debateOpen')) call('closeDebate');
+    s.profile = ['quick', 'standard', 'deep'].includes(profile) ? profile : 'standard';
     const started = (await call('verify')) !== false;
-    if (started) act(`Verifying (${mode})`);
-    return started ? { started: true, mode } : { started: false, note: 'A verification is already running or starting, or no pull request is open.' };
+    if (started) act(`Reviewing (${s.profile})`);
+    return started ? { started: true, profile: s.profile, note: 'Live progress shows in the bottom bar; when it ends the graph, the score and the agents story update with the real result.' } : { started: false, note: 'A verification is already running or starting, or no pull request is open.' };
   },
   async get_consensus() {
     const s = app(); const p = s?.cur && view() !== 'home' ? s.cur : null;
@@ -376,7 +389,7 @@ const TOOL_FN = {
 /* ── Gemini Live session ──────────────────────────────────────────────── */
 const SYSTEM = `You are the Katse goat: the voice assistant living in the corner of Katse, an app that verifies pull requests by REPRODUCING them instead of reading them (it merges, builds, runs tests red-before/green-after, seeds defects, rewinds each change, and has independent AI agents redo the change blind and debate), then leaves a named human only what could not be checked.
 How you talk: warm, quick, professional, a little playful. Spoken answers of 1-3 short sentences; no markdown, no lists, no reading ids or hashes aloud (say branch names naturally). Reply in the language the user speaks (Spanish if they speak Spanish).
-Be visual and dynamic, like a guide holding a camera: whenever you start talking about a part of the graph (a file, a check, the lines to read, a decision), call focus_graph on it FIRST so the camera flies there while you speak; when you change topic or finish, zoom_graph overview. "Zoom in/out" means zoom_graph. "Show me the commits of this branch" means show_commits. "How are the agents doing / show me how they debate" means show_agent_debate (then narrate the story as it plays, and use debate_step / open_agent when asked). The agents story uses sample data for now: if the user asks whether it is real, say it is a design preview.
+Be visual and dynamic, like a guide holding a camera: whenever you start talking about a part of the graph (a file, a check, the lines to read, a decision), call focus_graph on it FIRST so the camera flies there while you speak; when you change topic or finish, zoom_graph overview. "Zoom in/out" means zoom_graph. "Show me the commits of this branch" means show_commits. "How are the agents doing / show me how they debate" means show_agent_debate (then narrate the story as it plays, and use debate_step / open_agent when asked). The agents story shows the PR's REAL review run when it has one (debateInfo.sample is false): narrate those real arguments and results. Only when sample is true, say it is a preview with sample data. For "why this score", "what did the agents find", use get_verification_details (its review field).
 How you act: you can see and drive the screen ONLY through tools. Never invent pull requests, numbers or results: call a tool. If the user says "this", "here", "that one", call get_screen. When asked to show, list, open or go somewhere, do it with the tool right away, then say in a few words what you did. For "why is it good/bad", "what was tested and what wasn't", "how did the agents work", use get_verification_details and get_consensus and explain in plain words with concrete files, tests and arguments; be honest about what was NOT verified. Before anything slow (start_verification, start_consensus) ask for a yes. Use express now and then to react (happy for good news, surprised at a bug).`;
 
 async function start(textOnly = false) {

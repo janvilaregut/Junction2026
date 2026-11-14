@@ -19,7 +19,9 @@ export function assertScratch(repo, dir) {
   let existing = target;
   while (!fs.existsSync(existing)) existing = path.dirname(existing);
   const resolved = fs.realpathSync(existing);
-  if (!roots.some(root => resolved === path.resolve(root) || inside(root, resolved))) throw new Error('Scratch directory resolves outside its permitted root');
+  // Roots resolved too: on macOS the temp dir lives behind a symlink (/var → /private/var).
+  const real = (root) => { let r = path.resolve(root); const tail = []; while (!fs.existsSync(r)) { tail.unshift(path.basename(r)); r = path.dirname(r); } return path.join(fs.realpathSync(r), ...tail); };
+  if (!roots.flatMap(root => [path.resolve(root), real(root)]).some(root => resolved === root || inside(root, resolved))) throw new Error('Scratch directory resolves outside its permitted root');
   return target;
 }
 

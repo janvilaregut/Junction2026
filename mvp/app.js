@@ -35,6 +35,13 @@ const NS = 'http://www.w3.org/2000/svg';
 const mk = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
 const PAL = { ok: '#bfe3d0', warn: '#f3e2a6', bad: '#f2a99f', no: '#55555c', file: '#cde4ee', filedim: '#4d585d', agent: '#e3dcf4', core: '#f5f5f7' };
 const S = { projects: [], agents: [], pid: null, prs: { incoming: [], outgoing: [] }, base: '', expanded: false, cur: null, run: null, plan: null, mode: 'quick', es: null, stage: '', t0: 0, timer: 0 };
+/* The real review pipeline (server/pipeline/complete.js) runs with a profile: a time and token budget. */
+const PROFILE = { quick: ['Quick', '90 s · first checks, no alternatives'], standard: ['Standard', '5 min · two alternatives from the base, debate and attacks'], deep: ['Deep', '15 min · extra exploration, mutations'] };
+S.profile = PROFILE[store.get('katse.profile')] ? store.get('katse.profile') : 'standard';
+const VERDICT = { 'ready-for-human': ['ok', 'Ready for your approval'], 'request-changes': ['bad', 'Request changes'], 'insufficient-evidence': ['warn', 'Not enough evidence'] };
+const CAND = { built: 'patch built', pending: 'building', failed: 'failed', timeout: 'out of time', duplicate: 'duplicate', empty: 'no changes' };
+const FIND = { 'confirmed-original': ['bad', 'Confirmed failure in the PR'], 'original-failure-unconfirmed': ['warn', 'PR failure, not confirmed'], 'candidate-only': ['no', 'Fails only in an alternative'], refuted: ['ok', 'Refuted: the PR passes'], 'invalid-test': ['no', 'Invalid test'], pending: ['no', 'Pending'], unstable: ['warn', 'Unstable result'] };
+const modelName = (m) => { const x = String(m || '').split('/').pop().replace(/^gemini-\d+(\.\d+)?-/, ''); return x ? x[0].toUpperCase() + x.slice(1) : 'Model'; };
 
 /* The backend reports with fixed ids; these give them English names. */
 const LANE = {
@@ -396,6 +403,14 @@ function model(b, plan) {
       if (r.ok) (b.l3.regions || []).forEach((g) => { const c = g.cells.find((x) => x.replica === r.id)?.status; const z = zones.find((x) => x.rid === g.id); if (z && (c === 'same' || c === 'different')) { link(id, z.nid, c === 'different' ? 'warn' : ''); any = true; } });
       if (!any) link(id, 'pr');
     });
+    if (b.version >= 2) {
+      const fnd = (id) => (b.verdict?.findings || []).find((f) => f.attack === id);
+      (b.candidates || []).forEach((c) => { const id = 'c:' + c.id; add({ id, label: c.id, kind: 'agent', tone: c.status === 'built' ? 'agent' : 'no', info: `Alternative from the base · ${modelName(c.model)} · ${CAND[c.status] || c.status}` }); link(id, 'pr'); });
+      (b.attacks || []).forEach((a) => {
+        const f = fnd(a.id), [tone, what] = FIND[f?.classification] || ['no', a.status];
+        const id = 'a:' + a.id; add({ id, label: a.id, kind: 'check', tone, info: `Attack · ${what} · ${a.hypothesis || a.mission || ''}` }); link(id, 'pr', tone === 'bad' ? 'bad' : '');
+      });
+    }
   } else {
     ['Builds', 'Tests', 'Mutation'].forEach((l, i) => { add({ id: 'v' + i, label: l, kind: 'check', tone: 'no', info: 'Waiting for verification' }); link('v' + i, 'pr'); });
   }
@@ -707,7 +722,7 @@ function collapseGraph([x, y], tone) {
 let openSeq = 0, closeTimer = 0, renderTimer = 0;
 const alive = (seq) => seq === openSeq && !$('full').hidden && $('full').classList.contains('open');
 function stopStream() { if (S.es) { S.es.close(); S.es = null; } clearInterval(S.timer); }
-const fetchPlan = (p) => api(`/projects/${S.pid}/plan?pr=${encodeURIComponent(p.id)}&mode=${S.mode === 'full' ? 'completo' : 'rapido'}`);
+const fetchPlan = (p) => api(`/projects/${S.pid}/plan?pr=${encodeURIComponent(p.id)}&mode=completo&profile=${S.profile}`);
 /* The graph blooms once the core has mostly arrived in the middle, however fast the data came back. */
 function scheduleGraph(seq, m) { clearTimeout(renderTimer); renderTimer = setTimeout(() => alive(seq) && renderGraph(m), Math.max(0, S.openedAt + 430 - performance.now())); }
 
@@ -761,21 +776,23 @@ $('back').onclick = closeGraph;
    An error from loading the branch is fatal (only Back); an error from an action can be dismissed. */
 function renderBar(error, fatal) {
   const p = S.cur, b = S.run?.brief;
-  const seg = `<div class="seg" title="Full: agents redo the change blind, without seeing it. Takes minutes."><button data-m="quick" class="${S.mode === 'quick' ? 'on' : ''}">Quick</button><button data-m="full" class="${S.mode === 'full' ? 'on' : ''}" ${S.agents.length ? '' : 'disabled title="No agents available"'}>Full</button></div>`;
+  const seg = `<div class="seg">${Object.entries(PROFILE).map(([id, [n, d]]) => `<button data-p="${id}" class="${S.profile === id ? 'on' : ''}" title="${esc(d)}">${n}</button>`).join('')}</div>`;
   let h;
   if (error) h = `<span class="txt" style="color:var(--bad);white-space:normal;max-width:520px">${esc(error)}</span>${fatal ? '<button class="cta ghost" id="bBack">Back</button>' : '<button class="cta ghost" id="bOk">OK</button>'}`;
   else if (S.starting) h = '<span class="spin"></span><span class="txt" style="color:var(--fg)">Starting…</span><button class="cta" disabled>Verifying…</button>';
-  else if (S.es) h = `<span class="spin"></span><span class="txt" style="color:var(--fg)">${esc(S.stage)}</span><span class="txt">${secs(Date.now() - S.t0)}</span><button class="cta" disabled>Verifying…</button>`;
+  else if (S.es) h = `<span class="spin"></span><span class="txt live" style="color:var(--fg)">${esc(S.stage)}</span><span class="txt">${secs(Date.now() - S.t0)}</span><button class="cta" disabled>Verifying…</button>`;
   else if (b) {
     const stale = p.sha && !b.pr.head.startsWith(p.sha);
     const so = S.run.signoff;
-    const [tone, label] = stale ? ['no', 'Out of date'] : so ? (so.decision === 'aprobar' ? ['ok', 'Signed'] : ['bad', 'Sent back']) : [laneTone(b.lane.id, b.lane.tone), laneName(b.lane.id, b.lane.name)];
-    h = `<span class="num">${b.residue.lines}<small> / ${b.totals.lines}</small></span><span class="txt">lines are yours</span><span class="chip ${tone}" style="background:${PAL[tone]}">${esc(label)}</span>`
+    const v = b.version >= 2 && b.verdict, sc = v?.score;
+    const [tone, label] = stale ? ['no', 'Out of date'] : so ? (so.decision === 'aprobar' ? ['ok', 'Signed'] : ['bad', 'Sent back']) : v ? VERDICT[v.status] || ['warn', v.label] : [laneTone(b.lane.id, b.lane.tone), laneName(b.lane.id, b.lane.name)];
+    const num = v ? (sc && sc.value != null ? `<span class="num">${sc.value}<small> / 10</small></span><span class="txt">review score</span>` : '<span class="num">–</span><span class="txt">no score yet</span>') : `<span class="num">${b.residue.lines}<small> / ${b.totals.lines}</small></span><span class="txt">lines are yours</span>`;
+    h = `${num}<span class="chip ${tone}" style="background:${PAL[tone]}">${esc(label)}</span>`
       + (stale ? `${seg}<button class="cta" id="bVerify">Verify again</button>` : `<button class="cta" id="bReview">${S.run.signoff ? 'View sign-off' : 'Review & sign'}</button>`);
   } else if (S.plan) h = `<span class="num">${S.plan.totals.files}<small> files</small></span><span class="txt">+${S.plan.totals.added} −${S.plan.totals.removed} · not verified yet</span>${seg}<button class="cta" id="bVerify">Verify</button>`;
   else h = '<span class="txt">Loading…</span>';
   $('fbar').innerHTML = h;
-  $('fbar').querySelectorAll('[data-m]').forEach((x) => (x.onclick = () => { S.mode = x.dataset.m; renderBar(); }));
+  $('fbar').querySelectorAll('[data-p]').forEach((x) => (x.onclick = () => { S.profile = x.dataset.p; store.set('katse.profile', S.profile); renderBar(); }));
   if ($('bVerify')) $('bVerify').onclick = () => verify();
   if ($('bReview')) $('bReview').onclick = openReview;
   if ($('bBack')) $('bBack').onclick = closeGraph;
@@ -790,7 +807,7 @@ async function verify() {
   const seq = openSeq, p = S.cur;
   S.starting = true; renderBar();
   try {
-    const r = await api(`/projects/${S.pid}/verify`, { body: { pr: p.id, options: { mode: S.mode === 'full' ? 'completo' : 'rapido', mutants: 4 } } });
+    const r = await api(`/projects/${S.pid}/verify`, { body: { pr: p.id, options: { mode: 'completo', profile: S.profile, mutants: 4 } } });
     S.starting = false;
     p.running = r.runId; // the tree and a reopen show it as running until the next reload
     if (S.cur?.id === p.id) S.cur.running = r.runId;
@@ -803,6 +820,16 @@ async function verify() {
     return false;
   }
 }
+/* What the real pipeline is doing right now, in a few words (its events: contract, candidate, debate, attack, result, judgment). */
+function liveText(e) {
+  if (e.type === 'contract') return `Contract: ${e.expectations?.length || 0} expectations`;
+  if (e.type === 'candidate') return `Alternative ${e.id}: ${CAND[e.status] || e.status}`;
+  if (e.type === 'debate') return `Debate: ${e.candidate} ${e.round === 'results' ? 'after the tests' : 'reviews the other proposal'}`;
+  if (e.type === 'attack') return `Attack ${e.id}: ${e.status}`;
+  if (e.type === 'result') return `${e.version}: ${e.status} · ${e.ran || 0} tests`;
+  if (e.type === 'judgment') return `Judge: ${VERDICT[e.verdict?.status]?.[1] || e.verdict?.label || 'done'}`;
+  return null;
+}
 function attach(runId, seq = openSeq) {
   stopStream();
   const prId = S.cur.id;
@@ -813,7 +840,9 @@ function attach(runId, seq = openSeq) {
   es.onmessage = async (m) => {
     if (S.es !== es) return;
     const e = JSON.parse(m.data);
+    const live = liveText(e);
     if (e.type === 'stage' && e.status === 'start') { S.stage = STAGE[e.id] || e.name; renderBar(); }
+    else if (live) { S.stage = live; renderBar(); }
     else if (e.type === 'end') {
       stopStream();
       try {
@@ -845,32 +874,55 @@ function openReview() {
   if ($('full').hidden || !S.run?.brief) return; // the drawer belongs to the open branch, never to the tree
   const run = S.run, b = run.brief, so = run.signoff;
   $('dk').textContent = `${name(S.cur)} · ${S.cur.branch}`;
-  $('dt').textContent = so ? (so.decision === 'aprobar' ? 'Signed' : 'Sent back') : laneName(b.lane.id, b.lane.name);
-  const lead = so ? (so.decision === 'aprobar' ? 'Signed. The answers, what was read and the merge commands are below.' : 'Sent back to the author. The answers are below.') : LANE[b.lane.id]?.[1] || b.lane.summary;
+  const v2 = b.version >= 2 && b.verdict;
+  $('dt').textContent = so ? (so.decision === 'aprobar' ? 'Signed' : 'Sent back') : v2 ? VERDICT[b.verdict.status]?.[1] || b.verdict.label : laneName(b.lane.id, b.lane.name);
+  const lead = so ? (so.decision === 'aprobar' ? 'Signed. The answers, what was read and the merge commands are below.' : 'Sent back to the author. The answers are below.') : v2 ? 'AI agents rebuilt the change from the base, debated, attacked the PR and a judge scored it. The evidence is below; your signature is the approval.' : LANE[b.lane.id]?.[1] || b.lane.summary;
   const H = [`<p class="lead">${esc(lead)}</p>`];
-  if (b.recommendation) H.push(`<p class="lead" style="margin-top:6px">Recommendation: <b style="color:var(--fg);font-weight:500">${esc(RECO[b.recommendation.id] || b.recommendation.name)}</b></p>`);
+  if (b.version >= 2 && b.verdict) H.push(v2HTML(b));
+  if (b.recommendation && !(b.version >= 2)) H.push(`<p class="lead" style="margin-top:6px">Recommendation: <b style="color:var(--fg);font-weight:500">${esc(RECO[b.recommendation.id] || b.recommendation.name)}</b></p>`);
   if (b.questions.length) H.push(`<div class="sec"><h3>Decide <span>${b.questions.length}</span></h3>${b.questions.map((q) => `<div class="q"><p>${esc(q.text)}</p>${q.options.map((o) => `<label class="opt"><input type="radio" name="q-${esc(q.id)}" value="${esc(o)}" ${so?.answers?.[q.id] === o ? 'checked' : ''} ${so ? 'disabled' : ''}>${esc(OPTION[o] || o)}</label>`).join('')}</div>`).join('')}</div>`);
   if (b.residue.items.length) H.push(`<div class="sec"><h3>Read <span>${b.residue.lines} lines</span></h3>${b.residue.items.map((i) => `<details class="res"><summary>${esc(base(i.file))}:${i.start}${i.end !== i.start ? '–' + i.end : ''}<span>${i.lines} ${i.lines === 1 ? 'line' : 'lines'}</span></summary>${codeHTML(i)}</details>`).join('')}</div>`);
   H.push(`<div class="sec"><h3>Checked</h3><div class="list">${b.claims.map((c) => `<div class="li"><i style="background:${PAL[CLAIM[c.status][0]]}"></i><span><b>${CLAIM[c.status][1]}</b> · ${esc(c.text)}</span></div>`).join('')}</div></div>`);
   H.push(`<div class="sec"><details class="more2"><summary>Not checked · ${b.notChecked.length} ›</summary><div class="list">${b.notChecked.map((n) => `<div class="li"><i></i><span><b>${esc(n.what)}</b> · ${esc(n.why)}</span></div>`).join('')}</div></details></div>`);
   H.push(so ? signedHTML(run) : signHTML(b));
   H.push(`<div class="foot"><span><button class="link" id="mdlink">Full report</button></span><span>${b.options?.mode === 'completo' ? `Full run, ${b.options.agents?.length || 0} agents` : 'Quick run'} · ${secs(b.timing.totalMs)}${b.cost?.usd ? ` · $${b.cost.usd.toFixed(2)}` : ''}</span></div>
-    <div class="foot" style="margin-top:10px"><span>Verify again:&nbsp; <button class="link" data-again="quick">Quick</button>${S.agents.length ? ` · <button class="link" data-again="full" title="${Math.min(3, S.agents.length)} agents redo the change blind. Takes minutes.">Full, with agents</button>` : ''}</span></div>`);
+    <div class="foot" style="margin-top:10px"><span>Verify again:&nbsp; ${Object.entries(PROFILE).map(([id, [n, d]]) => `<button class="link" data-again="${id}" title="${esc(d)}">${n}</button>`).join(' · ')}${b.version >= 2 && b.contract ? ' · <button class="link" id="goDeep" title="Keeps the contract and verified patches; runs the tests again">Continue with Deep</button>' : ''}</span></div>`);
   $('dbody').innerHTML = H.join('');
   $('dbody').scrollTop = 0;
   $('drawer').hidden = false;
   $('mdlink').onclick = async () => showText('Full report', await (await fetch(`/api/projects/${S.pid}/runs/${run.id}/report`)).text());
-  $('dbody').querySelectorAll('[data-again]').forEach((x) => (x.onclick = () => { S.mode = x.dataset.again; $('drawer').hidden = true; verify(); }));
+  $('dbody').querySelectorAll('[data-again]').forEach((x) => (x.onclick = () => { S.profile = x.dataset.again; store.set('katse.profile', S.profile); $('drawer').hidden = true; verify(); }));
+  if ($('goDeep')) $('goDeep').onclick = async () => {
+    const seq = openSeq; $('drawer').hidden = true; S.starting = true; renderBar();
+    try { const r = await api(`/projects/${S.pid}/runs/${run.id}/continue`, { body: { profile: 'deep' } }); S.starting = false; if (alive(seq)) attach(r.runId, seq); }
+    catch (e) { S.starting = false; if (alive(seq)) renderBar(e.message); }
+  };
   if (so) bindSigned(run); else bindSign(run);
 }
+function v2HTML(b) {
+  const v = b.verdict, sc = v.score, [tone, label] = VERDICT[v.status] || ['warn', v.label];
+  const cands = b.candidates || [], debate = Array.isArray(b.debate) ? b.debate : b.debate?.entries || [];
+  const parts = (sc?.components || []).map((c) => `<div class="li"><i style="background:${PAL[c.earned >= c.max ? 'ok' : c.earned > 0 ? 'warn' : 'no']}"></i><span><b>${esc(c.label)} · ${esc(c.earned)}/${esc(c.max)}</b> · ${esc(c.reason)}</span></div>`).join('');
+  const caps = (sc?.caps || []).map((c) => `<div class="li"><i style="background:var(--warn)"></i><span><b>Capped at ${esc(c.max)}/10</b> · ${esc(c.reason)}</span></div>`).join('');
+  const finds = (v.findings || []).map((f) => { const [t, what] = FIND[f.classification] || ['no', f.classification]; return `<details class="res"><summary>${esc(f.attack || '')} · ${esc(what)}<span><i class="dot" style="background:${PAL[t]}"></i></span></summary><div class="li2"><p>${esc(f.hypothesis || '')}</p>${f.scenario ? `<p><b>Scenario</b> ${esc(f.scenario)}</p>` : ''}${(f.outcomes || []).map((o) => `<p><b>${esc(o.version)}</b> ${esc({ passed: 'passes', failed: 'fails', pending: 'pending' }[o.outcome] || o.outcome)}</p>`).join('')}${f.reason ? `<p>${esc(f.reason)}</p>` : ''}</div></details>`; }).join('');
+  const talk = debate.filter((d) => d.status !== 'incomplete').map((d) => `<div class="q"><p><b>${esc(d.candidate)} · ${esc(modelName(d.model))}</b> <span style="color:var(--fg3)">${d.round === 'results' ? 'after the tests' : 'on the proposals'}</span></p>${d.strength ? `<p class="lead"><b>Strength</b> ${esc(d.strength)}</p>` : ''}${d.risk ? `<p class="lead"><b>Risk</b> ${esc(d.risk)}</p>` : ''}${d.scenario ? `<p class="lead"><b>Test idea</b> ${esc(d.scenario)}</p>` : ''}${d.revision ? `<p class="lead"><b>Would change</b> ${esc(d.revision)}</p>` : ''}</div>`).join('');
+  return `<div class="sec"><h3>Judge <span>${esc(modelName(b.providers?.review || 'carbon'))}</span></h3><div class="done"><b style="font-size:30px">${sc?.value != null ? `${esc(sc.value)}<small style="font-size:16px;color:var(--fg3)"> / 10</small>` : 'No score'}</b> <span class="chip ${tone}" style="background:${PAL[tone]};margin-left:8px">${esc(label)}</span>
+      <p>A heuristic rubric about the PR as written, not a probability of no bugs.${v.pending?.length ? ` ${v.pending.length} open ${v.pending.length === 1 ? 'blocker' : 'blockers'}.` : ''}</p></div>
+      ${parts || caps ? `<div class="list" style="margin-top:10px">${parts}${caps}</div>` : ''}
+      ${v.semantic?.explanation ? `<details class="more2" style="margin-top:10px"><summary>What the judge says ›</summary><p class="lead">${esc(v.semantic.explanation)}</p></details>` : ''}</div>
+    ${finds ? `<div class="sec"><h3>Attacks on the PR <span>${(v.findings || []).length}</span></h3>${finds}</div>` : ''}
+    ${talk ? `<div class="sec"><h3>Debate between the alternatives <span>${debate.length}</span></h3>${talk}</div>` : ''}
+    ${cands.length ? `<div class="sec"><h3>Alternatives from the base <span>${cands.length}</span></h3><div class="list">${cands.map((c) => `<div class="li"><i style="background:${PAL[c.status === 'built' ? 'agent' : 'no']}"></i><span><b>${esc(c.id)} · ${esc(modelName(c.model))}</b> · ${esc(CAND[c.status] || c.status)}${c.final ? ' · final' : ''}</span></div>`).join('')}</div></div>` : ''}
+    ${b.budget ? `<div class="sec"><h3>Budget</h3><p class="lead">${esc(PROFILE[b.options?.profile]?.[0] || b.options?.profile || '')} · ${secs(b.budget.elapsedMs || b.timing?.totalMs || 0)} of ${secs(b.budget.limitMs || 0)} · ${(b.budget.accounting?.observed ?? b.budget.tokens ?? 0).toLocaleString('en-GB')} tokens reported</p></div>` : ''}`;
+}
 function signHTML(b) {
-  const hard = b.rules.fired.some((r) => HARD.includes(r.id));
+  const hard = (b.version >= 2 && b.verdict && b.verdict.status !== 'ready-for-human') || b.rules.fired.some((r) => HARD.includes(r.id));
   return `<div class="sec"><h3>Sign</h3><p class="lead">The automatic review is advice. Your signature is the approval.${b.audit ? ' This area is on probation: a second person will audit it.' : ''}</p>
     <div class="field"><label for="signer">Your name</label><input type="text" id="signer" value="${esc(store.get('katse.signer') || '')}" placeholder="Full name"></div>
     ${b.residue.items.length ? `<label class="ck"><input type="checkbox" id="ckRes"><span>I read the residue: ${b.residue.lines} lines</span></label>` : ''}
     <label class="ck"><input type="checkbox" id="ckNot"><span>I reviewed the ${b.notChecked.length} things that were not checked</span></label>
     <div class="field"><label for="risk">Residual risk I accept</label><textarea id="risk" rows="3" placeholder="In your words: what could still go wrong, and why you accept it."></textarea></div>
-    <div class="btns"><button class="cta ghost" id="sendBack">Send back</button><button class="cta" id="sign" ${hard ? 'disabled title="A change that does not build or breaks tests cannot be accepted"' : ''}>Accept &amp; sign</button></div>
+    <div class="btns"><button class="cta ghost" id="sendBack">Send back</button><button class="cta" id="sign" ${hard ? 'disabled title="Checks are missing or the PR fails: read the report"' : ''}>Accept &amp; sign</button></div>
     <div class="err" id="serr"></div></div>`;
 }
 /* `run` is the run this drawer was built from. If the open branch changed underneath, nothing is sent. */
@@ -883,10 +935,10 @@ function bindSign(run) {
     const residueOk = !!$('ckRes')?.checked, notOk = !!$('ckNot')?.checked, risk = $('risk').value.trim();
     // Same rules the server enforces, said in English before the round trip.
     const open = b.questions.filter((q) => !answers[q.id]).length;
-    const hard = b.rules.fired.find((r) => HARD.includes(r.id));
+    const hard = (b.version >= 2 && b.verdict && b.verdict.status !== 'ready-for-human') || b.rules.fired.find((r) => HARD.includes(r.id));
     const problem = !signer ? 'Write your name: a person signs, not the tool.'
       : decision !== 'aprobar' ? ''
-      : hard ? 'This change cannot be accepted: it does not build or it breaks tests. Send it back.'
+      : hard ? 'This change cannot be accepted yet: checks are missing or it fails. Send it back or verify again.'
       : open ? `Answer the ${open === 1 ? 'open question' : `${open} open questions`} first.`
       : b.residue.items.length && !residueOk ? 'Confirm that you read the residue.'
       : !notOk ? 'Confirm that you reviewed what was not checked.'
