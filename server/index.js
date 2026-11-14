@@ -27,6 +27,7 @@ import { graphScope, trustProgress, eligible } from './graph-review.js';
 import { runIndex } from './runs.js';
 import { reviewNode, savedReview, requirementOf } from './math/nodereview.js';
 import { attention as attentionOf } from './math/attention.js';
+import { projectContext, changeContext, spotContext } from './context.js';
 
 const PORT = Number(process.env.PORT || 4173);
 const UI = path.join(ROOT, 'mvp');
@@ -264,6 +265,17 @@ async function api(req, res, url) {
         trust = trustProgress(scope,reports);
       } catch {}
       return send(res, 200, { ...m, trust, marks: marksOf(project.id, m.head) });
+    }
+    if (sub === 'context') { // in words: what the project is, what a change is for, what one function does (the voice assistant explains with it)
+      const about = url.searchParams.get('about') || 'project', prId = url.searchParams.get('pr'), node = url.searchParams.get('node');
+      const out = {};
+      if (about === 'project' || !prId) out.project = await projectContext(project);
+      if (prId && about !== 'project') {
+        const pr = await findPullRequest(project, prId);
+        if (about === 'change') out.change = await changeContext(project, pr);
+        if (about === 'spot') out.spot = await spotContext(project, await mathAnalyze(project, pr), String(node || ''));
+      }
+      return send(res, 200, out);
     }
     if (sub === 'plan') {
       const pr = await findPullRequest(project, url.searchParams.get('pr'));

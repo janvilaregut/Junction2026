@@ -44,6 +44,7 @@ TOOLS.push(
   { name: 'look_deeper', description: 'The user wants the change looked at harder: launches a Deep review (up to 15 min, real cost). ASK FOR A YES FIRST.', parameters: T() },
   { name: 'run_tests', description: 'The second way to settle a spot: back it with EXECUTABLE TESTS instead of agents. The full pipeline (contract, alternatives rebuilt from the base, attacks, a probe that runs) on the chosen functions; only this moves "% tested" on the bar. Only changed C# functions; takes minutes and real model cost, bounded by the depth: quick (90 s, cannot settle a spot), standard (5 min), deep (15 min). ASK FOR A YES FIRST. scope: "spot" (query, else the one open, else the next pending one), "all" (the whole change), "continue" (same contract, new budget, after a review that ended with not enough evidence). Use it for "test this", "back it with tests", "run the tests on this spot", "test the whole change", "continue the investigation".', parameters: T({ scope: { type: 'STRING', enum: ['spot', 'all', 'continue'] }, query: { type: 'STRING' }, depth: { type: 'STRING', enum: ['quick', 'standard', 'deep'], description: 'Optional: change the review depth first.' } }, ['scope']) },
   { name: 'open_report', description: 'Open the report of the last full review of this pull request: the verdict card with the score, what was and was not checked and the evidence; it is where the person signs or sends it back. Use it for "show me the report / the verdict / the score", "I want to sign". If there is no review yet it says so (start_verification runs one).', parameters: T() },
+  { name: 'explain_context', description: 'What things ARE, in words, so you can explain them instead of reciting numbers. about "project": what this repository is and does (its own README) and how it is laid out. about "change": what the open pull request was asked to do (the linked issue, the recorded prompt or its commit messages) and which parts it touches. about "spot": what one function does: its own comment, its code, who calls it, what it calls and which tests reach it (query: the function; empty = the one open). Call it BEFORE explaining what something does or why it matters, and whenever the user asks "what is this", "what does it do", "what is this for", "explain it", "why does this matter".', parameters: T({ about: { type: 'STRING', enum: ['project', 'change', 'spot'] }, query: { type: 'STRING' } }, ['about']) },
   { name: 'open_project', description: 'Switch to another project (repository), or with an empty query show the project picker with every project and how many branches each has to review. Use it for "open the project X", "change project", "show me the projects".', parameters: T({ query: { type: 'STRING', description: 'Project name or part of it; empty = show the picker.' } }) },
 );
 // Retired: the bubbles story. Agents are shown in one place only, the review tree (open_review); the raw
@@ -89,6 +90,22 @@ function findPR(q) {
 async function waitFor(cond, ms = 6000) { const t = performance.now(); while (!cond() && performance.now() - t < ms) await sleep(80); return cond(); }
 const clip = (s, n = 400) => (s && String(s).length > n ? String(s).slice(0, n) + '…' : s);
 const projectList = () => (app()?.projects || []).map((p) => ({ name: p.name, base: p.base, toReview: app().counts?.[p.id]?.review ?? null, current: p.id === app().pid }));
+/* What things are, in words (server/context.js). Kept for the page's life: it only changes with the code. */
+const CONTEXT = new Map();
+async function context(about, node) {
+  const s = app(); if (!s?.pid) return null;
+  const pr = about === 'project' ? '' : s.cur?.id || '';
+  const key = [s.pid, about, pr, s.cur?.sha || '', node || ''].join('|');
+  if (!CONTEXT.has(key)) {
+    try {
+      const r = await fetch(`/api/projects/${s.pid}/context?about=${about}${pr ? `&pr=${encodeURIComponent(pr)}` : ''}${node ? `&node=${encodeURIComponent(node)}` : ''}`);
+      const d = await r.json();
+      if (!r.ok || d.error) return null;
+      CONTEXT.set(key, d[about] || null);
+    } catch { return null; }
+  }
+  return CONTEXT.get(key);
+}
 /* The project picker covers the branch tree: step into the current project before pointing at its branches. */
 const leaveProjects = () => { if (view() === 'projects' && app()?.pid) call('pickProject', app().pid); };
 /* How much of the change executable tests back (only changed C# functions can be tested). */
@@ -177,8 +194,8 @@ const TOOL_FN = {
     if (!s?.focus && !s?.zoom) { call('highlightLanes', [p.id]); await sleep(420); call('highlightLanes', []); }
     call('openGraph', p); // grows out of the branch's own dot in the tree
     act(`Opened ${p.branch}`);
-    await waitFor(() => app()?.run?.brief || app()?.plan, 8000);
-    return { opened: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)), verification: briefOf(app()?.run?.brief, 'summary'), notVerifiedYet: !app()?.run?.brief };
+    const [, change] = await Promise.all([waitFor(() => app()?.run?.brief || app()?.plan, 8000), context('change')]);
+    return { opened: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)), whatItIsFor: change ? { askedFor: clip(change.askedFor?.text, 700), from: change.askedFor?.from, touches: change.touches } : undefined, verification: briefOf(app()?.run?.brief, 'summary'), notVerifiedYet: !app()?.run?.brief, note: 'Say first what this change is for, in one plain sentence taken from whatItIsFor; then where it stands.' };
   },
   async go_home() { leaveProjects(); const was = inGraph(); call('closeGraph'); if (!was) call('hideCommits'); act('Back home'); return { ok: true }; },
   async show_commits({ query = '' } = {}) {
@@ -335,9 +352,11 @@ const TOOL_FN = {
     const info = call('codeInfo');
     // No code to read (documentation, configuration, removed code, an unchanged neighbour): its evidence card instead.
     if (!info) return { spot: node.m?.qname || node.label, panel: 'evidence card', colour: node.m?.verdict, why: node.m?.claim, note: 'This spot has no code panel: its evidence card is open next to it. Say what it is in one sentence. Agents do not review it.' };
-    return { panel: 'code, on the right', ...info, note: info.canReviewWithAgents
-      ? 'The code panel is open; the agents have NOT been started. Say in one or two sentences what this spot is and which lines deserve reading, then ask whether they want the agents to review it (open_review) or prefer to read it themselves (mark_read when they say they read it).'
-      : 'The code panel is open. Say in one or two sentences what it shows. Agents do not review this kind of spot.' };
+    const about = node.m ? await context('spot', node.m.id) : null;
+    const whatItDoes = about ? { itsOwnComment: about.itsOwnComment, change: about.change, calledBy: about.calledBy.slice(0, 6), calls: about.calls.slice(0, 6), testedBy: about.testedBy.slice(0, 4), code: clip(about.code, 1400) } : undefined;
+    return { panel: 'code, on the right', whatItDoes, ...info, note: info.canReviewWithAgents
+      ? 'The code panel is open; the agents have NOT been started. Say in one or two sentences what this function DOES and what the change did to it (from whatItDoes, in plain words, no metrics), and which part deserves reading. Then ask whether they want the agents to review it (open_review) or prefer to read it themselves (mark_read when they say they read it).'
+      : 'The code panel is open. Say in one or two sentences what it is and does. Agents do not review this kind of spot.' };
   },
   async spot_tab({ tab }) {
     const mode = { code: 'code', all_code: 'all', evidence: 'ev', dependencies: 'deps' }[tab];
@@ -447,6 +466,17 @@ const TOOL_FN = {
     if (!r || r.error) return { error: r?.error || 'Could not open the report.' };
     act(s.run?.signoff ? 'Sign-off' : 'Report');
     return { ...r, summary: briefOf(b, 'summary'), scopedToSomeFunctions: !!b?.graphReview || undefined, note: r.live ? 'The review is still running: the tree grows live.' : 'The verdict card is on screen. Say the verdict and the score in one sentence and what blocks approval, if anything. Signing is done by the person in the card, never by you.' };
+  },
+  async explain_context({ about = 'project', query = '' } = {}) {
+    const s = app(); if (!s?.pid) return { error: 'No project is open. open_project shows them.' };
+    if (about === 'project') return (await context('project')) || { error: 'Could not read the project.' };
+    if (!s.cur || !inGraph()) return { error: 'Open a pull request first.' };
+    if (about === 'change') return (await context('change')) || { error: 'Could not read what this change is for.' };
+    if (!s.math) return { error: 'This graph has no functions to explain.' };
+    const node = query ? findSpot(query) : s.fixTarget || (call('codeInfo') ? (call('findNodes', call('codeInfo').spot) || [])[0] : null);
+    if (!node?.m) return { error: query ? `No function matches "${query}".` : 'Say which function: none is open.' };
+    const d = await context('spot', node.m.id);
+    return d ? { ...d, note: 'Explain what it does as you would to a colleague new to this code: its job, who relies on it, what this change did to it. Not line by line, no metrics.' } : { error: 'Could not read that function.' };
   },
   async open_project({ query = '' } = {}) {
     const s = app(), list = s?.projects || [];
