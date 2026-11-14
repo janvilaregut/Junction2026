@@ -231,7 +231,7 @@
     const mx = V.g.xE - Math.min(260, (V.g.xE - V.g.xS) * 0.35), my = (other.y + l.y) / 2;
     other.b.away = { x: mx, y: my - 12 }; l.b.away = { x: mx, y: my + 12 };
     say(other, other.said, -1); setTimeout(() => say(l, l.said, 1), 450);
-    setTimeout(() => { other.b.away = null; l.b.away = null; other.status = l.status = round === 'results' ? 'revised' : 'version ready'; }, 2600);
+    setTimeout(() => { other.b.away = null; l.b.away = null; if (V.playing || V.live) other.status = l.status = round === 'results' ? 'revised' : 'version ready'; }, 2600); // a finished replay keeps its final words
   }
   function attack(e) {
     const a = V.atk || (V.atk = { x: 0, y: 0, r: 0, tr: 10, status: '' });
