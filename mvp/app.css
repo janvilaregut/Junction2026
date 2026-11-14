@@ -300,3 +300,6 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 .vpop .vb{margin-top:12px;display:flex;justify-content:flex-end}.vpop .vb .cta{padding:9px 16px;font-size:13px}
 @media (max-width:760px){.vtog{top:20px;right:16px}.vhead{top:76px;max-width:calc(100vw - 32px)}.flegend{display:none}}
 .dmsg.below{transform:translate(-30px,0)}.dmsg.below>div{transform-origin:30px 0;border-bottom-left-radius:18px;border-top-left-radius:5px}
+
+.dbody code,.dbody .lead,.dbody .li2{overflow-wrap:anywhere}
+.dbody .sec .link{margin:4px 6px 4px 0}

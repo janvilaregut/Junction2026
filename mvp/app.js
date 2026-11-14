@@ -165,7 +165,7 @@ function renderTree() {
       const M = Math.max(16, Math.min(44 + dy * 0.45, W - 16 - tipX));
       const mx = tipX + M;
       const faint = !recent.includes(p) && dir < 0;
-      const g = mk('g', { class: 'lane' + (st.tone === 'warn' || st.tone === 'bad' ? ' pulse' : ''), 'data-pr': p.id, 'data-tx': tipX, 'data-ty': y, style: `transform-origin:0px ${mainY}px`, tabindex: 0, role: 'button', 'aria-label': `${name(p)}: ${p.title} (${st.label})` }, lanes);
+      const g = mk('g', { class: 'lane' + (st.tone === 'warn' || st.tone === 'bad' ? ' pulse' : ''), 'data-pr': p.id, 'data-tx': tipX, 'data-ty': y, style: `transform-origin:0px ${mainY}px;pointer-events:none` }, lanes);
       geo[p.id] = { p, st, col, dir, xf };
       const fork = `M${xf} ${mainY} C ${xf + R * .55} ${mainY}, ${xf + R * .45} ${y}, ${xf + R} ${y} L ${tipX} ${y}`;
       const merge = `M${tipX} ${y} C ${tipX + M * .55} ${y}, ${mx - M * .45} ${mainY}, ${mx} ${mainY}`;
@@ -182,13 +182,14 @@ function renderTree() {
         mk('circle', { cx: tipX, cy: y, r: faint ? 4 : 6.5, fill: col }, g);
         mk('circle', { cx: tipX, cy: y, r: faint ? 7 : 11, fill: 'none', stroke: col, 'stroke-opacity': .25, class: 'tipring' }, g);
       }
-      mk('text', { x: tipX, y: dir < 0 ? y - (faint ? 11 : 17) : y + 25, 'text-anchor': 'middle', class: 'lbl' + (faint ? ' old' : '') }, g).textContent = dir > 0 ? name(p) + ' · yours' : name(p);
-      mk('path', { d: faint ? fork : fork + ' ' + merge, fill: 'none', stroke: 'transparent', 'stroke-width': Math.max(GAP - 8, 18) }, g);
+      const hit = mk('g', { tabindex: 0, role: 'button', 'aria-label': `${name(p)}: ${p.title} (${st.label})`, style: 'pointer-events:all;cursor:pointer' }, g);
+      mk('rect', { x:tipX - 36, y:dir < 0 ? y - 34 : y - 14, width:72, height:48, fill:'transparent' }, hit);
+      mk('text', { x: tipX, y: dir < 0 ? y - (faint ? 11 : 17) : y + 25, 'text-anchor': 'middle', class: 'lbl' + (faint ? ' old' : '') }, hit).textContent = dir > 0 ? name(p) + ' · yours' : name(p);
       const enter = () => { svg.classList.add('hl'); g.classList.add('on'); showCard(p, st, tipX, y, dir); };
       const leave = () => { g.classList.remove('on'); $('card').classList.remove('on'); applyHighlight(); };
       const open = () => openGraph(p);
-      g.onmouseenter = enter; g.onmouseleave = leave; g.onfocus = enter; g.onblur = leave; g.onclick = open;
-      g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } else if (e.key === 'c') showCommits(p.id); };
+      g.onmouseenter = enter; g.onmouseleave = leave; hit.onfocus = enter; hit.onblur = leave; hit.onclick = open;
+      hit.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } else if (e.key === 'c') showCommits(p.id); };
     });
   };
   draw(inc, -1); draw(out, 1);
@@ -844,15 +845,24 @@ function liveText(e) {
   if (e.type === 'debate') return `Debate: ${e.candidate} ${e.round === 'results' ? 'after the tests' : 'reviews the other proposal'}`;
   if (e.type === 'attack') return `Attack ${e.id}: ${e.status}`;
   if (e.type === 'result') return `${e.version}: ${e.status} · ${e.ran || 0} tests`;
+  if (e.type === 'intent') return `Requested / implemented: ${e.status}`;
   if (e.type === 'judgment') return `Judge: ${VERDICT[e.verdict?.status]?.[1] || e.verdict?.label || 'done'}`;
   return null;
 }
 function attach(runId, seq = openSeq) {
   stopStream();
   const prId = S.cur.id;
+  renderGraph(model(null, S.plan || {files:S.run?.brief?.files || []}));
+  S.run = null; // Do not expose the previous verdict while a fresh review is running.
   Object.assign(S, { stage: 'Starting in an isolated copy', t0: Date.now() });
   const es = new EventSource(`/api/projects/${S.pid}/runs/${runId}/events`);
   S.es = es; renderBar();
+  api(`/projects/${S.pid}/runs/${runId}`).then(meta => {
+    if (S.es !== es || !alive(seq)) return;
+    const started = Date.parse(meta.startedAt);
+    if (Number.isFinite(started)) S.t0 = started;
+    renderBar();
+  }).catch(() => {});
   S.timer = setInterval(() => { if (S.es === es && alive(seq)) renderBar(); }, 1000);
   es.onmessage = async (m) => {
     if (S.es !== es) return;
@@ -895,14 +905,14 @@ function openReview() {
   $('dt').textContent = so ? (so.decision === 'aprobar' ? 'Signed' : 'Sent back') : v2 ? VERDICT[b.verdict.status]?.[1] || b.verdict.label : laneName(b.lane.id, b.lane.name);
   const lead = so ? (so.decision === 'aprobar' ? 'Signed. The answers, what was read and the merge commands are below.' : 'Sent back to the author. The answers are below.') : v2 ? 'AI agents rebuilt the change from the base, debated, attacked the PR and a judge scored it. The evidence is below; your signature is the approval.' : LANE[b.lane.id]?.[1] || b.lane.summary;
   const H = [`<p class="lead">${esc(lead)}</p>`];
-  if (b.version >= 2 && b.verdict) H.push(v2HTML(b), intentHTML(b));
+  if (b.version >= 2 && b.verdict) H.push(v2HTML(b), intentHTML(b), reviewEvidenceHTML(b));
   if (b.recommendation && !(b.version >= 2)) H.push(`<p class="lead" style="margin-top:6px">Recommendation: <b style="color:var(--fg);font-weight:500">${esc(RECO[b.recommendation.id] || b.recommendation.name)}</b></p>`);
   if (b.questions.length) H.push(`<div class="sec"><h3>Decide <span>${b.questions.length}</span></h3>${b.questions.map((q) => `<div class="q"><p>${esc(q.text)}</p>${q.options.map((o) => `<label class="opt"><input type="radio" name="q-${esc(q.id)}" value="${esc(o)}" ${so?.answers?.[q.id] === o ? 'checked' : ''} ${so ? 'disabled' : ''}>${esc(OPTION[o] || o)}</label>`).join('')}</div>`).join('')}</div>`);
   if (b.residue.items.length) H.push(`<div class="sec"><h3>Read <span>${b.residue.lines} lines</span></h3>${b.residue.items.map((i) => `<details class="res"><summary>${esc(base(i.file))}:${i.start}${i.end !== i.start ? '–' + i.end : ''}<span>${i.lines} ${i.lines === 1 ? 'line' : 'lines'}</span></summary>${codeHTML(i)}</details>`).join('')}</div>`);
-  H.push(`<div class="sec"><h3>Checked</h3><div class="list">${b.claims.map((c) => `<div class="li"><i style="background:${PAL[CLAIM[c.status][0]]}"></i><span><b>${CLAIM[c.status][1]}</b> · ${esc(c.text)}</span></div>`).join('')}</div></div>`);
+  H.push(`<div class="sec"><h3>Checked · builds, mutations and rewind</h3>${claimEvidenceHTML(b.claims)}</div>`);
   H.push(`<div class="sec"><details class="more2"><summary>Not checked · ${b.notChecked.length} ›</summary><div class="list">${b.notChecked.map((n) => `<div class="li"><i></i><span><b>${esc(n.what)}</b> · ${esc(n.why)}</span></div>`).join('')}</div></details></div>`);
   H.push(so ? signedHTML(run) : signHTML(b));
-  H.push(`<div class="foot"><span><button class="link" id="mdlink">Full report</button></span><span>${b.options?.mode === 'completo' ? `Full run, ${b.options.agents?.length || 0} agents` : 'Quick run'} · ${secs(b.timing.totalMs)}${b.cost?.usd ? ` · $${b.cost.usd.toFixed(2)}` : ''}</span></div>
+  H.push(`<div class="foot"><span><button class="link" id="mdlink">Full report</button></span><span>${b.options?.mode === 'completo' ? `Full review · recorded provider roles` : 'Quick run'} · ${secs(b.timing.totalMs)}${b.cost?.usd ? ` · $${b.cost.usd.toFixed(2)}` : ''}</span></div>
     <div class="foot" style="margin-top:10px"><span>Verify again:&nbsp; ${Object.entries(PROFILE).map(([id, [n, d]]) => `<button class="link" data-again="${id}" title="${esc(d)}">${n}</button>`).join(' · ')}${b.version >= 2 && b.contract ? ' · <button class="link" id="goDeep" title="Keeps the contract and verified patches; runs the tests again">Continue with Deep</button>' : ''}</span></div>`);
   $('dbody').innerHTML = H.join('');
   $('dbody').querySelectorAll('[data-art]').forEach(x => { x.onclick = async () => {
@@ -927,13 +937,13 @@ function v2HTML(b) {
   const caps = (sc?.caps || []).map((c) => `<div class="li"><i style="background:var(--warn)"></i><span><b>Capped at ${esc(c.max)}/10</b> · ${esc(c.reason)}</span></div>`).join('');
   const finds = (v.findings || []).map((f) => { const [t, what] = FIND[f.classification] || ['no', f.classification]; return `<details class="res"><summary>${esc(f.attack || '')} · ${esc(what)}<span><i class="dot" style="background:${PAL[t]}"></i></span></summary><div class="li2"><p>${esc(f.hypothesis || '')}</p>${f.scenario ? `<p><b>Scenario</b> ${esc(f.scenario)}</p>` : ''}${(f.outcomes || []).map((o) => `<p><b>${esc(o.version)}</b> ${esc({ passed: 'passes', failed: 'fails', pending: 'pending' }[o.outcome] || o.outcome)}</p>`).join('')}${f.reason ? `<p>${esc(f.reason)}</p>` : ''}</div></details>`; }).join('');
   const talk = debate.filter((d) => d.status !== 'incomplete').map((d) => `<div class="q"><p><b>${esc(d.candidate)} · ${esc(modelName(d.model))}</b> <span style="color:var(--fg3)">${d.round === 'results' ? 'after the tests' : 'on the proposals'}</span></p>${d.strength ? `<p class="lead"><b>Strength</b> ${esc(d.strength)}</p>` : ''}${d.risk ? `<p class="lead"><b>Risk</b> ${esc(d.risk)}</p>` : ''}${d.scenario ? `<p class="lead"><b>Test idea</b> ${esc(d.scenario)}</p>` : ''}${d.revision ? `<p class="lead"><b>Would change</b> ${esc(d.revision)}</p>` : ''}</div>`).join('');
-  return `${b.providers?.available?.diverse === false ? '<div class="sec"><p class="lead">NVIDIA / Verda was unavailable in this run. Google substitutions are recorded on the candidates; this run does not validate Nemotron.</p></div>' : ''}<div class="sec"><h3>Judge <span>${esc(modelName(b.providers?.review || 'carbon'))}</span></h3><div class="done"><b style="font-size:30px">${sc?.value != null ? `${esc(sc.value)}<small style="font-size:16px;color:var(--fg3)"> / 10</small>` : 'No score'}</b> <span class="chip ${tone}" style="background:${PAL[tone]};margin-left:8px">${esc(label)}</span>
+  return `${b.providers?.available?.diverse === false ? '<div class="sec"><p class="lead">NVIDIA / Verda was unavailable in this run. Google substitutions are recorded on the candidates; this run does not validate Nemotron.</p></div>' : ''}<div class="sec"><h3>Judge <span>${esc(modelName(b.providers?.models?.review || 'carbon'))}</span></h3><div class="done"><b style="font-size:30px">${sc?.value != null ? `${esc(sc.value)}<small style="font-size:16px;color:var(--fg3)"> / 10</small>` : 'No score'}</b> <span class="chip ${tone}" style="background:${PAL[tone]};margin-left:8px">${esc(label)}</span>
       <p>A heuristic rubric about the PR as written, not a probability of no bugs.${v.pending?.length ? ` ${v.pending.length} open ${v.pending.length === 1 ? 'blocker' : 'blockers'}.` : ''}</p></div>
       ${parts || caps ? `<div class="list" style="margin-top:10px">${parts}${caps}</div>` : ''}
       ${v.semantic?.explanation ? `<details class="more2" style="margin-top:10px"><summary>What the judge says ›</summary><p class="lead">${esc(v.semantic.explanation)}</p></details>` : ''}</div>
     ${finds ? `<div class="sec"><h3>Attacks on the PR <span>${(v.findings || []).length}</span></h3>${finds}</div>` : ''}
     ${talk || debate.some(d => d.status === 'incomplete') ? `<div class="sec"><h3>Debate between the alternatives <span>${debate.length}</span></h3>${talk}${debate.filter(d => d.status === 'incomplete').map(d => `<p class="lead">${esc(d.candidate)} · ${esc(d.round)} · incomplete: ${esc(d.reason || 'No response')}</p>`).join('')}</div>` : ''}
-    ${cands.length ? `<div class="sec"><h3>Alternatives from the base <span>${cands.length}</span></h3><div class="list">${cands.map((c) => `<div class="li"><i style="background:${PAL[c.status === 'built' ? 'agent' : 'no']}"></i><span><b>${esc(c.id)} · ${esc(modelName(c.model))}</b> · ${esc(CAND[c.status] || c.status)}${c.final ? ' · final' : ''}</span></div>`).join('')}</div></div>` : ''}
+    ${cands.length ? `<div class="sec"><h3>Alternatives from the base <span>${cands.length}</span></h3><div class="list">${cands.map((c) => `<div class="li"><i style="background:${PAL[c.status === 'built' ? 'agent' : 'no']}"></i><span><b>${esc(c.id)} · ${esc(modelName(c.model))}</b> · ${esc(CAND[c.status] || c.status)}${c.final ? ' · selected for comparison' : ''}</span></div>`).join('')}</div></div>` : ''}
     ${b.budget ? `<div class="sec"><h3>Budget</h3><p class="lead">${esc(PROFILE[b.options?.profile]?.[0] || b.options?.profile || '')} · ${secs(b.budget.elapsedMs || b.timing?.totalMs || 0)} of ${secs(b.budget.limitMs || 0)} · ${(b.budget.accounting?.observed ?? b.budget.tokens ?? 0).toLocaleString('en-GB')} tokens reported</p></div>` : ''}`;
 }
 function intentHTML(b) {

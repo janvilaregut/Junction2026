@@ -38,7 +38,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   const artifacts = path.join(runDir, 'artifacts'); fs.mkdirSync(artifacts, { recursive: true });
   const tempRoot = path.join(os.tmpdir(), 'katse', path.basename(runDir)); fs.mkdirSync(tempRoot, { recursive: true });
   const state = { version: 2, contract: null, candidates: [], attacks: [], evidence: [], sessions: [], groups: [], finalMissions: [], pending: [], debate: [], requiredFinalMissions: profile.finalMissions, budget: { profile: profile.id, tokenLimit: profile.tokenBudget, limitMs: budgetMs, generationEnd, finalEnd, deadline, concurrency: { models: 2, runners: 1 }, maxCandidates: profile.initialCandidates + profile.maxDescendants, maxGenerations: profile.maxDescendants ? 2 : 1, formula: 'two independent candidates; additional work only for unresolved risks within profile', priorityFormula: 'R*(1+U+D)/(C*(1+N))', heuristics: true } };
-  let it, baseline, baselineTask, resume, original, reviewerDir, complete = false, semantic = null;
+  let it, baseline, baselineTask, finalAttackTask, resume, original, reviewerDir, complete = false, semantic = null;
   const save = () => writeJSON(path.join(artifacts, 'pipeline.json'), { ...state, candidates: state.candidates.map(stripCandidate) });
   const pending = (where, error) => { const text = redact(error.message || error); if (error.sessionRecord) state.sessions.push(error.sessionRecord); state.pending.push({ where, text }); emit({ type: 'log', text: `${where}: ${text}` }); save(); };
   const recordSession = r => { state.sessions.push({ id: r.id, model: r.model, sessionId: r.sessionId, history: r.history, artifact: r.artifact, ms: r.ms }); save(); return r.result; };
@@ -68,6 +68,15 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       const feedback = parent ? state.evidence.filter(e => e.version === parent.id).map(e => ({ status: e.status, failures: e.tests?.filter(t => t.outcome === 'Failed'), log: e.log && fs.readFileSync(path.join(artifacts, e.log), 'utf8').slice(-7000) })) : [];
       let result = await session({ dir, artifacts, role: `build-${id}`, model, timeout: 75000, noTools: true, maxOutputTokens: 4096, maxInputTokens: 14000,
         prompt: `Independently solve this contract from PRE-CHANGE source. The proposed patch is hidden. NO tools, commands or full file rewrites. Return at most 4 block replacements as JSON {"summary":"brief","decisions":["brief"],"unresolved":[],"edits":[{"block":"B1","new":"COMPLETE replacement for that block, including its unchanged context lines"}]}. Select only supplied block IDs. Copy unchanged lines within each edited block exactly. Do NOT include block labels in new. Do not invent or edit methods outside these blocks. Return the complete replacement block. Preserve indentation. Strategy: ${c.strategy}. For descendants edit the current parent source. Original requirement (independent of the proposed patch): ${state.requirementContext}\nContract: ${JSON.stringify(state.contract.expectations.map(({testIdeas,symbols,...e})=>e))}\nSource excerpts: ${context}\nParent feedback: ${JSON.stringify(feedback)}`, validate: x => typeof x.summary === 'string' && Array.isArray(x.edits) });
+      // An explicit no-change answer is not malformed JSON. Do not spend another
+      // model call asking it to invent a patch, especially for an unchanged parent.
+      if (!result.result.edits.length) {
+        recordSession(result); c.session = { id: result.sessionId, artifact: result.artifact };
+        c.summary = result.result.summary; c.decisions = result.result.decisions; c.unresolved = result.result.unresolved;
+        c.status = parent ? 'duplicate' : 'empty';
+        if (parent) c.duplicateOf = parent.id;
+        return;
+      }
       try { applyProposal(dir, result.result.edits, state.sourcePaths, blocks); }
       catch (error) {
         recordSession(result);
@@ -130,7 +139,8 @@ async function executeComplete(args, { intake, verifyBaseline }) {
   async function deliberate(afterExecution = false) {
     const built = state.candidates.filter(c => c.status === 'built').slice(0,2);
     if (built.length < 2 || profile.id === 'quick') return;
-    if (afterExecution && Date.now() + 18000 >= finalEnd) return;
+    // Optional discussion must never displace an unvalidated candidate.
+    if (afterExecution && (!state.budget.candidateValidation?.complete || Date.now() + 26000 >= finalEnd)) return;
     const proposals = built.map(c=>({id:c.id,decisions:c.decisions,unresolved:c.unresolved,patch:fs.readFileSync(path.join(artifacts,c.patch),'utf8').slice(0,6500)}));
     const outcomes = afterExecution ? state.evidence.map(e=>({version:e.version,status:e.status,ran:e.ran,failures:e.tests?.filter(t=>t.outcome==='Failed').map(t=>({name:t.name,error:t.error?.slice(0,1200)}))})) : [];
     await Promise.allSettled(built.map(async c=>{
@@ -140,6 +150,19 @@ async function executeComplete(args, { intake, verifyBaseline }) {
         state.debate.push({candidate:c.id,model:c.model,round:afterExecution?'results':'proposals',...reply});
         emit({type:'debate',candidate:c.id,round:afterExecution?'results':'proposals',...reply});save();
       } catch(e) { state.debate.push({candidate:c.id,round:afterExecution?'results':'proposals',status:'incomplete',reason:e.message}); }
+    }));
+  }
+
+  async function prepareFinalAttacks() {
+    const finalists = chooseCandidates(state.candidates, state.evidence, state.attacks);
+    const champion = state.candidates.find(c => c.id === finalists[0]?.id);
+    if (champion) champion.final = true;
+    state.frozen = { A: original.tree, B: champion?.tree, selected: champion?.id, contract: state.contract.hash };
+    emit({ type: 'log', text: `Comparación final congelada: original y ${champion?.id || 'sin alternativa construida'}` });
+    const missions = ['New variants of the original bug, not covered by previous attacks', 'Regression: preserve existing invalid-formatter diagnostics', 'Interaction between generic arity, constraints, nested types and accessibility'];
+    await Promise.all(missions.slice(0, profile.finalMissions).map(async (mission, i) => {
+      const a = await attack(mission, i + 1, true);
+      state.finalMissions.push({ mission, attack: a.id, complete: a.status === 'admitted', roles: { attacker: a.attacker, defender: a.defender }, labels: a.labels });
     }));
   }
 
@@ -186,6 +209,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
         const tree = await out(dir,['write-tree']); if(tree!==previous.tree) throw new Error('Continuation candidate hash mismatch');
         await git(dir,[...ID,'commit','-m',`Restore ${previous.id} for continued review`]);
         state.candidates.push({...previous,dir,continuedFrom:resume.runId,restoredFromCommit:previous.commit,commit:await out(dir,['rev-parse','HEAD'])});
+        emit({type:'candidate',id:previous.id,status:'built',tree,restoredFrom:resume.runId});
       }
       coalesce();
       const existingCount = state.candidates.filter(c=>c.status==='built').length;
@@ -196,6 +220,10 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       const results = await Promise.allSettled(tasks); for (const r of results) if (r.status === 'rejected') pending('initial-generation', r.reason);
       coalesce();
       await deliberate();
+      // Standard has no descendants or earlier attacks. Its frozen code and contract
+      // are already available: prepare the attack while baseline compilation/tests
+      // finish. This adds no model calls and keeps the single runner untouched.
+      if (profile.id === 'standard') finalAttackTask = within(finalEnd, prepareFinalAttacks).catch(e => pending('final-attack-preparation', e));
       if (state.groups.length && profile.id === 'deep' && !state.attacks.some(a => a.status === 'admitted') && Date.now() + 30000 < generationEnd) {
         const expectation = state.contract.expectations.find(isGrounded);
         if (expectation) await attack(`One minimal executable case for ${expectation.id}: ${expectation.behavior}. No claims about unspecified behavior.`, 10);
@@ -208,7 +236,7 @@ async function executeComplete(args, { intake, verifyBaseline }) {
         original.dir = path.join(tempRoot, 'original'); await blindCopy(it.repo, original.dir, it.headSha);
       }
       const initial = state.candidates.filter(c => c.status === 'built');
-      if (state.attacks.some(a => a.status === 'admitted')) {
+      if (profile.id === 'deep' && state.attacks.some(a => a.status === 'admitted')) {
         await test(original);
         for (const c of initial) await test(c);
       }
@@ -221,7 +249,8 @@ async function executeComplete(args, { intake, verifyBaseline }) {
       }
       const wantsExploration = state.groups.some(g => g.unverified > 0 || g.disagreement > 0);
       if (profile.maxDescendants && wantsExploration && survivors.length && Date.now() + 60000 < generationEnd) {
-        const descendants = await Promise.allSettled(survivors.slice(0, profile.maxDescendants).map((p, i) => candidate(Math.max(0,...state.candidates.map(c=>Number(c.id.slice(1)))) + i, p)));
+        const lastIndex = Math.max(0,...state.candidates.map(c=>Number(c.id.slice(1))));
+        const descendants = await Promise.allSettled(survivors.slice(0, profile.maxDescendants).map((p, i) => candidate(lastIndex + i, p)));
         for (const r of descendants) if (r.status === 'rejected') pending('descendant', r.reason);
         coalesce();
         for (const c of state.candidates.filter(c => c.generation === 2 && c.status === 'built')) await test(c);
@@ -231,17 +260,11 @@ async function executeComplete(args, { intake, verifyBaseline }) {
 
   // Ensure the baseline process has stopped before sharing its working directory.
   if (baselineTask) await baselineTask;
+  if (finalAttackTask) await finalAttackTask;
   if (it && state.contract && original && baseline) {
     try {
       await within(finalEnd, async () => {
-        const finalists = chooseCandidates(state.candidates, state.evidence, state.attacks);
-        const champion = state.candidates.find(c => c.id === finalists[0]?.id);
-        if (champion) champion.final = true; state.frozen = { A: original.tree, B: champion?.tree, selected: champion?.id, contract: state.contract.hash };
-        emit({ type: 'log', text: `Comparación final congelada: original y ${champion?.id || 'sin alternativa construida'}` });
-        const missions = ['New variants of the original bug, not covered by previous attacks', 'Regression: preserve existing invalid-formatter diagnostics', 'Interaction between generic arity, constraints, nested types and accessibility'];
-        await Promise.all(missions.slice(0, profile.finalMissions).map(async (mission, i) => {
-          const a = await attack(mission, i + 1, true); state.finalMissions.push({ mission, attack: a.id, complete: a.status === 'admitted', roles: { attacker: a.attacker, defender: a.defender }, labels: a.labels });
-        }));
+        if (!finalAttackTask) await prepareFinalAttacks();
         const originalResult = await test(original, true);
         for (const c of state.candidates.filter(c=>c.status==='built').slice(0,profile.id==='deep'?1:2)) {
           if(Date.now()+20000<finalEnd) await test(c,true);
