@@ -424,7 +424,7 @@
   }
 
   /* ── Input ─────────────────────────────────────────────────────────── */
-  $('agentsBtn').onclick = openDebate;
+  if ($('agentsBtn')) $('agentsBtn').onclick = openDebate;
   $('dclose').onclick = (e) => { e.stopPropagation(); closeDebate(); };
   $('dprev').onclick = (e) => { e.stopPropagation(); go(-1); };
   $('dnext').onclick = (e) => { e.stopPropagation(); go(1); };

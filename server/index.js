@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, sha256 } from './util.js';
 import { ask, clis } from './llm.js';
-import { git, commits, resolveRef } from './git.js';
+import { git, commits, resolveRef, diff, parseDiff } from './git.js';
 import { listProjects, getProject, addProject, cloneProject, updateProject, removeProject, listPullRequests, findPullRequest, projectStatus } from './projects.js';
 import { startRun, getRun, subscribe, activeRun, artifact, latestByPr, latestBriefs, saveSignoff } from './runs.js';
 import { intake, replicaBudget } from './pipeline/run.js';
@@ -33,6 +33,29 @@ const readBody = (req) => new Promise((resolve, reject) => {
   req.on('data', (d) => { s += d; if (s.length > 2_000_000) reject(new Error('Cuerpo demasiado grande')); });
   req.on('end', () => { try { resolve(s ? JSON.parse(s) : {}); } catch { reject(new Error('JSON no válido')); } });
 });
+
+/** Where the PR changed code, and which independent rebuilds (the run's candidates, built from the base
+ *  without seeing the PR) changed the same places. Converging regions are reproduced; PR-only ones are the
+ *  ones a human should read. Read-only: git diff plus the run's saved patches. */
+async function versionsOf(project, from, to, run) {
+  const prFiles = await diff(project.path, from, to);
+  const kinds = Object.fromEntries((run?.brief?.files || []).map((f) => [f.path, f.kind]));
+  const cands = (run?.brief?.candidates || []).filter((c) => c.patch).map((c) => {
+    let files = []; try { files = parseDiff(artifact(project.id, run.id, c.patch)); } catch { /* patch missing */ }
+    return { id: c.id, model: c.model, status: c.status, files };
+  });
+  const near = (a, b) => a.oldStart <= b.oldStart + Math.max(b.oldLines, 1) + 3 && b.oldStart <= a.oldStart + Math.max(a.oldLines, 1) + 3;
+  const regions = [];
+  for (const f of prFiles) {
+    if (f.binary) continue;
+    const kind = kinds[f.path] || (/test/i.test(f.path) ? 'test' : /\.(md|txt|rst)$/i.test(f.path) ? 'doc' : 'source');
+    for (const h of f.hunks) {
+      const who = cands.filter((c) => c.files.some((g) => g.path === f.path && (f.status === 'added' || g.hunks.some((k) => near(h, k))))).map((c) => c.id);
+      regions.push({ file: f.path, kind, status: f.status, start: h.newStart, end: h.newStart + Math.max(h.newLines, 1) - 1, oldStart: h.oldStart, lines: h.added.length + h.removed.length, removed: h.removed.slice(0, 30), added: h.added.slice(0, 30), who });
+    }
+  }
+  return { from, to, runId: run?.id || null, candidates: cands.map((c) => ({ id: c.id, model: c.model, status: c.status, files: c.files.map((f) => f.path) })), regions };
+}
 
 /** What a verification will and will not do for this PR, computed without running anything. */
 async function planFor(project, pr, mode, profileId = 'standard') {
@@ -170,6 +193,10 @@ async function api(req, res, url) {
       }
       return send(res, 200, prs);
     }
+    if (sub === 'versions') { // no run yet: the PR's own regions against its base
+      const pr = await findPullRequest(project, url.searchParams.get('pr'));
+      return send(res, 200, await versionsOf(project, `${await resolveRef(project.path, project.base)}...${pr.ref}`, null, null));
+    }
     if (sub === 'commits') { // the branch's own commits (base..branch), oldest first, at most the last 40
       const pr = await findPullRequest(project, url.searchParams.get('pr'));
       const list = await commits(project.path, await resolveRef(project.path, project.base), pr.ref);
@@ -218,6 +245,11 @@ async function api(req, res, url) {
       if (!action) {
         const r = await checkedRun(project, runId);
         return send(res, 200, { ...r, signed: r.signoff && r.brief && r.signatureValid !== false ? signedView(r.brief, r.signoff) : null });
+      }
+      if (action === 'versions') {
+        const r = getRun(project.id, runId), i = r.brief?.input;
+        if (!i?.proposed) throw new Error('Esta verificación no tiene versiones');
+        return send(res, 200, await versionsOf(project, i.historicalBase || i.target, i.proposed, r));
       }
       if (action === 'continue' && method === 'POST') {
         const previous = await checkedRun(project, runId);
