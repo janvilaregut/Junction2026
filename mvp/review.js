@@ -310,6 +310,8 @@
         b.tip = mk('circle', { r: 2.6, fill: b.color, opacity: 0 }, top);
       }
     }
+    // Branch names above every twig and dot, with a halo of the background (.flab): nothing crosses a name.
+    for (const b of tl.order) if (b.lab) top.appendChild(b.lab);
     tl.baseDot = mk('circle', { r: 7, fill: F.spotRaw ? PAL.bad : COL.PR }, top);
     tl.baseLab = mk('text', { class: 'fcap', 'text-anchor': 'middle' }, top); tl.baseLab.textContent = F.spotRaw ? `${F.spotRaw.file}:${F.spotRaw.start}` : 'base + ticket';
     for (const u of tl.bub) {
@@ -413,6 +415,29 @@
     return K[K.length - 1];
   }
   const at = (el, x, y) => { el.setAttribute('x', x.toFixed(1)); el.setAttribute('y', y.toFixed(1)); };
+  /* Agents never sit on top of each other. Two grown bubbles that overlap (or nearly: the goo filter would fuse
+     them) are pushed apart along the line between them, both by half the overlap; bubbles at the same point
+     split vertically in a fixed order, so the picture does not jitter. Small tips on the branches stay put:
+     they mark where a branch is. A few rounds settle three or four bubbles. */
+  function separate(list) {
+    const big = list.filter((u) => u.sr > 14);
+    if (big.length < 2) return;
+    const gap = Math.max(16, Math.min(24, Math.max(...big.map((u) => u.sr)) * 0.3));
+    for (let round = 0; round < 6; round++) {
+      let moved = false;
+      for (let i = 0; i < big.length; i++) for (let j = i + 1; j < big.length; j++) {
+        const a = big[i], b = big[j];
+        let dx = b.sx - a.sx, dy = b.sy - a.sy, d = Math.hypot(dx, dy);
+        const need = a.sr + b.sr + gap;
+        if (d >= need) continue;
+        if (d < 0.5) { dx = 0; dy = 1; d = 1; } // same spot: the later agent goes below
+        const push = (need - d) / 2, ux = dx / d, uy = dy / d;
+        a.sx -= ux * push; a.sy -= uy * push; b.sx += ux * push; b.sy += uy * push;
+        moved = true;
+      }
+      if (!moved) break;
+    }
+  }
   const moveG = (el, x, y) => el.setAttribute('transform', `translate(${x.toFixed(1)},${y.toFixed(1)})`);
 
   function draw(t, now) {
@@ -459,7 +484,13 @@
       if (r > 20) r += Math.sin(now / 800 + x * 0.01) * r * 0.02;
       else if (F.live && t >= tl.hold - 1) r += Math.sin(now / 500 + y * 0.05) * 1.6; // waiting for the agents: the tips breathe
       let col = u.color; for (const k of u.colors) col = mix(col, k.color, sm((t - k.t) / k.dur));
-      u.el.setAttribute('cx', x.toFixed(1)); u.el.setAttribute('cy', y.toFixed(1)); u.el.setAttribute('r', Math.max(0, r).toFixed(1)); u.el.setAttribute('fill', col);
+      Object.assign(u, { sx: x, sy: y, sr: Math.max(0, r), col, on: true });
+    }
+    separate(tl.bub.filter((u) => u.on));
+    for (const u of tl.bub) {
+      if (!u.on) continue;
+      const { sx: x, sy: y, sr: r, col } = u;
+      u.el.setAttribute('cx', x.toFixed(1)); u.el.setAttribute('cy', y.toFixed(1)); u.el.setAttribute('r', r.toFixed(1)); u.el.setAttribute('fill', col);
       let nm = { name: u.name, sub: u.sub }; for (const n of u.names) if (t >= n.t) nm = n;
       if (u.t1.textContent !== nm.name) { u.t1.textContent = nm.name; u.t2.textContent = nm.sub || ''; }
       at(u.t1, x, y + (r > 36 ? -1 : 5)); at(u.t2, x, y + 15);
@@ -470,7 +501,7 @@
         u.badge.setAttribute('opacity', (sm((t - bd.t0) / 300) * (1 - sm((t - bd.t1) / 300))).toFixed(2));
         u.badgeC.setAttribute('fill', bd.ok ? PAL.ok : PAL.bad); u.badgeT.textContent = bd.ok ? '✓' : '✕';
       } else u.badge.setAttribute('opacity', 0);
-      Object.assign(u, { sx: x, sy: y, sr: r, nm, on: true });
+      u.nm = nm;
       maxR = Math.max(maxR, r);
     }
     BLUR.setAttribute('stdDeviation', Math.max(2.5, maxR * 0.09).toFixed(1));
