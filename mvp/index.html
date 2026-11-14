@@ -39,7 +39,9 @@
   <button class="back" id="back" aria-label="Back"><i>←</i><span><b id="fid"></b><small id="fbr"></small></span></button>
   <div class="flegend"><span><i style="background:var(--file)"></i>File</span><span><i style="background:var(--ok)"></i>Reproduced</span><span><i style="background:var(--warn)"></i>You decide</span><span><i style="background:var(--bad)"></i>You read it</span></div>
   <section class="fix" id="fix" hidden aria-label="Fix it: the agents' tree">
-    <svg id="fsvg" aria-hidden="true"><defs><filter id="fgoo" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur id="fgooblur" in="SourceGraphic" stdDeviation="3" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter></defs><g id="fcam"><g id="fworld"></g></g><g id="fscr"><g id="fblobs" filter="url(#fgoo)"></g></g></svg>
+    <svg id="fsvg" aria-hidden="true"><g id="fcam"><g id="fworld"></g></g></svg>
+    <canvas id="fgl" aria-hidden="true"></canvas>
+    <svg id="fsvg2" aria-hidden="true"><defs><filter id="fgoo" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur id="fgooblur" in="SourceGraphic" stdDeviation="3" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter></defs><g id="fscr"><g id="fblobs" filter="url(#fgoo)"></g></g></svg>
     <div class="fsays" id="fsays"></div>
     <div class="fstat" id="fstat"></div>
     <div class="fctl"><button id="fskip">Skip</button><button id="fclose" aria-label="Back to the graph">×</button></div>
