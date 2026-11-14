@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, sha256 } from './util.js';
 import { ask, clis } from './llm.js';
-import { git } from './git.js';
+import { git, commits, resolveRef } from './git.js';
 import { listProjects, getProject, addProject, cloneProject, updateProject, removeProject, listPullRequests, findPullRequest, projectStatus } from './projects.js';
 import { startRun, getRun, subscribe, activeRun, artifact, latestByPr, latestBriefs, saveSignoff } from './runs.js';
 import { intake, replicaBudget } from './pipeline/run.js';
@@ -148,6 +148,11 @@ async function api(req, res, url) {
         pr.running = act?.prId === pr.id ? act.id : null;
       }
       return send(res, 200, prs);
+    }
+    if (sub === 'commits') { // the branch's own commits (base..branch), oldest first, at most the last 40
+      const pr = await findPullRequest(project, url.searchParams.get('pr'));
+      const list = await commits(project.path, await resolveRef(project.path, project.base), pr.ref);
+      return send(res, 200, { total: list.length, commits: list.slice(-40).map(({ sha, author, date, subject }) => ({ sha, author, date, subject })) });
     }
     if (sub === 'plan') {
       const pr = await findPullRequest(project, url.searchParams.get('pr'));

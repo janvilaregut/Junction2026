@@ -13,6 +13,7 @@
 </head>
 <body>
 
+<main id="home">
 <header class="top">
   <div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z"/><path d="M14 7C9 7.5 4.8 10.4 1 16c3.8 5.6 8 8.5 13 9v-2.8c-3.7-.5-6.6-2.4-9.6-6.2 3-3.8 5.9-5.7 9.6-6.2z" transform="translate(32) scale(-1 1)"/><circle cx="16" cy="16" r="3.5"/></svg>Katse</div>
   <button class="proj" id="proj" title="Switch project"><i></i><span id="projName">…</span></button>
@@ -30,13 +31,23 @@
     <button class="more" id="more" hidden></button>
   </div>
 </section>
+</main>
 <div class="card" id="card"></div>
 
 <section class="full" id="full" hidden>
   <svg id="g" aria-label="Change graph"></svg>
   <button class="back" id="back" aria-label="Back"><i>←</i><span><b id="fid"></b><small id="fbr"></small></span></button>
   <div class="flegend"><span><i style="background:var(--file)"></i>File</span><span><i style="background:var(--ok)"></i>Reproduced</span><span><i style="background:var(--warn)"></i>You decide</span><span><i style="background:var(--bad)"></i>You read it</span></div>
+  <button class="agentsBtn" id="agentsBtn" title="Watch the agents debate"><span class="bub"><i></i><i></i><i></i></span>Agents</button>
   <div class="fbar" id="fbar"></div>
+  <section class="debate" id="debate" hidden aria-label="Agents debating">
+    <svg id="dsvg" aria-hidden="true"><defs><filter id="goo" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceGraphic" stdDeviation="13" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter></defs><g id="dblobs" filter="url(#goo)"></g><g id="dlabels"></g></svg>
+    <div class="dmsgs" id="dmsgs"></div>
+    <div class="dtop"><div class="dprog" id="dprog"></div><div class="dbar"><span><b id="dtitle">Agents</b><em>Preview · sample data</em></span><button class="x" id="dclose" aria-label="Back to the graph">×</button></div></div>
+    <div class="dline" id="dline"></div>
+    <div class="dnav"><button id="dprev" aria-label="Previous">←</button><button id="dnext" aria-label="Next">→</button></div>
+    <div class="agent" id="agent" hidden></div>
+  </section>
 </section>
 
 <aside class="drawer" id="drawer" hidden>
@@ -48,6 +59,7 @@
 <div class="tip" id="tip"></div>
 
 <script src="app.js"></script>
+<script src="debate.js"></script>
 <script type="module" src="mascot/mascot.js"></script>
 </body>
 </html>

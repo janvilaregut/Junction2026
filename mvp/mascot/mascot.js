@@ -162,7 +162,16 @@ const TOOLS = [
   { name: 'start_verification', description: 'Start verifying the current pull request. Slow (minutes). Ask the user to confirm first.', parameters: T({ mode: { type: 'STRING', enum: ['quick', 'full'] } }) },
   { name: 'get_consensus', description: 'Results of the multi-agent consensus for the current pull request: several Gemini agents solved the same requirement blind, a heatmap compared their code zone by zone with the PR, then they debated in pairs until a consensus. Returns agents, where they agreed/disagreed, each debate argument and who convinced whom, and the verdict (coincide = PR matches the consensus, difiere = the consensus proposes something else, dudoso = no clear majority).', parameters: T() },
   { name: 'start_consensus', description: 'Start a multi-agent consensus check on the current pull request (takes ~15 minutes). Ask the user to confirm first.', parameters: T() },
-  { name: 'open_consensus', description: 'Show the live consensus view (agent bubbles, debate and heatmap) for the current pull request.', parameters: T() },
+  { name: 'open_consensus', description: 'Open the raw technical consensus report page (heatmap, full arguments) for the current pull request. For the visual story of the agents use show_agent_debate instead.', parameters: T() },
+  { name: 'show_commits', description: 'Unfold one branch in the tree so all its commits show on a long rail (the other branches fold away). Use when the user asks for the commits / history of a branch. query: id, branch, number, a word from its title, or empty for the one open or in focus.', parameters: T({ query: { type: 'STRING' } }) },
+  { name: 'show_all_branches', description: 'Fold the commits back and show every branch in the tree again.', parameters: T() },
+  { name: 'focus_graph', description: 'Inside the open pull request graph: fly the camera to a node or group and light it up while you talk about it. query: a file name, "Tests", "Builds", "Mutation", a line like "Foo.cs:120", an agent, or a group: "what I must read" (red), "decisions" (yellow), "reproduced" (green), "checks", "files", "agents", "whole" (the core). Call it EVERY time you start explaining a specific part of the graph.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
+  { name: 'zoom_graph', description: 'Move the graph camera: "in" (closer), "out" (further), "overview" (back to the whole graph, clears the highlight).', parameters: T({ action: { type: 'STRING', enum: ['in', 'out', 'overview'] } }, ['action']) },
+  { name: 'show_agent_debate', description: 'Dive into the animated story of the AI agents for the open pull request: bubbles that solve it blind, compare, argue round by round (they meet, merge when they agree, the convinced one takes the winner\'s colour) and reach a consensus. Use when the user asks how the agents are doing, how they debated, who convinced whom, or to see the agents. It plays by itself; returns the story so you can narrate it. Sample data for now (design preview).', parameters: T() },
+  { name: 'debate_step', description: 'Move through the agents story: next, previous, restart, or jump to a chapter: agents, solve, compare, debate, verdict.', parameters: T({ to: { type: 'STRING', enum: ['next', 'previous', 'restart', 'agents', 'solve', 'compare', 'debate', 'verdict'] } }, ['to']) },
+  { name: 'open_agent', description: 'In the agents story: dive into one agent (its bubble fills the screen with its details, arguments and how its debates went). name: Precise, Steady, Balanced, Curious, Bold, or "the PR" (the advocate).', parameters: T({ name: { type: 'STRING' } }, ['name']) },
+  { name: 'close_agent', description: 'Leave the agent detail and go back to all the agents.', parameters: T() },
+  { name: 'leave_debate', description: 'Leave the agents story and go back to the pull request graph.', parameters: T() },
   { name: 'express', description: 'Show an emotion with the goat for a moment, to make the conversation lively (e.g. happy when a PR is fine, surprised at a bug).', parameters: T({ mood: { type: 'STRING', enum: ['happy', 'surprised', 'sad', 'confused', 'love', 'bleating', 'thinking'] } }, ['mood']) },
 ];
 for (const t of TOOLS) t.behavior = 'BLOCKING';
@@ -175,9 +184,17 @@ function prState(p) { try { return typeof state === 'function' ? state(p).label 
 const prBrief = (p, i) => ({ ordinal: i + 1, id: p.id, branch: p.branch, title: p.title, yours: !!p.yours, state: prState(p), verifying: !!p.running, linesForHuman: p.last ? `${p.last.residue} of ${p.last.total}` : null, commitsAhead: p.ahead, date: p.date });
 function view() {
   const full = document.getElementById('full'); const drawer = document.getElementById('drawer');
+  if (full && !full.hidden && call('agentOpen')) return 'agent';
+  if (full && !full.hidden && call('debateOpen')) return 'debate';
   if (drawer && !drawer.hidden) return 'review';
   if (full && !full.hidden) return 'graph';
+  if (app()?.focus) return 'commits';
   return 'home';
+}
+const inGraph = () => ['graph', 'review', 'debate', 'agent'].includes(view());
+function graphSummary() {
+  const g = typeof G !== 'undefined' ? G : null; if (!g) return null;
+  return [...g.nodes.values()].slice(0, 40).map((n) => ({ label: n.label, kind: n.kind, file: n.file, state: n.info }));
 }
 function findPR(q) {
   const list = allPRs(); const s = String(q || '').toLowerCase().trim();
@@ -188,11 +205,6 @@ function findPR(q) {
     || list.find((p) => p.branch.toLowerCase().includes(s) || (p.requirement && String(p.requirement) === s.replace('#', '')))
     || list.find((p) => (p.title || '').toLowerCase().includes(s))
     || list.find((p) => s.split(/\s+/).filter((w) => w.length > 2).some((w) => p.branch.toLowerCase().includes(w) || (p.title || '').toLowerCase().includes(w)));
-}
-function originOf(p) {
-  const lane = document.querySelector(`[data-pr="${CSS.escape(p.id)}"]`);
-  const r = (lane || goatBtn).getBoundingClientRect();
-  return lane ? [r.right - 8, r.top + r.height / 2] : [r.left + r.width / 2, r.top + r.height / 2];
 }
 async function waitFor(cond, ms = 6000) { const t = performance.now(); while (!cond() && performance.now() - t < ms) await sleep(80); return cond(); }
 const clip = (s, n = 400) => (s && String(s).length > n ? String(s).slice(0, n) + '…' : s);
@@ -238,7 +250,13 @@ const TOOL_FN = {
   async get_screen() {
     const s = app(); const v = view(); const p = s?.cur && v !== 'home' ? s.cur : null;
     const project = s?.projects?.find((x) => x.id === s.pid);
-    return { view: v, project: project?.name, base: s?.base, pullRequest: p ? prBrief(p, allPRs().findIndex((x) => x.id === p.id)) : null, verification: p ? briefOf(s.run?.brief, 'summary') : null, verifyingNow: !!s?.es };
+    const f = v === 'commits' ? s.focus : null;
+    return {
+      view: v, project: project?.name, base: s?.base, pullRequest: p ? prBrief(p, allPRs().findIndex((x) => x.id === p.id)) : null, verification: p ? briefOf(s.run?.brief, 'summary') : null, verifyingNow: !!s?.es,
+      graphNodes: v === 'graph' || v === 'review' ? graphSummary() : undefined,
+      commitsShown: f ? { branch: allPRs().find((x) => x.id === f.id)?.branch, total: f.total, commits: f.commits.map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date })) } : undefined,
+      agentsStory: v === 'debate' || v === 'agent' ? call('debateInfo') : undefined,
+    };
   },
   async list_pull_requests({ direction = 'all', include_old = false } = {}) {
     const all = allPRs();
@@ -246,27 +264,73 @@ const TOOL_FN = {
     let list = direction === 'incoming' ? all.filter((p) => !p.yours) : direction === 'outgoing' ? all.filter((p) => p.yours) : all;
     const old = list.filter((p) => !active(p)).length;
     if (!include_old) list = list.filter(active);
-    if (view() !== 'home') { call('closeGraph'); await sleep(750); }
+    if (inGraph()) { call('closeGraph'); await sleep(780); }
     call('highlightLanes', list.map((p) => p.id));
     act(`Showing ${list.length} pull request${list.length === 1 ? '' : 's'}`);
     return { count: list.length, olderNotShown: include_old ? 0 : old, pullRequests: list.slice(0, 25).map((p) => prBrief(p, all.findIndex((x) => x.id === p.id))) };
   },
-  async highlight_pull_requests({ ids = [] }) { if (view() !== 'home') { call('closeGraph'); await sleep(750); } call('highlightLanes', ids); return { ok: true }; },
+  async highlight_pull_requests({ ids = [] }) { if (inGraph()) { call('closeGraph'); await sleep(780); } call('highlightLanes', ids); return { ok: true }; },
   async open_pull_request({ query }) {
     const p = findPR(query);
     if (!p) return { error: `No pull request matches "${query}".`, available: allPRs().map((x) => x.branch).slice(0, 20) };
     const s = app();
-    if (view() !== 'home' && s?.cur?.id === p.id) return { alreadyOpen: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)) };
-    if (view() !== 'home') { call('closeGraph'); await sleep(750); }
-    call('highlightLanes', [p.id]); await sleep(350);
-    const [x, y] = originOf(p);
-    call('highlightLanes', []);
-    call('openGraph', p, x, y);
+    if (inGraph() && s?.cur?.id === p.id) { call('closeDebate'); return { alreadyOpen: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)) }; }
+    if (inGraph()) { call('closeGraph'); await sleep(780); }
+    if (s?.focus && s.focus.id !== p.id) { call('hideCommits'); await sleep(900); }
+    if (!s?.focus) { call('highlightLanes', [p.id]); await sleep(420); call('highlightLanes', []); }
+    call('openGraph', p); // grows out of the branch's own dot in the tree
     act(`Opened ${p.branch}`);
     await waitFor(() => app()?.run?.brief || app()?.plan, 8000);
     return { opened: true, pullRequest: prBrief(p, allPRs().findIndex((x) => x.id === p.id)), verification: briefOf(app()?.run?.brief, 'summary'), notVerifiedYet: !app()?.run?.brief };
   },
-  async go_home() { document.getElementById('drawer').hidden = true; call('closeGraph'); act('Back home'); return { ok: true }; },
+  async go_home() { const was = inGraph(); document.getElementById('drawer').hidden = true; call('closeGraph'); if (!was) call('hideCommits'); act('Back home'); return { ok: true }; },
+  async show_commits({ query = '' } = {}) {
+    const s = app();
+    const p = query ? findPR(query) : allPRs().find((x) => x.id === (s?.focus?.id || s?.cur?.id));
+    if (!p) return { error: query ? `No pull request matches "${query}".` : 'Which branch? Give a name.', available: allPRs().map((x) => x.branch).slice(0, 20) };
+    const r = await call('showCommits', p.id);
+    if (!r) return { error: 'Could not show the commits.' };
+    act(`${r.total} commit${r.total === 1 ? '' : 's'} · ${p.branch}`);
+    return { branch: p.branch, total: r.total, shown: r.commits.length, commits: r.commits.map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date })), tip: 'The newest commit is at the right end; open_pull_request opens the branch from there.' };
+  },
+  async show_all_branches() { if (inGraph()) { call('closeGraph'); await sleep(780); } call('hideCommits'); act('All branches'); return { ok: true }; },
+  async focus_graph({ query }) {
+    if (!inGraph()) return { error: 'No pull request is open. Open one first.' };
+    if (call('debateOpen')) { call('closeDebate'); await sleep(500); }
+    document.getElementById('drawer').hidden = true;
+    const list = call('focusGraph', query);
+    if (!list) return { error: `Nothing in the graph matches "${query}".`, nodes: graphSummary() };
+    act(list.length === 1 ? `Looking at ${list[0].label}` : `Looking at ${list.length} nodes`);
+    const nb = (n) => G.links.filter((l) => l.a === n || l.b === n).map((l) => (l.a === n ? l.b : l.a).label);
+    return { focused: list.map((n) => ({ label: n.label, kind: n.kind, file: n.file, state: n.info, connectedTo: nb(n).slice(0, 8) })) };
+  },
+  async zoom_graph({ action }) {
+    if (!inGraph()) return { error: 'No pull request is open.' };
+    if (call('debateOpen')) { call('closeDebate'); await sleep(400); }
+    call('zoomGraph', action === 'overview' ? 'fit' : action);
+    return { ok: true };
+  },
+  async show_agent_debate() {
+    if (!inGraph()) return { error: 'Open a pull request first.' };
+    document.getElementById('drawer').hidden = true;
+    if (!call('openDebate')) return { error: 'Could not open the agents view.' };
+    act('Agents debating');
+    return call('debateInfo');
+  },
+  async debate_step({ to }) {
+    if (!call('debateOpen')) return { error: 'The agents story is not open. Call show_agent_debate first.' };
+    return { chapter: call('debateGo', to) };
+  },
+  async open_agent({ name: who }) {
+    if (!call('debateOpen')) { if (!inGraph()) return { error: 'Open a pull request first.' }; call('openDebate'); await sleep(900); }
+    const a = call('openAgent', who);
+    if (!a) return { error: `No agent called "${who}". Agents: Precise, Steady, Balanced, Curious, Bold, and the PR's advocate.` };
+    act(`Inside ${a.name}`);
+    const info = call('debateInfo');
+    return { agent: a.name, role: a.role, temperature: a.temperature, files: a.files, tests: a.tests, steps: a.steps, debates: info.rounds.filter((r) => r.pair.includes(a.name)), sample: true };
+  },
+  async close_agent() { return { ok: !!call('closeAgent') }; },
+  async leave_debate() { call('closeDebate'); act('Back to the graph'); return { ok: true }; },
   async get_verification_details({ section = 'summary' } = {}) {
     const s = app();
     if (!s?.cur || view() === 'home') return { error: 'No pull request is open. Open one first.' };
@@ -312,6 +376,7 @@ const TOOL_FN = {
 /* ── Gemini Live session ──────────────────────────────────────────────── */
 const SYSTEM = `You are the Katse goat: the voice assistant living in the corner of Katse, an app that verifies pull requests by REPRODUCING them instead of reading them (it merges, builds, runs tests red-before/green-after, seeds defects, rewinds each change, and has independent AI agents redo the change blind and debate), then leaves a named human only what could not be checked.
 How you talk: warm, quick, professional, a little playful. Spoken answers of 1-3 short sentences; no markdown, no lists, no reading ids or hashes aloud (say branch names naturally). Reply in the language the user speaks (Spanish if they speak Spanish).
+Be visual and dynamic, like a guide holding a camera: whenever you start talking about a part of the graph (a file, a check, the lines to read, a decision), call focus_graph on it FIRST so the camera flies there while you speak; when you change topic or finish, zoom_graph overview. "Zoom in/out" means zoom_graph. "Show me the commits of this branch" means show_commits. "How are the agents doing / show me how they debate" means show_agent_debate (then narrate the story as it plays, and use debate_step / open_agent when asked). The agents story uses sample data for now: if the user asks whether it is real, say it is a design preview.
 How you act: you can see and drive the screen ONLY through tools. Never invent pull requests, numbers or results: call a tool. If the user says "this", "here", "that one", call get_screen. When asked to show, list, open or go somewhere, do it with the tool right away, then say in a few words what you did. For "why is it good/bad", "what was tested and what wasn't", "how did the agents work", use get_verification_details and get_consensus and explain in plain words with concrete files, tests and arguments; be honest about what was NOT verified. Before anything slow (start_verification, start_consensus) ask for a yes. Use express now and then to react (happy for good news, surprised at a bug).`;
 
 async function start(textOnly = false) {
