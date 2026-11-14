@@ -348,7 +348,7 @@ export async function analyze(project, pr, { force = false, decisions = true } =
   // ── What is drawn: the changed functions, and the neighbours that explain why they matter ───────────
   const order = [...live].sort((a, b) => ({ risky: 0, uncertain: 1, cleared: 2, proved: 3 }[a.verdict] - { risky: 0, uncertain: 1, cleared: 2, proved: 3 }[b.verdict]) || b.priority - a.priority || b.impact - a.impact);
   const shown = order.slice(0, MAX_UNITS), hidden = order.slice(MAX_UNITS);
-  if (hidden.length) limits.push(`${hidden.length} more changed functions are not drawn (${hidden.filter((u) => u.verdict === 'proved' || u.verdict === 'cleared').length} of them settled); they are counted in the totals.`);
+  if (hidden.length) limits.push(`${hidden.length} more changed ${hidden.length === 1 ? 'function is' : 'functions are'} not drawn (${hidden.filter((u) => u.verdict === 'proved' || u.verdict === 'cleared').length} settled); ${hidden.length === 1 ? 'it is' : 'they are'} counted in the totals.`);
   const ids = new Set(shown.map((u) => u.id));
   let ctxIds = [], edges = [];
   if (graph) guard('graph', () => {
