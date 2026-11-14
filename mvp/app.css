@@ -417,7 +417,19 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 .fcopy{position:relative;margin-top:12px}
 .fcopy pre{margin:0;padding:10px 12px;padding-right:64px;background:var(--bg);border-radius:12px;font:400 11px/1.6 var(--mono);color:var(--fg2);white-space:pre-wrap;word-break:break-all}
 .fcopy button{position:absolute;right:8px;top:8px;padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line2);font:500 11px var(--body);color:var(--fg2)}
-.fnote{margin-top:10px;font-size:12px;color:var(--fg3)}
+.fnote{margin-top:10px;font-size:12px;color:var(--fg3);line-height:1.45;overflow-wrap:anywhere}
+/* What a graph-directed review adds to the verdict card: its scope, why the score, every alternative */
+.fvh.dim{color:var(--fg3)}
+.fvl span{min-width:0;overflow-wrap:anywhere}.fvl em{font-style:normal;color:var(--fg2)}
+details.fnote summary{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--fg2);list-style:none;transition:color .2s}
+details.fnote summary:hover{color:var(--fg)}
+details.fnote summary::-webkit-details-marker{display:none}
+details.fnote summary::before{content:'';flex:0 0 5px;height:5px;border-right:1.5px solid var(--fg3);border-bottom:1.5px solid var(--fg3);transform:rotate(-45deg);transition:transform .2s}
+details.fnote[open] summary::before{transform:rotate(45deg)}
+details.fnote p{margin-top:8px}
+.fverd details.fnote ul{margin-top:8px;font-size:12px;line-height:1.4}
+.fverd details.fnote ul:empty,details.fnote p:empty{display:none}
+.fverd a.cta{display:block;margin-top:12px;padding:11px 14px;font-size:13px;text-align:center;text-decoration:none}
 
 /* The mathematical graph (math.js): changed functions sized by what depends on them, coloured by what can be claimed */
 .lk.in{stroke:rgba(255,255,255,.11);stroke-dasharray:2 5}

@@ -344,12 +344,20 @@
     const chip = so ? (so.decision === 'aprobar' ? ['ok', 'Signed'] : ['bad', 'Sent back']) : [v.tone, v.label];
     const H = [`<div class="fvk">${esc(s.spot ? s.spot.where : 'Review')}</div>
       <div class="fvs"><span class="fvn">${v.score ?? '–'}<small>/10</small></span><span class="fchip" style="background:${PAL[chip[0]] || PAL.warn}">${esc(chip[1])}</span></div>`];
-    if (!s.live && run?.brief?.graphReview) H.push(`<p class="fnote">${run.brief.graphReview.scope.partial?'Selected scope':'Changed executable scope'} · ${run.brief.graphReview.nodes.map(n=>esc(n.id.split('::').pop())+': '+esc(n.status)).join(' · ')}. Pending nodes have no verified support; this score is not a bug-free probability.</p>`);
+    if (!s.live && run?.brief?.graphReview) { // a review sent from the graph: what the tests back, function by function
+      const gr = run.brief.graphReview, T = { verified: ['ok', 'backed by tests'], failed: ['bad', 'fails a test'], pending: ['warn', 'not backed yet'] };
+      const name = (id) => S.math?.nodes?.find((x) => x.id === id)?.name || id.split('::').pop().replace(/\/\d+#\d+$/, '');
+      const order = ['failed', 'pending', 'verified'], list = [...gr.nodes].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
+      H.push(`<div class="fvh dim">${gr.nodes.length < gr.scope.denominator.length ? 'Selected scope' : 'Whole change'} · ${gr.nodes.filter((n) => n.status === 'verified').length} of ${gr.nodes.length} backed by tests</div>`
+        + list.slice(0, 4).map((n) => `<p class="fvl"><i style="background:${PAL[(T[n.status] || T.pending)[0]]}"></i><span>${esc(name(n.id))} <em>${(T[n.status] || T.pending)[1]}</em></span></p>`).join('')
+        + (list.length > 4 ? `<p class="fnote">and ${list.length - 4} more</p>` : '')
+        + '<p class="fnote">The score covers this scope only. It is not the odds that the change is right.</p>');
+    }
     if (!s.live && run?.brief?.verdict) {
       const b=run.brief, j=b.verdict;
       H.push(`<details class="fnote"><summary>Why this score · evidence and limits</summary><p>${esc(j.score?.explanation || '')}</p><ul>${(j.score?.components || []).map(c=>`<li>${esc(c.label)}: ${c.earned}/${c.max}. ${esc(c.reason)}</li>`).join('')}</ul><ul>${(j.pending || []).map(p=>`<li>Pending: ${esc(p)}</li>`).join('')}</ul><ul>${(j.auditWarnings || []).map(p=>`<li>${esc(p)}</li>`).join('')}</ul><p>${esc(j.semantic?.explanation || '')}</p></details>`);
       H.push(`<details class="fnote"><summary>All alternatives · ${b.candidates?.length || 0}</summary><ul>${(b.candidates || []).map(c=>`<li>${esc(c.id)} · ${esc(modelName(c.model))} · ${esc(c.status)} · Entire: ${esc(c.checkpoint?.status || 'not captured')}${c.error?' · '+esc(c.error):''}</li>`).join('')}</ul></details>`);
-      H.push(`<p class="fnote">${esc(b.budget?.profile || '')} · ${secs(b.budget?.elapsedMs || 0)} · ${Number(b.budget?.tokens || 0).toLocaleString()} observed tokens${b.budget?.usageIncomplete?' (usage incomplete)':''}</p>`);
+      H.push(`<p class="fnote">${esc(PROFILE[b.budget?.profile]?.[0] || b.budget?.profile || '')} · ${secs(b.budget?.elapsedMs || 0)} · ${Number(b.budget?.tokens || 0).toLocaleString()} tokens${b.budget?.usageIncomplete?' (usage incomplete)':''}</p>`);
     }
     if (!s.live && run?.brief?.repair) { const r=run.brief.repair; H.push(`<p class="fnote">Repair: ${esc(r.status)} · ${esc(r.reason || r.summary || '')}</p>`); if(r.patch) H.push(`<a class="cta ghost" download href="/api/projects/${encodeURIComponent(S.pid)}/runs/${encodeURIComponent(run.id)}/artifact?name=${encodeURIComponent(r.patch)}">Download proposed patch</a>`); }
     if (s.spot?.text) H.push(`<p class="fvl"><i style="background:${PAL[s.spot.tone] || PAL.no}"></i>${esc(s.spot.text)}</p>`);
