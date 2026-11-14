@@ -35,7 +35,7 @@ function historyOf(repo, base) {
 import { verdict, summarize, POLICY, WEIGHTS } from './risk.js';
 import { lexicon, decide, merge } from './sensitivity.js';
 
-export const VERSION = 8; // part of the cache key: raise it whenever a measurement or the model changes
+export const VERSION = 10; // part of the cache key: raise it whenever a measurement or the model changes
 const MAX_UNITS = 44, MAX_CONTEXT = 22;
 // A call that can fail a test: assert/expect/should/verify/ensure/check families, and the Roslyn verifier runs (VerifyCS.Test.RunDefaultAsync).
 // Things a function can do that no static graph can follow, per language. A changed function that does one of
@@ -431,7 +431,8 @@ export async function manifestsOf(repo, tree) {
   const pkgs = pick(/(^|\/)package\.json$/, 12), projs = pick(/\.(csproj|props|targets)$/, 80), reqs = pick(/(^|\/)(requirements[^/]*\.txt|pyproject\.toml)$/, 6);
   const blobs = await readBlobs(repo, [...pkgs, ...projs, ...reqs].map((f) => f.sha));
   for (const f of pkgs) { try { out.packageJson.push({ dir: path.dirname(f.path) === '.' ? '' : path.dirname(f.path), json: JSON.parse(blobs.get(f.sha)) }); } catch { /* unreadable manifest */ } }
-  for (const f of projs) for (const m of (blobs.get(f.sha) || '').matchAll(/<(?:PackageReference|PackageVersion)\s+(?:Include|Update)="([^"]+)"/g)) out.csprojPackages.add(m[1]);
+  // Packages, and assemblies referenced directly (`<Reference Include="Name, Version=…">`): both bring namespaces.
+  for (const f of projs) for (const m of (blobs.get(f.sha) || '').matchAll(/<(?:PackageReference|PackageVersion|Reference|FrameworkReference)\s+(?:Include|Update)="([^",]+)/g)) out.csprojPackages.add(m[1].trim());
   for (const f of reqs) for (const m of (blobs.get(f.sha) || '').matchAll(/^\s*["']?([A-Za-z0-9_.-]+)\s*(?:[=<>~!\[]|["']|$)/gm)) out.pythonRequirements.add(m[1].toLowerCase());
   return out;
 }
