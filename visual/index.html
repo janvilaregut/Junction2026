@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="./katse-favicon.svg">
+  <title>Katse — Review #2283</title>
+  <style>
+    html { background: #0d111c; color-scheme: dark; }
+    body { max-width: 1200px; margin: 28px auto; padding: 0 16px; }
+  </style>
+</head>
+<body>
+<section id="katse-review" aria-label="Katse desktop mockup">
+  <header class="katse-header">
+    <img src="./katse-logo.svg" alt="Katse" width="99">
+    <span class="katse-header-context">Review workspace</span>
+  </header>
+  <div class="katse-shell">
+    <aside class="katse-nav">
+      <span class="katse-muted katse-mono">CASE #2283</span>
+      <nav aria-label="Review steps">
+        <button type="button" data-step="0" aria-current="step"><span>01</span> Case</button>
+        <button type="button" data-step="1"><span>02</span> Rewind</button>
+        <button type="button" data-step="2"><span>03</span> Compare</button>
+        <button type="button" data-step="3"><span>04</span> Evidence</button>
+        <button type="button" data-step="4"><span>05</span> Decision</button>
+      </nav>
+    </aside>
+    <main class="katse-main">
+      <div class="katse-meta"><span>MessagePack-CSharp</span><span class="katse-mono">9df83c38</span><span class="katse-preview">Demo preview</span></div>
+      <div data-panel="0">
+        <h1>One fix. Two things to prove.</h1>
+        <p class="katse-intro">The analyzer and source generator crash when an app uses a generic struct from a referenced library. The patch should restore generation and preserve valid diagnostics in local code.</p>
+        <div class="katse-grid">
+          <article><h2>Reported failure</h2><p>A referenced generic struct triggers an exception and leaves the app without its generated resolver.</p><code>IndexOutOfRangeException</code></article>
+          <article><h2>Change under review</h2><p>The patch guards source lookups and changes which diagnostics the analyzer reports.</p><code>TypeCollector.cs</code></article>
+        </div>
+        <button type="button" class="katse-primary" data-go="1"><span aria-hidden="true">↶</span> Rewind this PR</button>
+      </div>
+      <div data-panel="1" hidden>
+        <h1>Reconstruct the intent</h1>
+        <p class="katse-intro">Gemini reads the ticket and diff to identify the behavior to fix and the diagnostic behavior to preserve.</p>
+        <article class="katse-prompt"><h2>Inferred brief</h2><p>Handle generic structs from referenced libraries without crashing. Keep reporting valid diagnostics in the current project.</p></article>
+        <p class="katse-small"><strong>4 prompts</strong> · 1 base + 2 affected behaviors + 1 shared diagnostic path.</p>
+        <button type="button" class="katse-primary" data-go="2">Compare approaches <span aria-hidden="true">→</span></button>
+      </div>
+      <div data-panel="2" hidden>
+        <h1>Compare two approaches</h1>
+        <p class="katse-intro">An independent agent starts from the base commit and the reconstructed brief. This preview uses a prepared candidate to illustrate the risk.</p>
+        <div class="katse-grid">
+          <article><h2>Submitted patch</h2><p>Skip diagnostics outside the current compilation and preserve those with a valid local location.</p><code>9df83c38</code></article>
+          <article><h2>Prepared candidate</h2><p>A broader guard can avoid the crash while dropping a diagnostic that should still appear.</p><details><summary>Entire checkpoint preview</summary><p>A generated candidate would link its prompt and agent session to its commit.</p></details></article>
+        </div>
+        <p class="katse-small"><strong>Test selected</strong> · Does the analyzer still warn when the problem is in local code?</p>
+        <button type="button" class="katse-primary" data-go="3">Run the trial <span aria-hidden="true">→</span></button>
+      </div>
+      <div data-panel="3" hidden>
+        <h1>Inspect the evidence</h1>
+        <p class="katse-intro">Illustrative results for the same two checks on both patches.</p>
+        <table>
+          <thead><tr><th scope="col">Check</th><th scope="col">Submitted</th><th scope="col">Candidate</th></tr></thead>
+          <tbody><tr><th scope="row">External type generates a resolver</th><td class="katse-pass">Pass</td><td class="katse-pass">Pass</td></tr>
+          <tr><th scope="row">Local diagnostic is emitted</th><td class="katse-pass">Pass</td><td class="katse-fail">Fail</td></tr></tbody>
+        </table>
+        <details class="katse-proof" open><summary>Local diagnostic</summary><p>Expected a warning for an invalid local member. In this example the submitted patch emits it and the candidate drops it. Review the shared diagnostic filter in <code>TypeCollector.cs</code>.</p></details>
+        <button type="button" class="katse-primary" data-go="4">Review decision <span aria-hidden="true">→</span></button>
+      </div>
+      <div data-panel="4" hidden>
+        <h1>Record your decision</h1>
+        <p class="katse-intro">The decision applies to the submitted commit <code>9df83c38</code> and the two checks shown in this preview.</p>
+        <form>
+          <label for="katse-reason">Reviewer note</label>
+          <textarea id="katse-reason" rows="3" placeholder="What supports your decision?" required></textarea>
+          <div class="katse-actions">
+            <button type="submit" class="katse-primary" value="Approved">Approve</button>
+            <button type="submit" value="Changes requested">Request changes</button>
+          </div>
+        </form>
+        <p class="katse-small" data-decision aria-live="polite"></p>
+      </div>
+    </main>
+  </div>
+</section>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  #katse-review { color-scheme: dark; --ink:#0d111c; --panel:#171d2c; --line:#2b3246; --text:#f2f4fa; --soft:#b1b8cb; --violet:#b7a4ff; color:var(--text); background:var(--ink); font:400 14px/1.55 Geist,system-ui,sans-serif; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  #katse-review * { box-sizing:border-box; }
+  #katse-review .katse-header { display:flex; align-items:center; gap:18px; min-height:62px; padding:14px 22px; border-bottom:1px solid var(--line); }
+  #katse-review .katse-header img { display:block; height:auto; }
+  #katse-review .katse-header-context { color:var(--soft); border-left:1px solid var(--line); padding-left:18px; }
+  #katse-review .katse-shell { display:grid; grid-template-columns:155px minmax(0,1fr); }
+  #katse-review .katse-nav { padding:24px 11px; border-right:1px solid var(--line); }
+  #katse-review .katse-nav>.katse-mono { display:block; margin:0 9px 12px; }
+  #katse-review nav { display:grid; gap:5px; }
+  #katse-review button { font:inherit; color:inherit; background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:8px 13px; }
+  #katse-review button:hover { border-color:var(--violet); }
+  #katse-review nav button { text-align:left; background:transparent; border-color:transparent; padding:8px 9px; white-space:nowrap; }
+  #katse-review nav span { font:400 11px 'IBM Plex Mono',monospace; color:var(--soft); margin-right:7px; }
+  #katse-review nav [aria-current="step"] { background:#221d39; color:#d9ceff; }
+  #katse-review .katse-main { min-height:425px; padding:24px clamp(16px,4vw,44px) 29px; min-width:0; }
+  #katse-review .katse-meta, #katse-review .katse-actions { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; }
+  #katse-review .katse-meta { color:var(--soft); font-size:12px; margin-bottom:20px; }
+  #katse-review .katse-mono, #katse-review code { font-family:'IBM Plex Mono',monospace; font-size:12px; overflow-wrap:anywhere; }
+  #katse-review .katse-preview { color:var(--violet); margin-left:auto; }
+  #katse-review h1 { font:650 clamp(25px,4vw,39px)/1.09 Geist,system-ui,sans-serif; letter-spacing:-.045em; margin:0 0 9px; color:var(--text); }
+  #katse-review h2 { font:600 14px/1.4 Geist,system-ui,sans-serif; margin:0 0 5px; color:var(--text); }
+  #katse-review p { margin:0; }
+  #katse-review .katse-muted, #katse-review .katse-intro, #katse-review article p, #katse-review details p, #katse-review .katse-small { color:var(--soft); }
+  #katse-review .katse-intro { max-width:63ch; margin-bottom:19px; }
+  #katse-review .katse-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  #katse-review article { background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:13px 14px; min-width:0; }
+  #katse-review article code, #katse-review article details { display:block; margin-top:8px; color:var(--violet); }
+  #katse-review .katse-prompt { border-left:3px solid var(--violet); }
+  #katse-review .katse-small { font-size:13px; margin-top:12px; }
+  #katse-review .katse-primary { background:var(--violet); color:#161025; border-color:var(--violet); font-weight:650; margin-top:17px; }
+  #katse-review .katse-primary:hover { background:#cfbfff; }
+  #katse-review .katse-primary span { margin-inline:3px; }
+  #katse-review table { width:100%; border-collapse:collapse; text-align:left; font-size:13px; }
+  #katse-review th, #katse-review td { padding:8px 6px; border-bottom:1px solid var(--line); }
+  #katse-review thead th { color:var(--soft); font-weight:500; }
+  #katse-review tbody th { font-weight:500; }
+  #katse-review .katse-pass { color:#70e3b5; }
+  #katse-review .katse-fail { color:#ff8e88; }
+  #katse-review .katse-proof { margin-top:11px; }
+  #katse-review details p { margin-top:6px; }
+  #katse-review form { display:grid; gap:7px; max-width:550px; }
+  #katse-review textarea { width:100%; resize:vertical; padding:10px; background:var(--panel); color:inherit; border:1px solid var(--line); border-radius:7px; font:inherit; }
+  #katse-review .katse-actions button { margin-top:5px; }
+  #katse-review [hidden] { display:none !important; }
+  @media(max-width:630px) {
+    #katse-review .katse-shell { grid-template-columns:minmax(0,1fr); }
+    #katse-review .katse-nav { border-right:0; border-bottom:1px solid var(--line); padding:7px 10px; }
+    #katse-review .katse-nav>.katse-mono { margin:0 8px 3px; }
+    #katse-review nav { display:flex; flex-wrap:wrap; gap:2px; }
+    #katse-review nav button { padding:5px 7px; }
+    #katse-review nav span { display:none; }
+    #katse-review .katse-main { min-height:0; }
+  }
+  @media(max-width:410px) { #katse-review .katse-grid { grid-template-columns:minmax(0,1fr); } #katse-review .katse-preview { margin-left:0; } }
+  @media(pointer:coarse) { #katse-review button { min-height:44px; } }
+</style>
+<script>
+  (() => {
+    const root = document.getElementById("katse-review");
+    const steps = [...root.querySelectorAll("[data-step]")];
+    const panels = [...root.querySelectorAll("[data-panel]")];
+    const form = root.querySelector("form");
+    const note = root.querySelector("textarea");
+    const decision = root.querySelector("[data-decision]");
+    let current = 0;
+    function show(index) {
+      current = index;
+      panels.forEach((panel, i) => { panel.hidden = i !== current; });
+      steps.forEach((step, i) => {
+        if (i === current) step.setAttribute("aria-current", "step");
+        else step.removeAttribute("aria-current");
+      });
+    }
+    root.querySelectorAll("[data-step], [data-go]").forEach((button) => {
+      button.addEventListener("click", () => {
+        show(Number(button.dataset.step ?? button.dataset.go));
+        if (button.hasAttribute("data-go")) steps[current].focus();
+      });
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!note.value.trim()) { note.focus(); return; }
+      decision.textContent = `${event.submitter.value} · 9df83c38 · ${note.value.trim()}`;
+    });
+  })();
+</script>
+</body>
+</html>
