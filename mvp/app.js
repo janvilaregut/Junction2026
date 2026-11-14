@@ -515,7 +515,7 @@ function showCard(p, st, x, y, dir) {
   card.classList.add('on');
 }
 /* Light up some branches in the tree (by PR id) and dim the rest; no ids clears it.
-   Used by the voice mascot to point at PRs. Older branches are unfolded if needed. */
+   Used by the voice assistant to point at PRs. Older branches are unfolded if needed. */
 function highlightLanes(ids) {
   if ((S.focus || S.zoom) && ids?.length) { S.focus = null; S.zoom = null; S.unfold = true; renderTree(); }
   S.hl = [...new Set(ids || [])];

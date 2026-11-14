@@ -1,0 +1,79 @@
+/* Katse voice: a white aura with a hint of blue that hugs the screen edges while the assistant listens or talks.
+   Every layer is a static glow; the voice only changes opacities (--lvl, 0..1) and two rotating masks move the light
+   along the edges, so nothing is repainted with a blur on each frame. */
+@property --fa{syntax:'<angle>';inherits:false;initial-value:0deg}
+@property --fb{syntax:'<angle>';inherits:false;initial-value:180deg}
+
+.aura{--lvl:0;--r:0px;position:fixed;inset:0;z-index:90;pointer-events:none;border-radius:var(--r);opacity:0;visibility:hidden;
+  transition:opacity .9s ease,visibility 0s .9s,--r .9s cubic-bezier(.2,.9,.2,1)}
+.aura.on{--r:30px;opacity:1;visibility:visible;transition:opacity .45s ease,visibility 0s,--r .6s cubic-bezier(.2,.9,.2,1)}
+@property --r{syntax:'<length>';inherits:true;initial-value:0px}
+.aura>i{position:absolute;inset:0;border-radius:inherit}
+
+/* The screen becomes a rounded device: the corners outside the radius go black. */
+.aura::before{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 0 80px #000}
+
+/* A thin bright rim, always there while the aura is on. */
+.a-rim{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.78),inset 0 0 6px 1px rgba(232,241,255,.55)}
+/* Base glow, a bit stronger with the voice. */
+.a-soft{box-shadow:inset 0 0 26px 3px rgba(255,255,255,.34),inset 0 0 72px 10px rgba(188,212,255,.15);opacity:calc(.6 + var(--lvl)*.4)}
+/* Wider glows that only show as the voice gets louder. */
+.a-mid{box-shadow:inset 0 0 52px 12px rgba(240,246,255,.42),inset 0 0 120px 26px rgba(178,205,255,.2);opacity:calc(var(--lvl)*1.7)}
+.a-loud{box-shadow:inset 0 0 96px 30px rgba(255,255,255,.3),inset 0 0 220px 64px rgba(166,198,255,.2);opacity:calc(var(--lvl)*var(--lvl)*1.3)}
+/* Light travelling along the edges: a hot glow seen through a rotating angular window (two, counter-rotating). */
+.a-sweep{box-shadow:inset 0 0 3px 1.5px #fff,inset 0 0 34px 7px rgba(255,255,255,.8),inset 0 0 90px 14px rgba(196,218,255,.32);
+  -webkit-mask:conic-gradient(from var(--fa),#0000 0deg,#000 46deg,#0000 104deg,#0000 180deg,#000 226deg,#0000 284deg);
+  mask:conic-gradient(from var(--fa),#0000 0deg,#000 46deg,#0000 104deg,#0000 180deg,#000 226deg,#0000 284deg);
+  opacity:calc(.42 + var(--lvl)*.58);animation:aSpinA 7s linear infinite}
+.a-sweep.b{--fa:0deg;box-shadow:inset 0 0 2px 1px rgba(230,240,255,.9),inset 0 0 44px 9px rgba(214,230,255,.55),inset 0 0 110px 18px rgba(170,200,255,.22);
+  -webkit-mask:conic-gradient(from var(--fb),#0000 0deg,#000 60deg,#0000 140deg,#0000 360deg);
+  mask:conic-gradient(from var(--fb),#0000 0deg,#000 60deg,#0000 140deg,#0000 360deg);
+  opacity:calc(.25 + var(--lvl)*.75);animation:aSpinB 11s linear infinite}
+@keyframes aSpinA{to{--fa:360deg}}
+@keyframes aSpinB{to{--fb:-180deg}}
+/* A soft bloom rising from the bottom edge while it speaks. */
+.a-bloom{inset:auto;left:50%;bottom:-34vh;width:min(1100px,96vw);height:52vh;border-radius:50%;transform:translateX(-50%);
+  background:radial-gradient(closest-side,rgba(226,236,255,.30),rgba(190,212,255,.11) 55%,transparent);opacity:0;transition:opacity .5s}
+.aura[data-state="talking"] .a-bloom{opacity:calc(.25 + var(--lvl)*.9)}
+
+/* What is being said, centred above the bottom edge. */
+.vcap{position:fixed;left:50%;bottom:58px;z-index:91;width:min(680px,calc(100vw - 48px));transform:translate(-50%,10px);
+  display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;pointer-events:none;opacity:0;transition:opacity .5s,transform .6s cubic-bezier(.2,.9,.2,1)}
+.vcap.on{opacity:1;transform:translate(-50%,0)}
+/* A soft dark veil behind the words so they read over the tree or the graph. */
+.vcap::before{content:"";position:absolute;z-index:-1;left:50%;top:50%;width:calc(100% + 160px);height:calc(100% + 110px);transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(closest-side,rgba(10,10,12,.88),rgba(10,10,12,.6) 60%,transparent);pointer-events:none}
+.vcap:not(:has(p:not(:empty),.v-type:not([hidden])))::before{opacity:0}
+.vcap p{max-width:100%;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;transition:opacity .4s}
+.vcap p:empty{display:none}
+.v-you{font:400 13px/1.45 var(--body,Inter,system-ui);color:var(--fg2,#8e8e93);-webkit-line-clamp:2}
+.v-ai{font:400 18px/1.45 var(--body,Inter,system-ui);letter-spacing:-.01em;color:var(--fg,#f5f5f7);-webkit-line-clamp:3;text-shadow:0 1px 18px rgba(0,0,0,.65)}
+.v-hint{font:500 12px var(--body,Inter,system-ui);color:var(--fg3,#55555c);letter-spacing:.01em}
+.v-act{font:500 11px var(--mono,ui-monospace);color:var(--fg2,#8e8e93);padding:4px 11px;border-radius:999px;background:rgba(31,31,34,.85);border:1px solid var(--line,rgba(255,255,255,.07));opacity:0;transition:opacity .5s}
+.v-act.show{opacity:1}
+.v-act.bad{color:var(--bad,#f2a99f)}.v-act.warn{color:var(--warn,#f3e2a6)}
+.v-act:empty{display:none}
+.v-type{pointer-events:auto;display:flex;align-items:center;gap:6px;width:min(420px,100%);padding:4px 4px 4px 16px;border-radius:999px;background:rgba(22,22,24,.92);border:1px solid var(--line2,rgba(255,255,255,.14))}
+.v-type input{flex:1;min-width:0;background:none;border:0;outline:0;font:400 14px var(--body,Inter,system-ui);color:var(--fg,#f5f5f7);padding:7px 0}
+.v-type input::placeholder{color:var(--fg3,#55555c)}
+.v-type button{width:32px;height:32px;border-radius:50%;background:var(--fg,#f5f5f7);color:var(--bg,#0c0c0e);font-weight:600}
+
+/* The only thing left on screen when idle: a tiny dot bottom-right that says it is waiting for the wake word. */
+.vdot{position:fixed;right:20px;bottom:20px;z-index:41;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;transition:opacity .4s,transform .3s}
+.vdot::before{content:"";width:7px;height:7px;border-radius:50%;background:transparent;box-shadow:inset 0 0 0 1.4px var(--fg3,#55555c);transition:background .3s,box-shadow .3s}
+.vdot[data-wake="on"]::before{background:rgba(236,243,255,.8);box-shadow:0 0 0 3px rgba(205,226,255,.08),0 0 12px 2px rgba(205,226,255,.35);animation:vBreath 3.4s ease-in-out infinite}
+.vdot::after{content:attr(data-label);position:absolute;right:30px;white-space:nowrap;font:500 12px var(--body,Inter,system-ui);color:var(--fg2,#8e8e93);padding:5px 11px;border-radius:999px;background:var(--card,#161618);border:1px solid var(--line,rgba(255,255,255,.07));opacity:0;transform:translateX(6px);transition:opacity .25s,transform .25s;pointer-events:none}
+.vdot:hover::after,.vdot:focus-visible::after{opacity:1;transform:none}
+.vdot:focus-visible{outline:1.5px solid var(--line2,rgba(255,255,255,.14));outline-offset:2px}
+body:has(.aura.on) .vdot{opacity:0;pointer-events:none}
+@keyframes vBreath{50%{box-shadow:0 0 0 5px rgba(205,226,255,.04),0 0 16px 4px rgba(205,226,255,.22)}}
+
+/* Consensus overlay (live agents view), opened by the assistant. */
+.m-overlay{position:fixed;inset:0;z-index:38;display:grid;place-items:center;background:rgba(12,12,14,.6);backdrop-filter:blur(6px);opacity:0;transition:opacity .35s}
+.m-overlay.on{opacity:1}
+.m-sheet{position:relative;width:min(1180px,calc(100vw - 48px));height:min(860px,calc(100vh - 48px));border-radius:28px;overflow:hidden;background:var(--bg,#0c0c0e);border:1px solid var(--line2,rgba(255,255,255,.14));box-shadow:0 30px 80px rgba(0,0,0,.6);transform:scale(.96);transition:transform .45s cubic-bezier(.2,.9,.2,1)}
+.m-overlay.on .m-sheet{transform:none}
+.m-sheet iframe{width:100%;height:100%;border:0;display:block}
+.m-sheet .m-x{position:absolute;top:14px;right:14px;z-index:2;width:32px;height:32px;border-radius:50%;background:var(--card,#161618);border:1px solid var(--line,rgba(255,255,255,.07));color:var(--fg2,#8e8e93)}
+
+@media (max-width:640px){.aura.on{--r:22px}.vcap{bottom:40px}.v-ai{font-size:16px}}
+@media (prefers-reduced-motion:reduce){.a-sweep{animation:none}.vdot[data-wake="on"]::before{animation:none}}

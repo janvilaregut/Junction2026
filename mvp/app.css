@@ -37,7 +37,6 @@ h1 span{color:var(--fg3)}
 .git{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;margin-top:5vh;overflow-x:auto;overflow-y:hidden}
 #tree{display:block;width:100%;min-width:760px;overflow:visible}
 .gfoot{display:flex;justify-content:space-between;align-items:center;margin-top:18px;min-width:760px}
-body:has(.mascot) .gfoot{padding-right:120px} /* keep the folded-branches button clear of the voice mascot */
 .legend{display:flex;gap:18px;font-size:12px;color:var(--fg2)}
 .legend span,.flegend span{display:flex;align-items:center;gap:7px}
 .legend i,.flegend i{width:8px;height:8px;border-radius:50%}
@@ -269,7 +268,6 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 .plist button:hover{background:var(--card3)}
 
 @media (max-width:760px){body{padding:20px 16px}.legend{display:none}.fbar{left:16px!important;right:16px;transform:none;bottom:16px;flex-wrap:wrap;border-radius:28px}.fbar .txt,.flegend{display:none}.back{left:16px;top:16px}
-  body:has(.mascot) .fbar{bottom:122px} /* sit above the voice mascot */
   .agentsBtn{top:20px;right:16px}
   .fbar .txt.live{display:inline;white-space:normal;flex:1;min-width:0}
   .dtop{left:16px;right:16px;top:16px}.dnav{top:96px;right:16px}
