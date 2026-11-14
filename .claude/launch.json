@@ -1,7 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "katse", "runtimeExecutable": "node", "runtimeArgs": ["server/index.js"], "port": 4173 },
-    { "name": "katse-hud", "runtimeExecutable": "env", "runtimeArgs": ["PORT=4174", "KATSE_DATA=/Users/meulencv/development/projects/Junction2026/data", "node", "server/index.js"], "port": 4174 }
+    { "name": "katse", "runtimeExecutable": "node", "runtimeArgs": ["server/index.js"], "port": 4173 }
   ]
 }
