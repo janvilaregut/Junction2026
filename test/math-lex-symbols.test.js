@@ -120,3 +120,69 @@ test('files the engine does not read as code have no language', () => {
   assert.equal(langOf('a/b/C.CS'), 'cs');
   assert.equal(parseFile('# hi', 'README.md').symbols.length, 0);
 });
+
+// Found by the reviewers of the checks module, who had to work around each of these.
+test('imports and exports survive what comes before them', () => {
+  const p = parseFile('const a = `${x}`;\nimport b from "./b.js";\nexport const c = 1;', 'a.js');
+  assert.deepEqual([p.imports.map((i) => i.source), p.exports], [['./b.js'], ['c']], 'a template hole is a bracket pair, not a closing brace');
+  assert.deepEqual(parseFile('export const a = 1, b = 2;', 'x.js').exports, ['a', 'b'], 'every declarator of one export');
+  assert.deepEqual(parseFile('export const m: Map<string, number> = new Map(), n = 2;', 'x.ts').exports, ['m', 'n'], 'a comma inside type arguments starts nothing');
+  assert.deepEqual(parseFile('export let a = f(1, 2)\nexport const b = [1, 2]', 'x.js').exports, ['a', 'b'], 'without semicolons');
+});
+
+test('only a literal names a module', () => {
+  assert.deepEqual(parseFile("const l = require('./locales/' + name);", 'a.js').imports, []);
+  assert.deepEqual(parseFile('const m = await import(`./plugins/${id}.js`);', 'a.js').imports, []);
+  assert.deepEqual(parseFile("const m = await import('./a.js');\nconst n = require(`./b.js`);", 'a.js').imports.map((i) => i.source), ['./a.js', './b.js']);
+});
+
+test('the names of an import list, one per entry', () => {
+  const names = (src, path = 'x.js') => parseFile(src, path).imports[0].names.map((n) => `${n.imported}>${n.local}`);
+  assert.deepEqual(names("const { e, h: { i }, k = 1, ...rest } = require('./n');"), ['e>e', 'h>h', 'k>k'], 'a nested pattern reads h; a default value and a rest element import nothing more');
+  assert.deepEqual(names("import { 'kebab-name' as kn, plain, other as o } from './t.js';"), ['kebab-name>kn', 'plain>plain', 'other>o']);
+  assert.deepEqual(names("import { type T, type as kind, value } from './t.js';", 'x.ts'), ['T>T', 'type>kind', 'value>value']);
+  assert.deepEqual(parseFile('function p() {}\nmodule.exports = { p, q: function () { return helper(1); }, get size() { return 1; }, async run() {}, [key]: 2, ...more };', 'x.js').exports, ['p', 'q', 'size', 'run'], 'the keys of the literal, not every word inside it');
+});
+
+test('parameters: markers and pseudo-parameters are not arguments', () => {
+  const arity = (src, path) => { const s = parseFile(src, path).symbols[0]; return [s.minParams, s.maxParams]; };
+  assert.deepEqual(arity('def f(a, /, b, *, c):\n    pass\n', 'a.py'), [3, 3], 'Python / and bare *');
+  assert.deepEqual(arity('def f(a, *args, k=1, **kw):\n    pass\n', 'a.py'), [1, Infinity]);
+  assert.deepEqual(arity('function n(this: Foo, a: number, b?: string) {}', 'a.ts'), [1, 2], 'TypeScript this');
+  assert.deepEqual(arity("function say(html, who = 'ai', src) {}", 'a.js'), [3, 3], 'a required parameter after a default must still be reached by position');
+  assert.equal(parseFile('class C { void M(int a, int b = 2, params int[] rest) { } }', 'a.cs').symbols.find((s) => s.name === 'M').minParams, 1);
+});
+
+test('decorators and attributes belong to the declaration', () => {
+  const py = parseFile('import pytest\n\n@pytest.mark.skip(reason="later")\n@staticmethod\ndef test_s(a):\n    pass\n\ndef plain():\n    pass\n', 'test_a.py');
+  const s = py.symbols.find((x) => x.name === 'test_s');
+  assert.deepEqual([s.attrs, s.start, py.tokens[s.a].v], [['pytest.mark.skip', 'staticmethod'], 3, '@'], 'a Python declaration starts at its first decorator');
+  assert.deepEqual([py.symbols.find((x) => x.name === 'plain').attrs, py.symbols.find((x) => x.name === 'plain').start], [[], 8]);
+  const ts = parseFile('class C {\n  @Input() @Output({ alias: "x" })\n  public static run(a) { }\n}', 'x.ts').symbols.find((x) => x.name === 'run');
+  assert.deepEqual([ts.attrs, ts.modifiers], [['Input', 'Output'], ['public', 'static']], 'modifiers are read after the decorators and their arguments');
+  const k = parseFile('class K { get size() { return 1; } set size(v) { } get() { } }', 'a.js').symbols;
+  assert.deepEqual(k.filter((x) => x.kind !== 'type').map((x) => `${x.name}:${x.modifiers.join()}`), ['size:get', 'size:set', 'get:'], 'accessors are marked; a method called get is not one');
+});
+
+test('a benchmark is not a test', () => {
+  assert.equal(parseFile('class B { [Benchmark] public void Run() { } [Fact] public void Works() { } }', 'B.cs').symbols.find((s) => s.name === 'Run').isTest, false);
+  assert.equal(parseFile('class B { [Benchmark] public void Run() { } [Fact] public void Works() { } }', 'B.cs').symbols.find((s) => s.name === 'Works').isTest, true);
+  assert.deepEqual(parseFile("bench('fast', () => { run(); });\ntest('ok', () => { run(); });", 'a.js').symbols.map((s) => s.isTest), [false, true]);
+});
+
+test('C# using: directives, not declarations', () => {
+  const uses = (src) => parseFile(src, 'x.cs').imports.map((i) => (i.ns ? `${i.ns}=` : '') + i.source);
+  assert.deepEqual(uses('using System.Text;\nusing static System.Math;\nusing Json = Newtonsoft.Json;\nnamespace A { using B.C; class K { } }'), ['System.Text', 'System.Math', 'Json=Newtonsoft.Json', 'B.C']);
+  assert.deepEqual(uses('class C { void M() { using IDisposable d = x; using var e = y; using (var z = w) { } } }'), [], 'a using declaration in a body imports nothing');
+  assert.deepEqual(uses('extern alias v2;\nusing v2::Acme.App;\nusing global::System.IO;'), ['Acme.App', 'System.IO'], 'what precedes :: is an alias qualifier');
+});
+
+test('a member of a JavaScript class or object may be called anything', () => {
+  const names = (src, path) => parseFile(src, path).symbols.filter((s) => s.kind !== 'type').map((s) => `${s.name}/${s.params}`);
+  assert.deepEqual(names('class M { get(k) { return 1; } set(k, v) { } add(x) { } static(x) { } default(x) { } with(x) { } delete(k) { } static { init(); } static create() { } }', 'a.js'), ['get/1', 'set/2', 'add/1', 'static/1', 'default/1', 'with/1', 'delete/1', 'create/0']);
+  assert.deepEqual(names('const api = { get(k) { return 1; }, set(k, v) { }, remove(x) { } };', 'a.js'), ['get/1', 'set/2', 'remove/1']);
+  // A describe() callback is a function body: its statements are not members.
+  assert.deepEqual(names("describe('cart', () => {\n  if (ready) { setup(1); }\n  for (const x of xs) { use(x); }\n  it('adds', () => { run(); });\n});", 'cart.test.js'), ['adds/0']);
+  assert.deepEqual(names('interface Shape { default int size() { return 0; } int area(); }', 'Shape.java'), ['size/0', 'area/0']);
+  assert.deepEqual(names('class C { void M(int x) { switch (x) { case 1: { A(); break; } default: { B(); break; } } if (x > 0) { C(); } } }', 'C.cs'), ['M/1']);
+});

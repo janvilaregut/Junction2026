@@ -95,11 +95,12 @@ test('imports: a name the target does not export is bad only when the export lis
       "const { t } = require('./dyn.js');", //            module.exports = <call>: open
       "import lib from './lib.js';", //                   line 7: no default export in an ES module
       "import cjs from './cjs.js';", //                   a CommonJS module is its own default
-      "const { u: { v } } = require('./cjs.js');", //     nested pattern: not a list of names
+      "const { u: { v } } = require('./cjs.js');", //     line 9: a nested pattern still reads `u`, which is not exported
     ),
   };
   const f = unresolvedImports(pr({ head }));
-  assert.deepEqual(brief(f), ['bad import.missing-export src/use.js:2', 'bad import.missing-export src/use.js:5', 'bad import.missing-export src/use.js:7']);
+  assert.deepEqual(brief(f), ['bad import.missing-export src/use.js:2', 'bad import.missing-export src/use.js:5', 'bad import.missing-export src/use.js:7', 'bad import.missing-export src/use.js:9']);
+  assert.match(f.find((x) => x.line === 9).detail, /imports 'u' from '\.\/cjs\.js'/);
   assert.match(f.find((x) => x.line === 2).detail, /imports 'hidden' from '\.\/lib\.js', but src\/lib\.js exports only K, a, b, f, shown\./);
   assert.match(f.find((x) => x.line === 7).detail, /'default'/);
 });

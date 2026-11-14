@@ -840,17 +840,17 @@ function hasStaticImport(F) {
   return r;
 }
 
-/** Decorators written above a Python declaration (symbols.js starts the declaration at `def`): [{ name, line }]. */
+/** Decorators of a Python declaration, top to bottom (symbols.js starts the declaration at its first decorator): [{ name, line }]. */
 function pyDecorators(F, s) {
   const T = F.tokens, M = F.match, out = [];
-  let i = s.a - 1;
-  while (i > 0 && isOpTok(T[i], ';')) {
-    let k = i - 1;
-    while (k >= 0) { const u = T[k]; if (u.k === 'op') { if ((u.v === ')' || u.v === ']') && M[k] >= 0 && M[k] < k) { k = M[k] - 1; continue; } if (u.v === ';' || u.v === '{' || u.v === '}') break; } k--; }
-    const st = k + 1; if (!isOpTok(T[st], '@')) break;
-    let name = ''; for (let q = st + 1; q < i && (isWord(T[q]) || isOpTok(T[q], '.')); q++) name += T[q].v;
-    out.push({ name, line: T[st].l });
-    i = st - 1;
+  let i = s.a;
+  while (i < s.b && isOpTok(T[i], '@')) {
+    let q = i + 1, name = '';
+    for (; q < s.b && (isWord(T[q]) || isOpTok(T[q], '.')); q++) name += T[q].v;
+    out.push({ name, line: T[i].l });
+    if (isOpTok(T[q], '(') && M[q] > q) q = M[q] + 1;
+    while (q < s.b && !isOpTok(T[q], ';')) q++; // the rest of the decorator's line
+    i = q + 1;
   }
   return out;
 }

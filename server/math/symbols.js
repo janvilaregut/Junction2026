@@ -9,9 +9,9 @@ const FN_KW = new Set(['function', 'func', 'fn', 'fun', 'def']);
 const CONTROL = new Set(['if', 'else', 'for', 'foreach', 'while', 'do', 'switch', 'try', 'catch', 'finally', 'using', 'lock', 'fixed', 'checked', 'unchecked', 'unsafe', 'when', 'with', 'match', 'select', 'loop', 'synchronized', 'guard', 'defer', 'elif', 'except', 'repeat', 'return', 'throw', 'case', 'default', 'get', 'set', 'init', 'add', 'remove', 'static']);
 // Keywords that open a bare block only when nothing follows them (`get { }`, `static { }`); with more tokens they are modifiers.
 const ALONE = new Set(['get', 'set', 'init', 'add', 'remove', 'static']);
-const TEST_CALL = new Set(['describe', 'it', 'test', 'suite', 'context', 'specify', 'fdescribe', 'fit', 'xdescribe', 'xit', 'bench']);
+const TEST_CALL = new Set(['describe', 'it', 'test', 'suite', 'context', 'specify', 'fdescribe', 'fit', 'xdescribe', 'xit']); // not `bench`: a benchmark asserts nothing
 const TEST_GROUP = new Set(['describe', 'suite', 'context', 'fdescribe', 'xdescribe']);
-const TEST_ATTR = /^(Fact|Theory|Test|TestMethod|TestCase|TestCaseSource|DataTestMethod|InlineData|MemberData|ClassData|CombinatorialData|Benchmark|ParameterizedTest|RepeatedTest)$/;
+const TEST_ATTR = /^(Fact|Theory|Test|TestMethod|TestCase|TestCaseSource|DataTestMethod|InlineData|MemberData|ClassData|CombinatorialData|ParameterizedTest|RepeatedTest)$/;
 const TEST_PATH = /(^|\/)(tests?|spec|specs|__tests__|testing)\/|(Tests?|Spec)\.[a-z]+$|\.(test|spec)\.[a-z]+$|_test\.[a-z]+$|(^|\/)test_[^/]+\.py$/i;
 const TYPED_BEFORE = new Set(['cs', 'java', 'c', 'dart']); // `Type name`: the parameter name is the last identifier
 const ANGLE = new Set(['cs', 'java', 'ts', 'kt', 'c', 'rs', 'swift', 'dart', 'scala']);
@@ -47,11 +47,13 @@ export function parseFile(text, path, lang = langOf(path)) {
     return j >= lo && (T[j].k === 'id' || T[j].k === 'kw') ? j : -1;
   };
   function params(open) {
-    const close = match[open]; const names = []; let min = 0, max = 0;
+    const close = match[open]; const names = []; let min = 0, max = 0, lastRequired = 0;
     if (close < 0 || close === open + 1) return { params: 0, minParams: 0, maxParams: 0, paramNames: names };
     let seg = [], angle = 0;
     const flush = () => {
       if (!seg.length) return;
+      // Not parameters: Python's `/` and bare `*` markers, and TypeScript's `this` pseudo-parameter (a type annotation for `this`).
+      if ((lang === 'py' && seg.length === 1 && (op(seg[0], '/') || op(seg[0], '*'))) || (lang === 'ts' && !names.length && kw(seg[0], 'this'))) { seg = []; return; }
       const eq = seg.findIndex((i) => op(i, '=')), body = eq < 0 ? seg : seg.slice(0, eq);
       const ids = body.filter((i) => T[i].k === 'id' || (T[i].k === 'kw' && (T[i].v === 'self' || T[i].v === 'this')));
       const rest = body.some((i) => op(i, '...') || kw(i, 'params') || (lang === 'py' && op(i, '*')) || (lang === 'py' && op(i, '**')));
@@ -61,7 +63,7 @@ export function parseFile(text, path, lang = langOf(path)) {
       if (ids.length) name = TYPED_BEFORE.has(lang) || lang === 'go' && false ? T[ids[ids.length - 1]].v : colon > 0 ? word(body[colon - 1]) || T[ids[0]].v : lang === 'go' ? T[ids[0]].v : TYPED_BEFORE.has(lang) ? T[ids[ids.length - 1]].v : T[ids[0]].v;
       if (body.length && op(body[0], '{') || op(body[0], '[') && js) name = null; // destructuring: no single name
       if (lang === 'py' && (name === 'self' || name === 'cls') && !names.length && !max) { seg = []; return; }
-      names.push(name); max++; if (!optional && !rest) min++; if (rest) max = Infinity;
+      names.push(name); max++; if (!optional && !rest) { min++; lastRequired = names.length; } if (rest) max = Infinity;
       seg = [];
     };
     for (let i = open + 1; i < close; i++) {
@@ -70,21 +72,45 @@ export function parseFile(text, path, lang = langOf(path)) {
       seg.push(i); i = skip(i);
     }
     flush();
-    return { params: names.length, minParams: min, maxParams: max, paramNames: names };
+    // JavaScript and TypeScript bind arguments by position only, so a required parameter after one with a default
+    // still has to be reached: `f(a, b = 1, c)` needs three arguments. Languages with named arguments count.
+    return { params: names.length, minParams: js ? lastRequired : min, maxParams: max, paramNames: names };
   }
   const attrsOf = (a, b) => { // C#/Java/TS/Python attributes and decorators in front of a declaration
     const names = [];
     for (let i = a; i < b; i++) {
       if (op(i, '[') && lang === 'cs' && match[i] > i) { for (let j = i + 1; j < match[i]; j++) { if (T[j].k === 'id' && (op(j - 1, '[') || op(j - 1, ','))) names.push(T[j].v.replace(/Attribute$/, '')); j = skip(j); } i = match[i]; continue; }
-      if (op(i, '@') && word(i + 1)) { names.push(T[i + 1].v); i++; continue; }
+      if (op(i, '@') && word(i + 1)) { // @name, @a.b.name, @name(args): the dotted name, then its arguments are skipped
+        let j = i + 1; const parts = [T[j].v];
+        while (op(j + 1, '.') && word(j + 2)) { parts.push(T[j + 2].v); j += 2; }
+        names.push(parts.join('.'));
+        if (op(j + 1, '(') && match[j + 1] > j) j = match[j + 1];
+        i = j; continue;
+      }
       if (T[i].k === 'kw' || T[i].k === 'id') break;
     }
     return names;
   };
+  /** The first token of a declaration after its attributes and decorators. */
+  const afterAttrs = (a, b) => {
+    let i = a;
+    while (i < b) {
+      if (op(i, '[') && lang === 'cs' && match[i] > i) i = match[i] + 1;
+      else if (op(i, '@') && word(i + 1)) { let j = i + 1; while (op(j + 1, '.') && word(j + 2)) j += 2; if (op(j + 1, '(') && match[j + 1] > j) j = match[j + 1]; i = j + 1; }
+      else if (lang === 'py' && op(i, ';')) i++; // the end of a decorator's line
+      else break;
+    }
+    return i;
+  };
 
   function add(sym, ctx, a, b, bodyA, bodyB, open, single = null) {
     const attrs = attrsOf(a, b), mods = [];
-    for (let i = a; i < Math.min(b, bodyA > a ? bodyA : b); i++) { const w = word(i); if (w && MODIFIER.has(w)) mods.push(w); if (op(i, '(')) break; i = skip(i); }
+    for (let i = afterAttrs(a, b); i < Math.min(b, bodyA > a ? bodyA : b); i++) {
+      const w = word(i);
+      if (w && MODIFIER.has(w)) mods.push(w);
+      else if (js && (w === 'get' || w === 'set') && word(i + 1)) mods.push(w); // an accessor: `get size() {…}` is read like a property, not called
+      if (op(i, '(')) break; i = skip(i);
+    }
     const chain = ctx.chain || [];
     const p = open != null && open >= 0 ? params(open) : single ? { params: 1, minParams: 1, maxParams: 1, paramNames: [single] } : { params: 0, minParams: 0, maxParams: 0, paramNames: [] };
     const exported = mods.includes('export') || mods.includes('public') || mods.includes('pub') || (lang === 'go' && /^[A-Z]/.test(sym.name)) || (lang === 'py' && !sym.name.startsWith('_'));
@@ -102,7 +128,7 @@ export function parseFile(text, path, lang = langOf(path)) {
   function classify(a, open, ctx) {
     let h = top(a, open);
     // Attributes and decorators belong to the declaration but say nothing about its shape.
-    while (h.length && ((op(h[0], '[') && lang === 'cs') || op(h[0], '@'))) { if (op(h[0], '@')) { h.shift(); if (h.length && word(h[0])) h.shift(); while (h.length && op(h[0], '.')) { h.shift(); h.shift(); } if (h.length && op(h[0], '(')) h.shift(); } else h.shift(); }
+    while (h.length && ((op(h[0], '[') && lang === 'cs') || op(h[0], '@'))) { if (op(h[0], '@')) { h.shift(); if (h.length && word(h[0])) h.shift(); while (h.length && op(h[0], '.')) { h.shift(); h.shift(); } if (h.length && op(h[0], '(')) h.shift(); if (lang === 'py' && h.length && op(h[0], ';')) h.shift(); } else h.shift(); }
     if (lang === 'py' && h.length && op(h[h.length - 1], ':')) h.pop();
     if (!h.length) return { kind: 'block' };
     const first = h[0], last = h[h.length - 1];
@@ -143,7 +169,12 @@ export function parseFile(text, path, lang = langOf(path)) {
       if (name) return { kind: 'fn', name, open: open2 ?? arrowParams, single: bare };
       return { kind: 'block' };
     }
-    if (T[first].k === 'kw' && CONTROL.has(T[first].v) && !(ALONE.has(T[first].v) && h.length > 1)) return { kind: 'block' };
+    // A JavaScript class body or object literal holds members, never statements, and a member may be called
+    // anything: `get(key) {…}`, `set(k, v) {…}`, `delete(k) {…}`, `with(x) {…}`. (A describe() callback is scanned as
+    // a group but is an ordinary function body: statements there stay statements.)
+    const member = js && (ctx.kind === 'obj' || (ctx.kind === 'type' && !ctx.group));
+    const javaDefault = lang === 'java' && kw(first, 'default') && h.length > 2; // `default int size() {…}` in an interface
+    if (T[first].k === 'kw' && CONTROL.has(T[first].v) && !(ALONE.has(T[first].v) && h.length > 1) && !javaDefault && !(member && firstParen === 1)) return { kind: 'block' };
     if (firstParen >= 0 && (eqAt < 0 || eqAt > firstParen)) {
       if (js && ctx.kind !== 'type' && ctx.kind !== 'obj') return { kind: 'block' }; // `name(args) {` is only a declaration inside a class or an object
       if (lang === 'py' || lang === 'go' || lang === 'rs' || lang === 'kt' || lang === 'swift' || lang === 'php') return { kind: 'block' }; // these always use a keyword
@@ -152,7 +183,7 @@ export function parseFile(text, path, lang = langOf(path)) {
       const at = nameBefore(open2, a);
       if (at < 0) return { kind: 'block' };
       const name = T[at].v;
-      if (T[at].k === 'kw' && (CONTROL.has(name) || ['new', 'typeof', 'sizeof', 'nameof', 'await', 'base', 'this', 'function', 'super'].includes(name))) return { kind: 'block' };
+      if (T[at].k === 'kw' && !(member && at === first) && (CONTROL.has(name) || ['new', 'typeof', 'sizeof', 'nameof', 'await', 'base', 'this', 'function', 'super'].includes(name))) return { kind: 'block' };
       if (op(at - 1, '.') && !js) { // explicit interface implementation: IFoo.Bar(...)
         return { kind: 'fn', name, open: open2 };
       }
@@ -249,6 +280,7 @@ export function parseFile(text, path, lang = langOf(path)) {
           if (d.kind !== 'block' || op(i - 1, ';') || ctx.kind !== 'file' || !js) stmt = i; else stmt = i;
           continue;
         }
+        if (t.v === ';' && lang === 'py' && op(stmt, '@')) { i++; continue; } // a decorator's line: it belongs to the def or class that follows
         if (t.v === ';') { bodiless(stmt, i, ctx); stmt = i + 1; }
         else if (t.v === ',' && ctx.kind === 'obj') stmt = i + 1;
         else if (t.v === '}') stmt = i + 1;
@@ -282,27 +314,39 @@ function readImports(file) {
   const str = (i) => (i >= 0 && i < N && T[i].k === 'str' ? T[i].v.replace(/^[`'"]|[`'"]$/g, '') : null);
   const js = isJsLike(lang);
   let depth = 0;
-  const names = (a, b) => { // { a, b as c, d: e }
+  const isWord = (i) => i >= 0 && i < N && (T[i].k === 'id' || T[i].k === 'kw');
+  const group = (i) => ((op(i, '{') || op(i, '(') || op(i, '[') || op(i, '${')) && match[i] > i ? match[i] : i);
+  /** The entries of `{ a, b as c, d: e, 'x-y' as z, h: { nested }, k = 1, type T, ...rest, get m() {…} }`, one per top-level comma. */
+  const names = (a, b) => {
     const out = [];
-    for (let i = a + 1; i < b; i++) {
-      if (T[i].k !== 'id' && T[i].k !== 'kw') continue;
-      const imported = T[i].v; let local = imported;
-      if ((kw(i + 1, 'as') || op(i + 1, ':')) && T[i + 2]) { local = T[i + 2].v; i += 2; }
-      if (imported !== 'type') out.push({ imported, local });
+    for (let i = a + 1; i < b;) {
+      let end = i; while (end < b && !op(end, ',')) end = group(end) + 1;
+      let j = i;
+      const rest = op(j, '...');
+      if (isWord(j) && T[j].v === 'type' && j + 1 < end && (isWord(j + 1) || T[j + 1].k === 'str') && T[j + 1].v !== 'as') j++; // `type T`: a type-only entry
+      while (isWord(j) && ['get', 'set', 'async', 'static'].includes(T[j].v) && j + 1 < end && (isWord(j + 1) || op(j + 1, '*'))) j++; // a method of an object literal
+      if (op(j, '*')) j++;
+      if (!rest && j < end && (isWord(j) || T[j].k === 'str')) {
+        const imported = T[j].k === 'str' ? str(j) : T[j].v; let local = imported;
+        if ((kw(j + 1, 'as') || op(j + 1, ':')) && j + 2 < end && (isWord(j + 2) || T[j + 2].k === 'str')) local = T[j + 2].k === 'str' ? str(j + 2) : T[j + 2].v;
+        out.push({ imported, local });
+      }
+      i = end + 1;
     }
     return out;
   };
   for (let i = 0; i < N; i++) {
     const t = T[i];
-    if (t.k === 'op') { if (t.v === '{' || t.v === '(' || t.v === '[') depth++; else if (t.v === '}' || t.v === ')' || t.v === ']') depth--; }
+    if (t.k === 'op') { if (t.v === '{' || t.v === '(' || t.v === '[' || t.v === '${') depth++; else if (t.v === '}' || t.v === ')' || t.v === ']') depth--; } // `${` opens a template hole that `}` closes
     if (js) {
-      if (t.k === 'id' && t.v === 'require' && op(i + 1, '(') && str(i + 2) != null) {
+      // Only a literal specifier names a module: `require('./locales/' + name)` and import(`./plugins/${id}.js`) are left unresolved.
+      if (t.k === 'id' && t.v === 'require' && op(i + 1, '(') && str(i + 2) != null && op(i + 3, ')')) {
         const imp = { source: str(i + 2), line: t.l, names: [], default: null, ns: null };
         if (op(i - 1, '=')) { if (op(i - 2, '}') && match[i - 2] >= 0) imp.names = names(match[i - 2], i - 2); else if (T[i - 2]?.k === 'id') imp.ns = imp.default = T[i - 2].v; }
         file.imports.push(imp); continue;
       }
       if (t.k === 'kw' && t.v === 'import' && depth === 0) {
-        if (op(i + 1, '(')) { if (str(i + 2) != null) file.imports.push({ source: str(i + 2), line: t.l, names: [], default: null, ns: null, dynamic: true }); continue; }
+        if (op(i + 1, '(')) { if (str(i + 2) != null && (op(i + 3, ')') || op(i + 3, ','))) file.imports.push({ source: str(i + 2), line: t.l, names: [], default: null, ns: null, dynamic: true }); continue; }
         const imp = { source: null, line: t.l, names: [], default: null, ns: null };
         let j = i + 1;
         for (; j < N && !op(j, ';') && T[j].l <= t.l + 40; j++) {
@@ -328,6 +372,14 @@ function readImports(file) {
           let k = j + 1; if (op(k, '*')) k++;
           if (T[k]?.k === 'id') file.exports.push(T[k].v);
           else if (op(k, '{') && match[k] > k) file.exports.push(...names(k, match[k]).map((n) => n.local));
+          if (kw(j, 'const') || kw(j, 'let') || kw(j, 'var')) { // the other declarators: `export const a = 1, b = 2`
+            const STOP = new Set(['export', 'import', 'const', 'let', 'var', 'class', 'if', 'for', 'while', 'return', 'switch', 'try', 'throw', 'do']);
+            for (let m = group(k) + 1; m < N && !op(m, ';') && !(T[m].k === 'kw' && STOP.has(T[m].v)); m = group(m) + 1) {
+              if (!op(m, ',')) continue;
+              if (T[m + 1]?.k === 'id' && (op(m + 2, '=') || op(m + 2, ':') || op(m + 2, ',') || op(m + 2, ';') || m + 2 >= N)) file.exports.push(T[m + 1].v);
+              else if (op(m + 1, '{') && match[m + 1] > m && op(match[m + 1] + 1, '=')) file.exports.push(...names(m + 1, match[m + 1]).map((n) => n.local));
+            }
+          }
         }
         continue;
       }
@@ -340,13 +392,19 @@ function readImports(file) {
       continue;
     }
     if (lang === 'cs' && t.k === 'kw' && t.v === 'using' && !op(i + 1, '(') && !kw(i + 1, 'var') && (i === 0 || op(i - 1, ';') || op(i - 1, '{') || op(i - 1, '}') || T[i - 1].k === 'pp' || kw(i - 1, 'global'))) {
-      let j = i + 1, parts = [], alias = null, generic = false; if (kw(j, 'static')) j++;
+      let j = i + 1, parts = [], alias = null, generic = false, wordBefore = false; if (kw(j, 'static')) j++;
       for (; j < N && !op(j, ';'); j++) {
+        const isName = T[j].k === 'id' || T[j].k === 'kw';
+        // `using IDisposable d = x;` inside a body declares a variable: two names in a row, or more than one name
+        // before `=`, is never a using directive.
+        if (generic) continue; // the type arguments of an aliased generic type: the alias points at the type before them
+        if ((isName && wordBefore) || (op(j, '=') && (alias != null || parts.length !== 1))) { parts = []; break; }
+        wordBefore = isName;
         if (op(j, '=')) { alias = parts.join('.'); parts = []; }
-        else if (generic) continue; // the type arguments of an aliased generic type: the alias points at the type before them
-        else if (T[j].k === 'id' || T[j].k === 'kw') parts.push(T[j].v);
+        else if (isName) parts.push(T[j].v);
         else if (alias != null && op(j, '<')) generic = true;
-        else if (!op(j, '.') && !op(j, '::')) { parts = []; break; }
+        else if (op(j, '::')) parts = []; // `v2::Acme.App`, `global::System`: what precedes `::` is an alias qualifier, not part of the namespace
+        else if (!op(j, '.')) { parts = []; break; }
       }
       if (parts.length && op(j, ';')) file.imports.push({ source: parts.join('.'), line: t.l, names: [], default: null, ns: alias });
       i = j; continue;
