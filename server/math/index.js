@@ -36,8 +36,8 @@ function historyOf(repo, base) {
 import { verdict, summarize, POLICY, WEIGHTS } from './risk.js';
 import { lexicon, decide, merge } from './sensitivity.js';
 
-export const VERSION = 13; // part of the cache key: raise it whenever a measurement or the model changes
-const MAX_UNITS = 44, MAX_CONTEXT = 22;
+export const VERSION = 16; // part of the cache key: raise it whenever a measurement or the model changes
+const MAX_UNITS = 44, MAX_CONTEXT = 22, MAX_RING2 = 40, RING2_EACH = 4;
 // A call that can fail a test: assert/expect/should/verify/ensure/check families, and the Roslyn verifier runs (VerifyCS.Test.RunDefaultAsync).
 // Things a function can do that no static graph can follow, per language. A changed function that does one of
 // them gets a note: what it reaches cannot be established (reflection is where published call graphs miss edges).
@@ -408,6 +408,20 @@ export async function analyze(project, pr, { force = false, decisions = true } =
   if (graph) guard('graph', () => {
     const score = new Map(); if (cent) for (const [id, c] of cent) score.set(id, c.pagerank || 0);
     const nb = neighbourhood(graph, shown.filter((u) => graph.nodes.has(u.id)).map((u) => u.id), { depth: 1, max: MAX_CONTEXT, score });
+    // A second ring: a few neighbours of each neighbour (the best connected first). The change is then drawn between
+    // the clusters it touches, not as a lone star. Only while the change itself is small enough to leave room.
+    const kept = new Set(nb.nodes), val = (id) => score.get(id) || 0;
+    let room = shown.length <= 6 ? MAX_RING2 : 0;
+    for (const v of nb.nodes) {
+      if (room <= 0) break;
+      if (ids.has(v)) continue;
+      const cand = [...new Set([...(graph.in.get(v) || []), ...(graph.out.get(v) || [])])].filter((u) => !kept.has(u) && graph.nodes.has(u) && graph.nodes.get(u)?.kind !== 'type')
+        .sort((a, b) => val(b) - val(a) || (a < b ? -1 : 1)).slice(0, Math.min(RING2_EACH, room));
+      // Each one is drawn with the edge to the neighbour that brought it in, and no other: a cluster, not a hairball.
+      for (const u of cand) { kept.add(u); nb.edges.push((graph.out.get(u) || new Set()).has(v) ? [u, v] : [v, u]); }
+      room -= cand.length;
+    }
+    nb.nodes = [...kept];
     ctxIds = nb.nodes.filter((id) => !ids.has(id) && graph.nodes.get(id)?.kind !== 'type');
     const keep = new Set([...ids, ...ctxIds]);
     edges = nb.edges.filter(([a, b]) => keep.has(a) && keep.has(b) && a !== b).map(([a, b]) => ({ from: a, to: b, kind: graph.nodes.get(a)?.isTest ? 'tests' : 'calls' }));
@@ -432,7 +446,7 @@ export async function analyze(project, pr, { force = false, decisions = true } =
     lines: u.lines, evidence: u.evidence, findings: u.findings, parts: (u.parts || []).slice(0, 6).map((p) => ({ id: p.id, text: p.text, nats: round(p.nats) })),
     metrics: u.metrics?.after ? { cyclomatic: u.metrics.after.cyclomatic, cognitive: u.metrics.after.cognitive, nesting: u.metrics.after.nesting, loc: u.metrics.after.loc, before: u.metrics.before ? u.metrics.before.cyclomatic : null } : null,
     sensitive: u.sensitive?.level !== 'normal' ? u.sensitive : null, proof: u.proof?.proved ? { level: u.proof.level, renames: u.proof.renames || null } : null,
-    centrality: u.centrality ? { fanIn: u.centrality.fanIn, dependents: u.centrality.dependents, testedBy: u.centrality.testedBy, unlinked: u.centrality.unlinked || 0 } : null,
+    centrality: u.centrality ? { fanIn: u.centrality.fanIn, dependents: u.centrality.dependents, testedBy: u.centrality.testedBy, unlinked: u.centrality.unlinked || 0, pagerankPct: u.centrality.pagerankPct ?? null } : null,
     principles: u.principles || null, principleGate: u.principleGate || null,
   });
   const groupNodes = [...folded].map(([gid, ids]) => {

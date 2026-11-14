@@ -62,7 +62,7 @@ export function updateProject(id, patch) {
   const projects = listProjects();
   const p = projects.find((x) => x.id === id);
   if (!p) throw new Error(`Proyecto desconocido: ${id}`);
-  for (const k of ['base', 'issueRepo', 'name']) if (typeof patch[k] === 'string') p[k] = patch[k].trim() || null;
+  for (const k of ['base', 'issueRepo', 'name', 'featured', 'mine']) if (typeof patch[k] === 'string') p[k] = patch[k].trim() || null;
   if (patch.commands) p.commands = { build: patch.commands.build || '', test: patch.commands.test || '' };
   writeJSON(FILE, projects);
   return p;
@@ -115,12 +115,20 @@ export async function listPullRequests(p, { fetch = false } = {}) {
   for (const r of refs) {
     if (baseNames.has(r.short)) continue;
     const isRemote = r.full.startsWith('refs/remotes/');
+    const name = isRemote ? r.short.replace(/^origin\//, '') : r.short;
+    // A project that features prefixes lists those branches and nothing else.
+    if ((p.featured || p.mine) && (isRemote || ![p.featured, p.mine].some((x) => x && name.startsWith(x)))) continue;
     const info = await branchInfo(repo, baseRef, r.full);
     if (info.ahead === 0 || info.ahead > 50) continue; // nothing to review, or an unrelated long-lived line
-    const name = isRemote ? r.short.replace(/^origin\//, '') : r.short;
+    // A project can feature a branch prefix (the demo cases): those local branches are listed as pull requests
+    // to review, and the home shows only them until "other branches" is opened.
+    const feat = !!p.featured && !isRemote && name.startsWith(p.featured);
+    const mine = !!p.mine && !isRemote && name.startsWith(p.mine); // the same, for a branch of your own that wants out
+    const inc = isRemote || feat;
     const item = {
-      id: (isRemote ? 'in:' : 'out:') + name,
-      direction: isRemote ? 'incoming' : 'outgoing',
+      id: (inc ? 'in:' : 'out:') + name,
+      direction: inc ? 'incoming' : 'outgoing',
+      ...(feat || mine ? { featured: true } : {}),
       branch: name,
       ref: r.full,
       sha: r.sha,
@@ -130,7 +138,7 @@ export async function listPullRequests(p, { fetch = false } = {}) {
       behind: info.behind,
       requirement: requirementIdFrom(`${name} ${r.subject}`),
     };
-    if (isRemote) {
+    if (inc) {
       incoming.push(item);
     } else {
       // A local branch identical to its upstream is just a checkout of an incoming PR, not something you send.

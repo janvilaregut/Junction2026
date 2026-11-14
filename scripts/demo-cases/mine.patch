@@ -1,0 +1,51 @@
+From 4989acfd99a0175392e4c4b2f6259ccb85ade09f Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Sat, 14 Nov 2026 17:36:24 +0200
+Subject: [PATCH] Skip the sequence pool when the data cannot be LZ4
+
+MessagePackSerializer.Deserialize<T>(ref MessagePackReader reader, MessagePackSerializerOptions? options) stops early when it is cancelled or the reader is empty, and only rents a scratch sequence when the next token can be an LZ4 block.
+
+Deserialize throws new OperationCanceledException(reader.CancellationToken) when reader.CancellationToken.IsCancellationRequested is true.
+That check comes right after options is resolved.
+Deserialize throws new MessagePackSerializationException($"Failed to deserialize {typeof(T).FullName} value.", new EndOfStreamException()) when reader.End is true.
+That check comes right after the cancellation check, before the try block.
+After those checks, a local bool mayBeCompressed is true when options.Compression.IsCompression() is true and reader.NextMessagePackType is MessagePackType.Extension or MessagePackType.Array.
+mayBeCompressed is false in every other case.
+Inside the try block the decompression path is taken when mayBeCompressed is true, instead of when options.Compression.IsCompression() is true.
+When mayBeCompressed is false, Deserialize does not rent from options.SequencePool and reads straight from reader.
+Everything else stays as before.
+---
+ src/MessagePack/MessagePackSerializer.cs | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/src/MessagePack/MessagePackSerializer.cs b/src/MessagePack/MessagePackSerializer.cs
+index 316bf7b0..87341136 100644
+--- a/src/MessagePack/MessagePackSerializer.cs
++++ b/src/MessagePack/MessagePackSerializer.cs
+@@ -227,9 +227,22 @@ namespace MessagePack
+         {
+             options = options ?? DefaultOptions;
+ 
++            if (reader.CancellationToken.IsCancellationRequested)
++            {
++                throw new OperationCanceledException(reader.CancellationToken);
++            }
++
++            if (reader.End)
++            {
++                throw new MessagePackSerializationException($"Failed to deserialize {typeof(T).FullName} value.", new EndOfStreamException());
++            }
++
++            bool mayBeCompressed = options.Compression.IsCompression()
++                && (reader.NextMessagePackType == MessagePackType.Extension || reader.NextMessagePackType == MessagePackType.Array);
++
+             try
+             {
+-                if (options.Compression.IsCompression())
++                if (mayBeCompressed)
+                 {
+                     using (var msgPackUncompressedRental = options.SequencePool.Rent())
+                     {
+-- 
+2.54.0 (Apple Git-157)
+

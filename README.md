@@ -322,3 +322,35 @@ node server/consensus/cli.js . "$(git branch --show-current)"
 ```
 
 API: `POST /api/consenso {repo, branch, base?, prompt?, agents?}` → `{id}`; `GET /api/consenso/:id/events` (SSE). El código está en `server/consensus/`.
+
+## Modelo local (Gemma 4 con oMLX)
+
+Para lo que no puede salir del ordenador: código privado, hallazgos de seguridad, secretos, logs. Usa **Gemma 4** (`gemma-4-26B-A4B-it-oQ4e-mtp`) servido por **oMLX** en `127.0.0.1:8000` (API compatible con OpenAI). Va a unos 40-85 tokens/s; la primera llamada tarda unos 10 s más porque carga el modelo.
+
+- **Solo local:** el cliente se niega a enviar nada si `OMLX_URL` no apunta a esta máquina (`OMLX_ALLOW_REMOTE=1` lo permite).
+- **Clave:** `OMLX_API_KEY` del entorno o de `.env`; si no está, la lee de `~/.omlx/settings.json`. No se copia al repo.
+- **Otro modelo:** `KATSE_LOCAL_MODEL=gemma-4-26b-a4b-it-4bit` (o `--model` en la CLI).
+
+```bash
+npm run local -- --health                # ¿está oMLX en marcha?, ¿qué modelos sirve?
+npm run local -- "explica este error"    # una respuesta, en streaming
+npm run local                            # chat interactivo
+npm run local -- --scan fichero.js       # revisión de seguridad (con - lee de stdin)
+npm run local:demo                       # página de prueba en http://127.0.0.1:4179
+npm run local:test                       # pruebas contra el modelo real
+```
+
+Desde el código (`server/local/omlx.js`):
+
+```js
+import { chat, runTools, askLocal } from './local/omlx.js';
+import { scanCode } from './local/tasks.js';
+
+await chat({ prompt, system, onToken });          // texto, con streaming opcional
+await chat({ prompt, schema });                   // JSON que sigue un esquema → r.data
+await runTools({ prompt, tools: [{ name, description, parameters, run }] }); // las herramientas se ejecutan aquí
+await askLocal(prompt);                           // mismo contrato que ask() de server/llm.js
+await scanCode(code);                             // { verdict, summary, findings }
+```
+
+Las herramientas usan la misma forma que las `functionDeclarations` de Gemini, así que se pueden compartir con `server/consensus/`. `server/local/demo.js` exporta `handleLocal(req, res, url)` para montar `/api/local/*` en `server/index.js` cuando haga falta.

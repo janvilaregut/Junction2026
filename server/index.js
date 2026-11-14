@@ -28,6 +28,7 @@ import { runIndex } from './runs.js';
 import { reviewNode, savedReview, requirementOf } from './math/nodereview.js';
 import { attention as attentionOf } from './math/attention.js';
 import { projectContext, changeContext, spotContext } from './context.js';
+import { phoneState, subscribePhone, simulatePhone } from './phone.js';
 
 const PORT = Number(process.env.PORT || 4173);
 const UI = path.join(ROOT, 'mvp');
@@ -64,6 +65,20 @@ async function versionsOf(project, from, to, run) {
     }
   }
   return { from, to, runId: run?.id || null, candidates: cands.map((c) => ({ id: c.id, model: c.model, status: c.status, files: c.files.map((f) => f.path) })), regions };
+}
+
+/** Where a branch stands after the mathematics and the agents, from what is saved for its head: how many changed
+ *  spots it has, how many are still open, and how many the agents wrote differently. Nothing is run. */
+async function reviewState(project, pr) {
+  const m = await mathAnalyze(project, pr), marks = marksOf(project.id, m.head);
+  const r = { total: 0, open: 0, differs: 0, reviewed: 0 };
+  for (const n of m.nodes) {
+    if (n.verdict === 'context') continue;
+    const s = marks[n.id]?.state;
+    r.total++; if (s) r.reviewed++;
+    if (s === 'differs') { r.differs++; r.open++; } else if (s !== 'reproduced' && s !== 'read' && (n.verdict === 'uncertain' || n.verdict === 'risky')) r.open++;
+  }
+  return r;
 }
 
 /** What a verification will and will not do for this PR, computed without running anything. */
@@ -158,6 +173,20 @@ async function api(req, res, url) {
     if (method === 'PATCH' || method === 'POST') return send(res, 200, { ...updateSettings(await readBody(req)), keys });
   }
   if (seg[0] === 'live' && seg[1] === 'token' && method === 'POST') return send(res, 200, await liveToken());
+  // The phone as a second local worker (proof of concept): plug it in and the interface plays a ripple.
+  if (seg[0] === 'phone') {
+    if (!seg[1] && method === 'GET') return send(res, 200, phoneState());
+    if (seg[1] === 'simulate' && method === 'POST') return send(res, 200, simulatePhone());
+    if (seg[1] === 'events') {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
+      const write = (e) => res.write(`data: ${JSON.stringify(e)}\n\n`);
+      write({ type: 'state', ...phoneState() });
+      const off = subscribePhone(write);
+      const ping = setInterval(() => res.write(': ping\n\n'), 15000);
+      req.on('close', () => { off(); clearInterval(ping); });
+      return undefined;
+    }
+  }
   // Consensus engine: Gemini variants solve blind, compare, debate in pairs.
   if (seg[0] === 'consenso') {
     if (!seg[1] && method === 'GET') return send(res, 200, listConsensus());
@@ -208,6 +237,7 @@ async function api(req, res, url) {
         const l = last[pr.id];
         pr.last = l ? { ...l, stale: !pr.sha || !l.head.startsWith(pr.sha) } : null;
         pr.running = act?.prId === pr.id ? act.id : null;
+        if (pr.featured) pr.review = await reviewState(project, pr).catch(() => null); // what the agents already settled, so the home shows it
         pr.ai = baseRef ? await aiOfRange(project.path, `${baseRef}..${pr.ref}`).catch(() => null) : null; // agent sessions behind its commits (Entire)
       }
       return send(res, 200, prs);
@@ -442,6 +472,6 @@ const server = http.createServer(async (req, res) => {
 
 // Register the bundled demo repository on first start so there is something to look at.
 const demo = path.join(ROOT, 'workspace', 'messagepack-csharp');
-if (!listProjects().length && fs.existsSync(demo)) await addProject(demo).catch(() => {});
+if (!listProjects().length && fs.existsSync(demo)) await addProject(demo).then((p) => updateProject(p.id, { name: 'MessagePack-CSharp', featured: 'easy/', mine: 'mine/' })).catch(() => {}); // easy/*: the simple demo cases (npm run demo:cases)
 
 server.listen(PORT, '127.0.0.1', () => console.log(`Katse en http://localhost:${PORT}`));

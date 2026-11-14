@@ -1,0 +1,63 @@
+From f110651979edbb32d6811640b11e76979cb605c5 Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Sat, 14 Nov 2026 15:09:52 +0200
+Subject: [PATCH] Cap the size of the maps the dictionary formatter handles
+
+Cap the size of the maps DictionaryFormatterBase reads and writes, so a corrupted header cannot make it allocate a huge dictionary, and stop early on an empty map.
+
+Deserialize throws new MessagePackSerializationException("The map is too large.") when len is above 1048576.
+In Deserialize, a len equal to 1048576 is accepted.
+In Deserialize that check comes right after len is read, before this.Create is called.
+Deserialize returns this.Complete(this.Create(0, options)) when len is 0, right after the size check and without calling options.Security.DepthStep.
+Serialize throws new MessagePackSerializationException("The map is too large.") when count is above 1048576.
+In Serialize, a count equal to 1048576 is accepted.
+In Serialize that check comes right before writer.WriteMapHeader(count).
+Serialize returns right after writer.WriteMapHeader(count) when count is 0, without calling this.GetSourceEnumerator.
+Everything else in both methods stays as before.
+---
+ .../Formatters/DictionaryFormatter.cs         | 20 +++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/src/MessagePack/Formatters/DictionaryFormatter.cs b/src/MessagePack/Formatters/DictionaryFormatter.cs
+index f1550a98..a8bd0113 100644
+--- a/src/MessagePack/Formatters/DictionaryFormatter.cs
++++ b/src/MessagePack/Formatters/DictionaryFormatter.cs
+@@ -50,8 +50,18 @@ namespace MessagePack.Formatters
+                     }
+                 }
+ 
++                if (count > 524288)
++                {
++                    throw new MessagePackSerializationException("The map is too large.");
++                }
++
+                 writer.WriteMapHeader(count);
+ 
++                if (count == 0)
++                {
++                    return;
++                }
++
+                 TEnumerator e = this.GetSourceEnumerator(value);
+                 try
+                 {
+@@ -80,6 +90,16 @@ namespace MessagePack.Formatters
+             {
+                 var len = reader.ReadMapHeader();
+ 
++                if (len >= 1048576)
++                {
++                    throw new MessagePackSerializationException("The map is too large.");
++                }
++
++                if (len == 0)
++                {
++                    return this.Complete(this.Create(0, options));
++                }
++
+                 TIntermediate dict = this.Create(len, options);
+                 options.Security.DepthStep(ref reader);
+                 try
+-- 
+2.54.0 (Apple Git-157)
+

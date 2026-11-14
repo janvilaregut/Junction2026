@@ -1,0 +1,47 @@
+From 314fdaa8c87eb05d69f47a0ae9909d5ac4d28c77 Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Sat, 14 Nov 2026 10:18:33 +0200
+Subject: [PATCH] Skip the element loop for empty collections
+
+CollectionFormatterBase.Serialize stops right after the header when the collection is empty, so no enumerator is created for nothing.
+
+In the array branch, Serialize returns right after writer.WriteArrayHeader(array.Length) when array.Length is 0.
+In the branch where the count is known, Serialize returns right after writer.WriteArrayHeader(seqCount.Value) when seqCount.Value is 0.
+In both branches the header is still written before returning.
+The branch where the count is not known stays as before.
+A collection with 1 or more elements is serialized exactly as before.
+---
+ src/MessagePack/Formatters/CollectionFormatter.cs | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/MessagePack/Formatters/CollectionFormatter.cs b/src/MessagePack/Formatters/CollectionFormatter.cs
+index 1d7863fd..c0cf5f54 100644
+--- a/src/MessagePack/Formatters/CollectionFormatter.cs
++++ b/src/MessagePack/Formatters/CollectionFormatter.cs
+@@ -330,6 +330,11 @@ namespace MessagePack.Formatters
+                 {
+                     writer.WriteArrayHeader(array.Length);
+ 
++                    if (array.Length == 0)
++                    {
++                        return;
++                    }
++
+                     foreach (TElement item in array)
+                     {
+                         writer.CancellationToken.ThrowIfCancellationRequested();
+@@ -344,6 +349,11 @@ namespace MessagePack.Formatters
+                     {
+                         writer.WriteArrayHeader(seqCount.Value);
+ 
++                        if (seqCount.Value == 0)
++                        {
++                            return;
++                        }
++
+                         // Unity's foreach struct enumerator causes boxing so iterate manually.
+                         using (var e = this.GetSourceEnumerator(value))
+                         {
+-- 
+2.54.0 (Apple Git-157)
+

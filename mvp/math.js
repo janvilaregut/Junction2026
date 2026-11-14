@@ -9,6 +9,31 @@
 const VWORD = { proved: 'Proved', cleared: 'Cleared', settled: 'Reviewed', uncertain: 'Uncertain', risky: 'Risky', context: 'Not changed' };
 const VTONE = { proved: 'ok', cleared: 'ok', settled: 'ok', uncertain: 'warn', risky: 'bad', context: 'ctx' };
 const MARK_WORD = { reproduced: 'Agents reproduced it', read: 'You read it', differs: 'Agents wrote it differently', unclear: 'Agents could not settle it' };
+/* S.marks is what the server saved for this head, plus the spots where the person took the agents' fix in this
+   sitting (FIXED in app.js): those read as settled everywhere, and are gone on a reload. */
+let RAW_MARKS = S.marks || {};
+Object.defineProperty(S, 'marks', { enumerable: true, configurable: true, get: () => ({ ...RAW_MARKS, ...(S.cur ? FIXED[S.pid + '|' + S.cur.id] : null) }), set: (v) => { RAW_MARKS = v || {}; } });
+/* Take the agents' version of the one spot they wrote differently: it turns green and the branch can be merged. */
+async function applyFix(only) {
+  const list = mathNodes().filter((x) => S.marks?.[x.id]?.state === 'differs' && (!only || x.id === only));
+  if (!list.length || !S.cur) return false;
+  const seq = openSeq, pid = S.pid, pr = S.cur.id, done = [];
+  for (const n of list) {
+    let r;
+    try { r = await api(`/projects/${pid}/math/review?pr=${encodeURIComponent(pr)}&node=${encodeURIComponent(n.id)}`); } catch (e) { if (alive(seq)) renderBar(e.message); return false; }
+    if (!alive(seq) || S.cur?.id !== pr) return false;
+    if (!r?.fix) { renderBar(`The agents left no fix for ${n.name}.`); return false; }
+    const plus = (r.fix.diff || []).filter((d) => d.t === '+').map((d) => d.l.trim()).join(' ');
+    (FIXED[pid + '|' + pr] ||= {})[n.id] = { state: 'reproduced', by: 'agents', fixed: true, note: `Fixed with ${r.fix.from}'s version${plus ? `: ${plus}` : ''} ${r.explanation || ''}`.slice(0, 260) };
+    done.push({ spot: n.qname || n.name, from: r.fix.from, change: plus, why: r.explanation || '' });
+  }
+  S.treeStale = true;
+  hideNodeCard(); renderGraph(graphModel()); renderBar();
+  return done.length === 1 ? done[0] : { fixed: done };
+}
+/* The open branch is the person's own (it wants out): its faults are theirs to fix, so the agents implement the
+   fixes; it is never sent back. Someone else's branch can be sent back to its author. */
+const ownBranch = () => S.cur?.direction === 'outgoing';
 const mathNodes = () => (S.math?.nodes || []).filter((n) => n.verdict !== 'context');
 /* What the executable track (server/graph-review.js) says about a node: verified, failed or pending. Only
    changed C# functions are in it; undefined for everything else. */
@@ -26,6 +51,34 @@ function nodeState(n) {
 function mathOpen() {
   return mathNodes().filter((n) => ['uncertain', 'risky'].includes(nodeState(n)))
     .sort((a, b) => (nodeState(b) === 'risky') - (nodeState(a) === 'risky') || b.priority - a.priority || (a.lines.added + a.lines.removed) - (b.lines.added + b.lines.removed));
+}
+/* On a featured (demo) branch the agents also get the spots mathematics only cleared: cleared is not a proof that
+   the new behaviour is right, and the branch is not accepted until the agents (or a person) have settled them. */
+const agentsOwe = () => (S.cur?.featured ? mathNodes().filter((n) => nodeState(n) === 'cleared' && !S.marks?.[n.id]) : []);
+/* "Merge it", in one go: whatever the agents still owe is reviewed first (cached reviews come back at once), on the
+   person's own branch their fixes are implemented, and then it merges. It stops, and says why, only where a person must
+   decide: someone else's branch the agents found faults in. */
+async function mergeFlow() {
+  if (!S.math || !S.cur) return { error: 'Open a pull request first.' };
+  const pr = S.cur.id;
+  if (reviewable([...mathOpen(), ...agentsOwe()]).length) await reviewAll();
+  if (S.cur?.id !== pr) return { error: 'The branch changed.' };
+  const differs = mathNodes().filter((n) => S.marks?.[n.id]?.state === 'differs').length;
+  if (differs && ownBranch()) await applyFix();
+  const why = mergeBlocker();
+  if (why) { renderBar(why); return { error: why, differs }; }
+  decidePR('merged');
+  return { ok: true, reviewedNow: true };
+}
+/* Why the open branch cannot be merged yet, in words; '' when it can. */
+function mergeBlocker() {
+  if (!S.math) return '';
+  const differs = mathNodes().filter((n) => S.marks?.[n.id]?.state === 'differs').length, owe = reviewable([...mathOpen(), ...agentsOwe()]).length;
+  if (differs && ownBranch()) return `The agents found ${differs === 1 ? 'a fault' : differs + ' faults'} in your branch: implement their ${differs === 1 ? 'fix' : 'fixes'} first.`;
+  if (differs > 1) return `Merge blocked: the agents wrote ${differs} spots differently. Request changes.`;
+  if (differs) return 'The agents wrote one spot differently and have a small fix: apply it first.';
+  if (owe) return `${owe} ${owe === 1 ? 'spot has' : 'spots have'} not been reviewed by the agents yet.`;
+  return mathOpen().length ? `${mathOpen().length} spot(s) still open.` : '';
 }
 const linesOfNode = (n) => (n.lines?.added || 0) + (n.lines?.removed || 0);
 
@@ -187,18 +240,37 @@ function reviewNext() {
    the depth; only changed C# functions, and only that moves "backed by tests". */
 function mathBar() {
   const M = S.math; if (!M) return null;
-  const open = mathOpen(), s = M.summary, total = s.lines.total;
-  const need = open.reduce((n, x) => n + linesOfNode(x), 0);
+  const open = mathOpen(), s = M.summary, total = s.lines.total, owed = agentsOwe();
+  // Lines still to settle: the open spots and, on someone else's branch, the ones the agents have not reviewed yet. On
+  // the person's own branch a green spot counts as confident: "merge it" has the agents confirm it on the way (mergeFlow).
+  const need = [...open, ...(ownBranch() ? [] : owed)].reduce((n, x) => n + linesOfNode(x), 0);
   const b = S.run?.brief, so = S.run?.signoff;
   const lv = !open.length ? ['ok', 'Settled'] : open.some((n) => nodeState(n) === 'risky') ? ['bad', `${open.filter((n) => nodeState(n) === 'risky').length} risky`] : ['warn', `${open.length} uncertain`];
   const target = S.fixTarget?.m;
   const full = b?.graphReview ? 'View scoped report' : so ? 'View sign-off' : b ? 'Review & sign' : 'Full review';
-  const todo = reviewable(open);
+  const todo = reviewable([...open, ...agentsOwe()]);
+  if (!open.length && todo.length) lv.splice(0, 2, ...(ownBranch() ? ['ok', 'Ready to merge'] : ['warn', `${todo.length} for the agents`]));
+  // The person's OK, once the agents are done: accept and merge when nothing is left open, ask for changes when
+  // the agents wrote a spot differently. (app.js decidePR: this sitting only.)
+  // One spot written differently is a small fix the agents can apply, and then it merges; more than one blocks the merge.
+  const was = decisionOf(S.cur), differs = mathNodes().filter((n) => S.marks?.[n.id]?.state === 'differs').length;
+  const own = ownBranch();
+  const dec = was || BUSY.total ? null
+    : todo.length ? (own && !differs ? ['flow', 'Accept &amp; merge'] : null)
+    : differs && own ? ['fix', differs > 1 ? 'Implement the agents&#39; fixes' : 'Implement the agents&#39; fix']
+    : differs === 1 ? ['fix', 'Apply the agents&#39; fix'] : differs ? ['returned', 'Request changes'] : !open.length ? ['merged', 'Accept &amp; merge'] : null;
+  if (dec && differs > 1 && !own) lv.splice(0, 2, 'bad', `Merge blocked · ${differs} spots fail`);
+  if (dec && differs && own) lv.splice(0, 2, 'warn', `${differs} to fix`);
+  const sendBack = dec?.[0] === 'fix' && !own; // someone else's branch with one small fault: fix it here, or send it back
+  if (was) lv.splice(0, 2, was === 'merged' ? 'ok' : 'bad', was === 'merged' ? 'Merged' : 'Changes requested');
   if (BUSY.size || BUSY.total) return `<span class="spin"></span><span class="txt live" style="color:var(--fg)">Agents rebuild ${BUSY.total - BUSY.done > 1 ? `${BUSY.total - BUSY.done} spots` : 'the last spot'} blind</span><span class="txt">${BUSY.done} / ${BUSY.total}</span><button class="cta" disabled>Reviewing…</button>`;
   const cta = target ? `${['reproduced', 'differs', 'unclear'].includes(S.marks?.[target.id]?.state) ? 'See the review' : 'Review with agents'} <small class="spot">${esc(short(target.name, 18))}</small>` : todo.length ? `Review all <small class="spot">${todo.length} ${todo.length === 1 ? 'spot' : 'spots'}</small>` : open.length ? `Next <small class="spot">${open.length} left for you</small>` : full;
   return `<span class="num">${need}<small> / ${total}</small></span><span class="txt">${need === 1 ? 'line needs' : 'lines need'} a look</span><span class="chip ${lv[0]}" style="background:${PAL[lv[0]]}">${lv[1]}</span>`
-    + depthPill(testRows(target, b, so), M.trust)
-    + (target || open.length ? `<button class="cta ghost" id="bFull">${full}</button>` : '') + `<button class="cta" id="bReview">${cta}</button>`;
+    + depthPill(testRows(target, b, so), M.trust, total ? Math.round(100 * (total - need) / total) : null)
+    + (dec ? '' : target || open.length ? `<button class="cta ghost" id="bFull">${full}</button>` : '')
+    + (dec && (!target || sendBack) ? '' : `<button class="cta${dec ? ' ghost' : ''}" id="bReview">${cta}</button>`)
+    + (sendBack ? '<button class="cta ghost" id="bReturn">Request changes</button>' : '')
+    + (dec ? `<button class="cta${dec[0] === 'returned' ? ' bad' : ''}" id="bDecide" data-d="${dec[0]}">${dec[1]}</button>` : '');
 }
 /* The next function the tests should take: the one selected if it is in their scope, else the most pressing pending one. */
 function testTarget(target) {
@@ -222,7 +294,9 @@ function bindMathBar() {
   act('continue', () => continueReview());
   // A first full review of C# goes through the graph, so every function gets its own executable check; any other language keeps the plain full review.
   if ($('bFull')) $('bFull').onclick = () => { hideNodeCard(); S.run?.brief || !trust ? openReview({ full: true }) : openTree({ focusNodes: 'all' }); };
-  if ($('bReview')) $('bReview').onclick = () => (target ? openReview({ node: target }) : reviewable(open).length ? reviewAll() : open.length ? reviewNext() : openReview({ full: true }));
+  if ($('bReturn')) $('bReturn').onclick = () => { hideNodeCard(); decidePR('returned'); };
+  if ($('bDecide')) $('bDecide').onclick = () => { const d = $('bDecide').dataset.d; hideNodeCard(); d === 'flow' ? mergeFlow() : d === 'fix' ? applyFix() : decidePR(d); };
+  if ($('bReview')) $('bReview').onclick = () => (target ? openReview({ node: target }) : reviewable([...open, ...agentsOwe()]).length ? reviewAll() : open.length ? reviewNext() : openReview({ full: true }));
 }
 /* ── Review all: every open function goes to the agents at once, three at a time; the graph settles live ── */
 const BUSY = new Set(); BUSY.total = 0; BUSY.done = 0;
@@ -231,7 +305,7 @@ const reviewable = (open) => open.filter((n) => !['doc', 'config', 'generated', 
 function paintBusy() { for (const n of G.nodes.values()) if (n.el) n.el.classList.toggle('busy', BUSY.has(n.id)); }
 async function reviewAll() {
   if (BUSY.total || !S.math || !S.cur) return false;
-  const seq = openSeq, pid = S.pid, pr = S.cur.id, queue = reviewable(mathOpen()).map((n) => n.id);
+  const seq = openSeq, pid = S.pid, pr = S.cur.id, queue = reviewable([...mathOpen(), ...agentsOwe()]).map((n) => n.id);
   if (!queue.length) return false;
   hideNodeCard(); zoomGraph('fit');
   BUSY.total = queue.length; BUSY.done = 0;

@@ -1,0 +1,79 @@
+From d2127d523eb00f96351ba92915b06303077aa0a4 Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Sat, 14 Nov 2026 12:41:07 +0200
+Subject: [PATCH] Guard the LZ4 compression paths against bad sizes
+
+Guard the LZ4 paths of MessagePackSerializer against sizes they cannot handle, and stop storing a compressed block that is not smaller than the data.
+
+ToLZ4BinaryCore throws new MessagePackSerializationException("The data is too large to compress with LZ4.") when msgpackUncompressedData.Length is above int.MaxValue.
+In ToLZ4BinaryCore that check comes right after the minCompressionSize check, before the compression kind is looked at.
+In the Lz4Block branch of ToLZ4BinaryCore, when lz4Length is equal to or above msgpackUncompressedData.Length, the method calls writer.WriteRaw(msgpackUncompressedData) and returns instead of writing the extension.
+When lz4Length is equal to msgpackUncompressedData.Length, the data is written raw.
+That comparison comes right after lz4Length is computed, inside the try block.
+The Lz4BlockArray branch of ToLZ4BinaryCore stays as before.
+TryDecompress throws new MessagePackSerializationException("The LZ4 block announces a negative length.") when uncompressedLength is below 0.
+In the Lz4Block branch of TryDecompress that check comes right after uncompressedLength is read with extReader.ReadInt32().
+In the Lz4BlockArray branch of TryDecompress that check comes right after uncompressedLength is taken from uncompressedLengths[i], for every block.
+An uncompressedLength of 0 is accepted.
+Everything else in both methods stays as before.
+---
+ src/MessagePack/MessagePackSerializer.cs | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/src/MessagePack/MessagePackSerializer.cs b/src/MessagePack/MessagePackSerializer.cs
+index 316bf7b0..0cd5d0a2 100644
+--- a/src/MessagePack/MessagePackSerializer.cs
++++ b/src/MessagePack/MessagePackSerializer.cs
+@@ -501,6 +501,11 @@ namespace MessagePack
+                         // tells us the length the data will be AFTER decompression.
+                         int uncompressedLength = extReader.ReadInt32();
+ 
++                        if (uncompressedLength < 0)
++                        {
++                            throw new MessagePackSerializationException("The LZ4 block announces a negative length.");
++                        }
++
+                         // The rest of the payload is the compressed data itself.
+                         ReadOnlySequence<byte> compressedData = extReader.Sequence.Slice(extReader.Position);
+ 
+@@ -538,6 +543,12 @@ namespace MessagePack
+                                 for (int i = 0; i < sequenceCount; i++)
+                                 {
+                                     var uncompressedLength = uncompressedLengths[i];
++
++                                    if (uncompressedLength < 0)
++                                    {
++                                        throw new MessagePackSerializationException("The LZ4 block announces a negative length.");
++                                    }
++
+                                     ReadOnlySequence<byte> lz4Block = reader.ReadBytes() ?? throw MessagePackSerializationException.ThrowUnexpectedNilWhileDeserializing<ReadOnlySequence<byte>>();
+                                     Span<byte> uncompressedSpan = writer.GetSpan(uncompressedLength).Slice(0, uncompressedLength);
+                                     var actualUncompressedLength = LZ4Operation(lz4Block, uncompressedSpan, LZ4CodecDecode);
+@@ -567,6 +578,11 @@ namespace MessagePack
+                 return;
+             }
+ 
++            if (msgpackUncompressedData.Length > int.MaxValue)
++            {
++                throw new MessagePackSerializationException("The data is too large to compress with LZ4.");
++            }
++
+             if (compression == MessagePackCompression.Lz4Block)
+             {
+                 var maxCompressedLength = LZ4Codec.MaximumOutputLength((int)msgpackUncompressedData.Length);
+@@ -575,6 +591,12 @@ namespace MessagePack
+                 {
+                     int lz4Length = LZ4Operation(msgpackUncompressedData, lz4Span, LZ4CodecEncode);
+ 
++                    if (lz4Length > msgpackUncompressedData.Length)
++                    {
++                        writer.WriteRaw(msgpackUncompressedData);
++                        return;
++                    }
++
+                     const int LengthOfUncompressedDataSizeHeader = 5;
+                     writer.WriteExtensionFormatHeader(new ExtensionHeader(ReservedExtensionTypeCodes.Lz4Block, LengthOfUncompressedDataSizeHeader + (uint)lz4Length));
+                     writer.WriteInt32((int)msgpackUncompressedData.Length);
+-- 
+2.54.0 (Apple Git-157)
+

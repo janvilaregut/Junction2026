@@ -46,7 +46,7 @@ S.vmode = 'graph'; // a branch always opens on its graph; Review & sign grows th
 const VERDICT = { 'ready-for-human': ['ok', 'Ready for your approval'], 'request-changes': ['bad', 'Request changes'], 'insufficient-evidence': ['warn', 'Not enough evidence'] };
 const CAND = { built: 'patch built', pending: 'building', failed: 'failed', timeout: 'out of time', duplicate: 'duplicate', empty: 'no changes' };
 const FIND = { 'confirmed-original': ['bad', 'Confirmed failure in the PR'], 'original-failure-unconfirmed': ['warn', 'PR failure, not confirmed'], 'candidate-only': ['no', 'Fails only in an alternative'], refuted: ['ok', 'Refuted: the PR passes'], 'invalid-test': ['no', 'Invalid test'], pending: ['no', 'Pending'], unstable: ['warn', 'Unstable result'] };
-const modelName = (m) => { const x = String(m || '').split('/').pop().replace(/^gemini-\d+(\.\d+)?-/, ''); return x ? x[0].toUpperCase() + x.slice(1) : 'Model'; };
+const modelName = (m) => { const x = String(m || '').split('/').pop().replace(/^gemini-\d+(\.\d+)?-/, '').replace(/^(nemotron)-.*$/i, '$1'); return x ? x[0].toUpperCase() + x.slice(1) : 'Model'; };
 
 /* The backend reports with fixed ids; these give them English names. */
 const LANE = {
@@ -71,9 +71,26 @@ const HARD = ['conflicto', 'no-compila', 'suite-rota', 'tests-propios-fallan'];
 const laneName = (id, fallback) => LANE[id]?.[0] || fallback || id;
 const laneTone = (id, tone) => (id === 'devolver' ? 'bad' : tone === 'ok' ? 'ok' : 'warn');
 
+/* What was decided in this sitting: accepted (merged) or sent back. Memory only, on purpose: a reload starts the demo clean. */
+const DECIDED = {};
+const decisionOf = (p) => (p ? DECIDED[S.pid + '|' + p.id] || null : null);
+/* Spots where the person took the agents' fix (math.js applyFix), per branch. Memory only, like the decisions. */
+const FIXED = {};
+const fixedCount = (p) => Object.keys(FIXED[S.pid + '|' + p.id] || {}).length;
 function state(p) {
-  const l = p.last;
+  const l = p.last, d = decisionOf(p);
+  if (d === 'merged') return { tone: 'ok', label: 'Merged', end: 'merged', session: true };
+  if (d === 'returned' && p.direction !== 'outgoing') return { tone: 'bad', label: 'Changes requested', end: 'cut', session: true };
   if (p.running) return { tone: 'no', label: 'Verifying', end: 'open' };
+  const r = p.review; // what the agents already settled on this head (server reviewState)
+  if (r && r.total && r.reviewed) {
+    const fx = fixedCount(p), open = r.open - fx, differs = r.differs - fx;
+    if (open <= 0) return { tone: 'ok', label: fx ? 'Fixed by the agents · ready to merge' : 'Ready to merge', end: 'open' };
+    if (differs && p.direction === 'outgoing') return { tone: 'warn', label: `The agents have ${differs === 1 ? 'a fix' : differs + ' fixes'} for you`, end: 'open' };
+    if (differs > 1) return { tone: 'bad', label: `Merge blocked · ${differs} spots fail`, end: 'open' };
+    if (differs === 1) return { tone: 'warn', label: 'One small fix from the agents', end: 'open' };
+  }
+  if (r && r.total && !r.reviewed) return p.direction === 'outgoing' && !r.open ? { tone: 'ok', label: 'Ready to merge', end: 'open' } : { tone: 'warn', label: 'Waiting for the agents', end: 'open' }; // featured, not reviewed yet: yours to start
   if (!l) return { tone: 'no', label: 'Not verified', end: 'open' };
   if (l.signedBy && !l.stale) return l.decision === 'devolver' ? { tone: 'bad', label: 'Sent back', end: 'cut' } : { tone: 'ok', label: 'Signed', end: 'merged' };
   if (l.stale) return { tone: 'no', label: 'Out of date', end: 'open' };
@@ -98,9 +115,18 @@ async function loadProject(id) {
   $('sum').textContent = 'Loading branches…';
   try { await reloadPRs(); } catch (e) { $('sum').textContent = e.message; }
 }
+/* A project that features branch prefixes (the demo cases) shows those branches and nothing else: the rest of the
+   repository's branches are not listed anywhere, not even behind a button. */
+function onlyFeatured(pid, prs) {
+  const proj = S.projects.find((p) => p.id === pid), pre = [proj?.featured, proj?.mine].filter(Boolean);
+  if (!pre.length) return prs;
+  const keep = (p) => p.featured || pre.some((x) => p.branch.startsWith(x));
+  return { ...prs, incoming: prs.incoming.filter(keep).map((p) => ({ ...p, featured: true })), outgoing: prs.outgoing.filter(keep).map((p) => ({ ...p, featured: true })) };
+}
 async function reloadPRs() {
   const pid = S.pid;
-  const [prs, hist] = await Promise.all([api(`/projects/${pid}/prs`), api(`/projects/${pid}/history`).catch(() => null)]);
+  const [all, hist] = await Promise.all([api(`/projects/${pid}/prs`), api(`/projects/${pid}/history`).catch(() => null)]);
+  const prs = onlyFeatured(pid, all);
   if (pid !== S.pid) return; // the project changed while this was loading
   const key = pid + JSON.stringify(prs) + JSON.stringify(hist);
   const same = S.prsKey === key; // a reload that changed nothing redraws nothing
@@ -140,7 +166,7 @@ const BRANCH_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" c
 S.counts = {}; // per project: the state of each branch, read from the same local git as the home (no fetch)
 const countAll = () => Promise.all(S.projects.map(async (p) => {
   try {
-    const prs = await api(`/projects/${p.id}/prs`);
+    const prs = onlyFeatured(p.id, await api(`/projects/${p.id}/prs`));
     const tones = [...prs.incoming, ...prs.outgoing].map((x) => state(x).tone);
     S.counts[p.id] = { tones, ok: tones.filter((t) => t === 'ok').length, review: tones.filter((t) => t === 'warn' || t === 'bad').length, open: tones.filter((t) => t === 'no').length };
   } catch { S.counts[p.id] = null; }
@@ -266,7 +292,8 @@ function renderTree() {
   const svg = $('tree'); svg.innerHTML = '';
   svg.classList.remove('hl', 'zoomed'); $('card').classList.remove('on');
   const W = Math.max(svg.parentElement.clientWidth, 760);
-  const recent = S.prs.incoming.filter((p) => p.last || p.running || (!p.behind && Date.now() - new Date(p.date) < 30 * 864e5));
+  const feat = S.prs.incoming.some((p) => p.featured); // the project features a few branches (the demo cases): only those until the rest is asked for
+  const recent = S.prs.incoming.filter((p) => (feat ? p.featured : p.last || p.running || (!p.behind && Date.now() - new Date(p.date) < 30 * 864e5)));
   const old = S.prs.incoming.filter((p) => !recent.includes(p));
   const F = S.focus; // a branch unfolded to show its commits
   if (F && ![...S.prs.incoming, ...S.prs.outgoing].some((p) => p.id === F.id)) S.focus = null;
@@ -274,7 +301,8 @@ function renderTree() {
   // Unfolded or zoomed in, only the recent branches (plus the chosen one) are drawn: the others go away anyway.
   const one = S.focus || S.zoom;
   const inc = one ? [...recent, ...old.filter((p) => p.id === one.id)] : S.expanded ? [...recent, ...old] : recent;
-  const out = S.prs.outgoing;
+  const out = feat && !S.expanded ? S.prs.outgoing.filter((p) => p.featured) : S.prs.outgoing;
+  const mergeAnim = S.mergeAnim; S.mergeAnim = null; // a branch accepted a moment ago: its merge is drawn once, moving
   if (!inc.length && !out.length && !old.length) {
     svg.style.height = '0px';
     $('sum').innerHTML = `No branches ahead of <b>${esc(base(S.base))}</b>. Push one and it shows up here.`;
@@ -324,8 +352,13 @@ function renderTree() {
       const merge = `M${tipX} ${y} C ${tipX + M * .55} ${y}, ${mx - M * .45} ${mainY}, ${mx} ${mainY}`;
       mk('path', { d: fork, fill: 'none', stroke: col, 'stroke-width': faint ? 1.4 : 2.2, 'stroke-linecap': 'round', 'stroke-opacity': faint ? .5 : .95 }, g);
       if (st.end !== 'cut' && !faint) { // stale branches are not merge candidates: no pending-merge curve
-        mk('path', { d: merge, fill: 'none', stroke: col, 'stroke-width': 1.6, 'stroke-opacity': st.end === 'merged' ? .9 : .45, 'stroke-dasharray': st.end === 'merged' ? '' : '3 5', 'stroke-linecap': 'round' }, g);
-        mk('circle', { cx: mx, cy: mainY, r: 5, fill: st.end === 'merged' ? col : '#0c0c0e', stroke: col, 'stroke-width': 1.8, 'stroke-opacity': st.end === 'merged' ? 1 : .6 }, g);
+        if (st.session) { // accepted in this sitting: the base line reaches its merge point, and the dotted curve is the track the merge runs on
+          mk('path', { d: merge, fill: 'none', stroke: col, 'stroke-width': 1.6, 'stroke-opacity': .3, 'stroke-dasharray': '3 5', 'stroke-linecap': 'round' }, g);
+          mk('line', { x1: xNow, y1: mainY, x2: mx, y2: mainY, stroke: '#f5f5f7', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-opacity': .8, class: 'mbase' }, g);
+        }
+        mk('path', { d: merge, fill: 'none', stroke: col, 'stroke-width': st.session ? 2.2 : 1.6, 'stroke-opacity': st.end === 'merged' ? .9 : .45, 'stroke-dasharray': st.end === 'merged' ? '' : '3 5', 'stroke-linecap': 'round', class: 'mcurve' }, g);
+        mk('circle', { cx: mx, cy: mainY, r: 5, fill: st.end === 'merged' ? col : '#0c0c0e', stroke: col, 'stroke-width': 1.8, 'stroke-opacity': st.end === 'merged' ? 1 : .6, class: 'mdot' }, g);
+        if (p.id === mergeAnim && st.session) playMerge(g, col, mx, mainY);
       }
       const c = Math.min(p.ahead || 1, 4) - 1; const a = xf + R + 16, b = tipX - 22;
       for (let k = 0; k < c && b > a; k++) mk('circle', { cx: a + ((b - a) * (k + 1)) / (c + 1), cy: y, r: 3.2, fill: '#0c0c0e', stroke: col, 'stroke-width': 1.6 }, g);
@@ -358,7 +391,7 @@ function renderTree() {
   S.treeW = W;
   applyHighlight();
   $('more').hidden = !old.length || !!S.focus || !!S.zoom;
-  $('more').textContent = S.expanded ? 'Hide older branches' : `+${old.length} older branches`;
+  $('more').textContent = feat ? (S.expanded ? 'Hide other branches' : `+${old.length + S.prs.outgoing.length - out.length} other branches`) : S.expanded ? 'Hide older branches' : `+${old.length} older branches`;
 
   // Folding: every other branch folds flat into the base line while the chosen one unfolds its commits.
   const all = [...lanes.children];
@@ -379,6 +412,58 @@ function renderTree() {
   if (S.unfold) { S.unfold = false; still(() => all.forEach((g) => g.classList.add('fold'))); requestAnimationFrame(() => all.forEach((g) => g.classList.remove('fold'))); }
   const pend = recent.filter((p) => state(p).end === 'open').length;
   $('sum').innerHTML = `<b>${pend} ${pend === 1 ? 'branch wants' : 'branches want'} in.</b> ${out.length ? `${out.length} of yours ${out.length === 1 ? 'wants' : 'want'} out.` : ''}`;
+}
+
+/* The merge of a branch accepted a moment ago, played once on the home: a spark leaves the tip and runs the dotted
+   curve, which turns solid behind it; where it lands the base line arrives too, and the point rings. */
+function playMerge(g, col, mx, mainY) {
+  const curve = g.querySelector('.mcurve'), base = g.querySelector('.mbase'), dot = g.querySelector('.mdot');
+  if (!curve || RM) return;
+  const len = curve.getTotalLength(), bl = base ? base.getTotalLength() : 0;
+  curve.style.strokeDasharray = `${len}`; curve.style.strokeDashoffset = `${len}`;
+  if (base) { base.style.strokeDasharray = `${bl}`; base.style.strokeDashoffset = `${bl}`; }
+  dot.setAttribute('fill', '#0c0c0e');
+  const spark = mk('circle', { r: 5, fill: '#f5f5f7', class: 'mspark', opacity: 0 }, g);
+  const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const WAIT = 350, RUN = 1500, LAND = 700;
+  let t0 = 0;
+  const step = (now) => {
+    if (!g.isConnected) return; // the tree was redrawn: that drawing is already the merged one
+    t0 = t0 || now;
+    const t = now - t0 - WAIT, k = ease(Math.max(0, Math.min(1, t / RUN))), q = Math.max(0, Math.min(1, (t - RUN * 0.55) / (RUN * 0.45 + LAND * 0.4)));
+    const pt = curve.getPointAtLength(len * k);
+    curve.style.strokeDashoffset = `${len * (1 - k)}`;
+    spark.setAttribute('cx', pt.x); spark.setAttribute('cy', pt.y); spark.setAttribute('opacity', t < 0 ? 0 : 1);
+    if (base) base.style.strokeDashoffset = `${bl * (1 - ease(q))}`;
+    if (t < RUN) return void requestAnimationFrame(step);
+    spark.remove(); dot.setAttribute('fill', col);
+    const ring = mk('circle', { cx: mx, cy: mainY, r: 6, fill: 'none', stroke: col, 'stroke-width': 2, class: 'mring' }, g);
+    const dotPop = (n2) => {
+      if (!g.isConnected) return;
+      const u = Math.min(1, (n2 - t0 - WAIT - RUN) / LAND), e = 1 - Math.pow(1 - u, 3);
+      ring.setAttribute('r', 6 + 26 * e); ring.setAttribute('stroke-opacity', 0.8 * (1 - e));
+      dot.setAttribute('r', 5 + 3 * Math.sin(Math.PI * u));
+      if (base) base.style.strokeDashoffset = `${bl * (1 - ease(Math.max(q, Math.min(1, 0.4 + u))))}`;
+      if (u < 1) return void requestAnimationFrame(dotPop);
+      ring.remove(); curve.style.strokeDasharray = ''; curve.style.strokeDashoffset = ''; if (base) { base.style.strokeDasharray = ''; base.style.strokeDashoffset = ''; }
+    };
+    requestAnimationFrame(dotPop);
+  };
+  requestAnimationFrame(step);
+}
+/* The person's OK on the open branch: 'merged' (accept it) or 'returned' (ask for changes). It goes back to the
+   home, where an accepted branch merges into the base in front of them. Kept for this sitting only (DECIDED). */
+function decidePR(kind) {
+  const p = S.cur;
+  if (!p || $('full').hidden || !['merged', 'returned'].includes(kind)) return false;
+  if (kind === 'returned' && p.direction === 'outgoing') return false; // your own branch is fixed, not sent back
+  if (kind === 'merged' && typeof mergeBlocker === 'function' && mergeBlocker()) return false; // only a branch that is all green merges
+  DECIDED[S.pid + '|' + p.id] = kind;
+  S.mergeAnim = kind === 'merged' ? p.id : null;
+  closeGraph();
+  // Redraw as soon as the home has zoomed back in, without waiting for the reload (git says nothing changed).
+  setTimeout(() => { if (!document.body.classList.contains('dive') && $('landing').hidden) renderTree(); }, 900);
+  return true;
 }
 
 /* ── One branch, unfolded: its commits on a long rail, newest at the tip ── */
@@ -737,7 +822,8 @@ function layout({ N, L }, W, H) {
   const P = Object.values(by);
   P.forEach((n) => { n.x = Math.cos(n.ang) * n.depth * 160; n.y = Math.sin(n.ang) * n.depth * 160; });
   const small = (n) => n.kind === 'zone' || n.kind === 'sym' || n.kind === 'ctx';
-  const len = (l) => (l.t && l.t.startsWith('dep') ? 120 : l.a.kind === 'core' || l.b.kind === 'core' ? 170 : small(l.a) || small(l.b) ? 80 : 140);
+  // Two unchanged neighbours that call each other sit close (a cluster); a neighbour stands well off the changed spot it touches.
+  const len = (l) => (l.a.kind === 'ctx' && l.b.kind === 'ctx' ? 52 : l.t && l.t.startsWith('dep') ? (l.a.kind === 'ctx' || l.b.kind === 'ctx' ? 165 : 120) : l.a.kind === 'core' || l.b.kind === 'core' ? 170 : small(l.a) || small(l.b) ? 80 : 140);
   for (let it = 0; it < 600; it++) {
     const t = 1 - it / 600;
     for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
@@ -1243,12 +1329,12 @@ function nodeTap(n) {
    choice is made knowing the time. `rows` are more entries for the same menu (math.js adds what the tests can
    be sent to) and `trust` is how much of the change is already backed by tests (server/graph-review.js). */
 let depthOpen = false;
-function depthPill(rows = '', trust = null) {
-  const pct = trust && trust.percent != null ? trust.percent : null;
+function depthPill(rows = '', trust = null, confidence = null) {
+  const pct = confidence != null ? confidence : null;
   const opts = Object.entries(PROFILE).map(([id, [n, d]]) => { const [time, ...what] = d.split(' · '); return `<button role="menuitemradio" aria-checked="${S.profile === id}" data-p="${id}"><i></i><b>${n}</b><em>${esc(time)}</em><span>${esc(what.join(' · '))}</span></button>`; }).join('');
-  const meter = pct == null ? '' : `<i class="ring" style="--p:${pct}"></i><b>${pct}%</b><small>tested</small><u></u>`;
+  const meter = pct == null ? '' : `<i class="ring" style="--p:${pct}"></i><b>${pct}%</b><small>confident</small><u></u>`;
   const head = trust ? `<div class="dk"><span>Backed by tests</span><span>${trust.verified} of ${trust.total} functions${trust.failed ? ` · ${trust.failed} failed` : ''}</span></div><p class="dn">Weighted by impact. What the tests cover, not the odds that it is right.</p>` : '';
-  return `<div class="depth${depthOpen ? ' open' : ''}" id="depth"><button class="dpill" id="bDepth" aria-haspopup="menu" aria-expanded="${depthOpen}" title="Review depth${pct == null ? '' : ` · ${pct}% of the change is backed by tests`}">${meter}<b>${PROFILE[S.profile][0]}</b><small>${esc(PROFILE[S.profile][1].split(' · ')[0])}</small><svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 5l4-4 4 4"/></svg></button>`
+  return `<div class="depth${depthOpen ? ' open' : ''}" id="depth"><button class="dpill" id="bDepth" aria-haspopup="menu" aria-expanded="${depthOpen}" title="Review depth${pct == null ? '' : ` · ${pct}% overall confidence in the change`}">${meter}<b>${PROFILE[S.profile][0]}</b><small>${esc(PROFILE[S.profile][1].split(' · ')[0])}</small><svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 5l4-4 4 4"/></svg></button>`
     + `<div class="dmenu" role="menu">${head}${rows ? `<div class="dacts">${rows}</div>` : ''}<div class="dk"><span>Review depth</span></div>${opts}</div></div>`;
 }
 function openDepth() { depthOpen = true; $('depth')?.classList.add('open'); $('bDepth')?.setAttribute('aria-expanded', 'true'); }

@@ -1,0 +1,217 @@
+From 63de3a40fb224c31a7de8d1b082e90e66cb51aac Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Tue, 10 Nov 2026 09:12:41 +0200
+Subject: [PATCH 1/8] Fix article in the Lz4BlockArray doc comment
+
+---
+ src/MessagePack/MessagePackCompression.cs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/MessagePack/MessagePackCompression.cs b/src/MessagePack/MessagePackCompression.cs
+index 8303a219..3fd2e0e4 100644
+--- a/src/MessagePack/MessagePackCompression.cs
++++ b/src/MessagePack/MessagePackCompression.cs
+@@ -27,7 +27,7 @@ namespace MessagePack
+         Lz4Block,
+ 
+         /// <summary>
+-        /// Compresses an entire msgpack sequence as a array of lz4 block format.
++        /// Compresses an entire msgpack sequence as an array of lz4 block format.
+         /// This is compressed/decompressed in chunks that do not consume LOH,
+         /// but the compression ratio is slightly sacrificed.
+         /// </summary>
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 687ef82051dbb171bf951de73f6bd75454c5cb4e Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Tue, 10 Nov 2026 15:47:03 +0200
+Subject: [PATCH 2/8] README: fix grammar in the Lz4BlockArray description
+
+---
+ README.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index c52f1088..05ea2d1d 100644
+--- a/README.md
++++ b/README.md
+@@ -823,7 +823,7 @@ MessagePackSerializer.Serialize(obj, lz4Options);
+ 
+ `Lz4Block` compresses an entire MessagePack sequence as a single LZ4 block. This is the simple compression that achieves best compression ratio, at the cost of copying the entire sequence when necessary to get contiguous memory.
+ 
+-`Lz4BlockArray` compresses an entire MessagePack sequence as a array of LZ4 blocks. Compressed/decompressed blocks are  chunked and thus do not enter the GC's Large-Object-Heap, but the compression ratio is slightly worse.
++`Lz4BlockArray` compresses an entire MessagePack sequence as an array of LZ4 blocks. Compressed/decompressed blocks are chunked and thus do not enter the GC's Large-Object-Heap, but the compression ratio is slightly worse.
+ 
+ We recommend to use `Lz4BlockArray` as the default when using compression.
+ For compatibility with MessagePack v1.x, use `Lz4Block`.
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 2b121bf3d40ac0ae8eddbb87f45133dd92ddbbef Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Wed, 11 Nov 2026 10:05:27 +0200
+Subject: [PATCH 3/8] SECURITY: fix verb tense in the servicing policy
+
+---
+ SECURITY.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/SECURITY.md b/SECURITY.md
+index aedee6a1..539109cb 100644
+--- a/SECURITY.md
++++ b/SECURITY.md
+@@ -10,7 +10,7 @@
+ 
+ Each supported major version is only serviced for security issues at its tip.
+ For example 2.5 will receive updates but 2.4 will not.
+-3.0 will receive updates until 3.1 is stable, at which point 3.0 will no longer received security updates.
++3.0 will receive updates until 3.1 is stable, at which point 3.0 will no longer receive security updates.
+ 
+ ## Reporting a Vulnerability
+ 
+-- 
+2.54.0 (Apple Git-157)
+
+
+From e018ac2ec67e379cfac64eeb8945cdc871793918 Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Wed, 11 Nov 2026 17:31:12 +0200
+Subject: [PATCH 4/8] Document Nil.Default
+
+---
+ src/MessagePack/Nil.cs | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/MessagePack/Nil.cs b/src/MessagePack/Nil.cs
+index e3c625d0..b3ecc274 100644
+--- a/src/MessagePack/Nil.cs
++++ b/src/MessagePack/Nil.cs
+@@ -14,6 +14,9 @@ namespace MessagePack
+ #endif
+     struct Nil : IEquatable<Nil>
+     {
++        /// <summary>
++        /// The only value of <see cref="Nil"/>.
++        /// </summary>
+         public static readonly Nil Default = default(Nil);
+ 
+         public static bool operator ==(Nil left, Nil right) => true;
+-- 
+2.54.0 (Apple Git-157)
+
+
+From e11d86515eb603d39a07310fc79746493b71c51e Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Thu, 12 Nov 2026 11:20:55 +0200
+Subject: [PATCH 5/8] CONTRIBUTING: explain how to run the tests from the
+ command line
+
+---
+ CONTRIBUTING.md | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 0883dcdd..197c0a0d 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -20,6 +20,10 @@ Alternatively you may build from the command line using `msbuild.exe` or:
+ 
+     dotnet build /p:platform=NoVSIX
+ 
++Run the tests from the command line with:
++
++    dotnet test
++
+ ## Unity
+ 
+ See the ReadMe for the target directory `src\MessagePack.UnityClient` for information on building and managing with Unity. Unity's CI is managed in `unity.yml` in GitHub Actions.
+-- 
+2.54.0 (Apple Git-157)
+
+
+From c88141b7bbed1a09feedd7323ff5bcb75af7c211 Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Thu, 12 Nov 2026 16:02:38 +0200
+Subject: [PATCH 6/8] Document the ExtensionResult properties
+
+---
+ src/MessagePack/ExtensionResult.cs | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/MessagePack/ExtensionResult.cs b/src/MessagePack/ExtensionResult.cs
+index 780d9bbb..2c96a317 100644
+--- a/src/MessagePack/ExtensionResult.cs
++++ b/src/MessagePack/ExtensionResult.cs
+@@ -25,8 +25,14 @@ namespace MessagePack
+             this.Data = data;
+         }
+ 
++        /// <summary>
++        /// Gets the type code of the extension.
++        /// </summary>
+         public sbyte TypeCode { get; private set; }
+ 
++        /// <summary>
++        /// Gets the payload of the extension.
++        /// </summary>
+         public ReadOnlySequence<byte> Data { get; private set; }
+ 
+         public ExtensionHeader Header => new ExtensionHeader(this.TypeCode, (uint)this.Data.Length);
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 7308196fe568737841b3707565c5f464668d9a03 Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Fri, 13 Nov 2026 09:44:19 +0200
+Subject: [PATCH 7/8] Reword the MessagePackSerializationException summary
+
+---
+ src/MessagePack/MessagePackSerializationException.cs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/MessagePack/MessagePackSerializationException.cs b/src/MessagePack/MessagePackSerializationException.cs
+index b038d338..08fbc53c 100644
+--- a/src/MessagePack/MessagePackSerializationException.cs
++++ b/src/MessagePack/MessagePackSerializationException.cs
+@@ -7,7 +7,7 @@ using System.Diagnostics.CodeAnalysis;
+ namespace MessagePack
+ {
+     /// <summary>
+-    /// An exception thrown during serializing an object graph or deserializing a messagepack sequence.
++    /// An exception thrown while serializing an object graph or deserializing a messagepack sequence.
+     /// </summary>
+     [Serializable]
+ #if MESSAGEPACK_INTERNAL
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 9e9a97b2278535e533f19cb3a633305b0d2ee8c9 Mon Sep 17 00:00:00 2001
+From: Meulen Cirillo <meulencv@gmail.com>
+Date: Fri, 13 Nov 2026 18:26:50 +0200
+Subject: [PATCH 8/8] CONTRIBUTING: fix preposition in the build instructions
+
+---
+ CONTRIBUTING.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 197c0a0d..328039ac 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -14,7 +14,7 @@ To get VS to find the toolsets when launched from the Start Menu, run `init -Ins
+ 
+ ## How to Build
+ 
+-Open `MessagePack.sln` on Visual Studio 2022.
++Open `MessagePack.sln` in Visual Studio 2022.
+ 
+ Alternatively you may build from the command line using `msbuild.exe` or:
+ 
+-- 
+2.54.0 (Apple Git-157)
+

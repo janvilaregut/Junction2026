@@ -8,3 +8,6 @@ tools/**/obj/
 .env
 .env.*
 !.env.example
+
+# Local git worktrees of other branches
+.claude/worktrees/

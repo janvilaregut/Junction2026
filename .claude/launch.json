@@ -1,6 +1,144 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "katse", "runtimeExecutable": "node", "runtimeArgs": ["server/index.js"], "port": 4173 }
+    {
+      "name": "katse",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server/index.js"
+      ],
+      "port": 4173
+    },
+    {
+      "name": "katse-mascot",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=4176",
+        "KATSE_DATA=/Users/meulencv/development/projects/Junction2026/data",
+        "node",
+        ".claude/worktrees/ui-hud/server/index.js"
+      ],
+      "port": 4176,
+      "autoPort": false
+    },
+    {
+      "name": "katse-fps",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=4177",
+        "KATSE_DATA=/Users/meulencv/development/projects/Junction2026/data",
+        "node",
+        ".claude/worktrees/fps-ramas/server/index.js"
+      ],
+      "port": 4177,
+      "autoPort": false
+    },
+    {
+      "name": "katse-zoom",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=4178",
+        "KATSE_DATA=/Users/meulencv/development/projects/Junction2026/data",
+        "node",
+        ".claude/worktrees/ui-hud/server/index.js"
+      ],
+      "port": 4178,
+      "autoPort": false
+    },
+    {
+      "name": "katse-local",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server/local/demo.js"
+      ],
+      "port": 4179,
+      "autoPort": false
+    },
+    {
+      "name": "katse-fps-base",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=4180",
+        "KATSE_DATA=/Users/meulencv/development/projects/Junction2026/data",
+        "node",
+        "/private/tmp/claude-501/-Users-meulencv-development-projects-Junction2026/5573ff26-c708-465b-aa55-fe8d8cbe0aba/scratchpad/baseline/server/index.js"
+      ],
+      "port": 4180,
+      "autoPort": false
+    },
+    {
+      "name": "katse-voice",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=4181",
+        "KATSE_DATA=/Users/meulencv/development/projects/Junction2026/data",
+        "node",
+        ".claude/worktrees/voice-aura/server/index.js"
+      ],
+      "port": 4181,
+      "autoPort": false
+    },
+    {
+      "name": "katse-math",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=4183",
+        "KATSE_DATA=/Users/meulencv/development/projects/Junction2026/data",
+        "node",
+        ".claude/worktrees/ui-hud/server/index.js"
+      ],
+      "port": 4183,
+      "autoPort": false
+    },
+    {
+      "name": "quality-lab-report",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4190",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        ".claude/worktrees/quality-lab/report"
+      ],
+      "port": 4190,
+      "autoPort": false
+    },
+    {
+      "name": "katse-principles",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=4185",
+        "KATSE_DATA=/Users/meulencv/development/projects/Junction2026/data",
+        "node",
+        ".claude/worktrees/ui-hud/server/index.js"
+      ],
+      "port": 4185,
+      "autoPort": false
+    },
+    {
+      "name": "katse-entire",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=4186",
+        "KATSE_DATA=/Users/meulencv/development/projects/Junction2026/data",
+        "node",
+        ".claude/worktrees/entire-sessions/server/index.js"
+      ],
+      "port": 4186,
+      "autoPort": false
+    },
+    {
+      "name": "katse-phone",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=4194",
+        "node",
+        "server/index.js"
+      ],
+      "port": 4194,
+      "autoPort": false
+    }
   ]
 }

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Katse · Local</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0c0e; --card: #161618; --card2: #1d1d20; --line: #2a2a2e; --text: #f1f1f3; --dim: #8d8d96;
+    --green: #bfe3d0; --yellow: #f3e2a6; --coral: #f2a99f; --blue: #cde4ee; --lav: #e3dcf4;
+    --sans: Inter, system-ui, sans-serif; --head: Outfit, Inter, sans-serif; --mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--sans); }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 16px 32px; min-height: 100vh; display: flex; flex-direction: column; gap: 20px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font: 600 26px/1.1 var(--head); margin: 0; letter-spacing: -0.01em; }
+  h1 span { color: var(--dim); font-weight: 500; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--card); font: 12px var(--mono); color: var(--dim); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+  .dot.ok { background: var(--green); } .dot.bad { background: var(--coral); }
+  .tabs { display: inline-flex; padding: 4px; border-radius: 999px; background: var(--card); align-self: flex-start; }
+  .tabs button { border: 0; background: none; color: var(--dim); padding: 8px 18px; border-radius: 999px; font: 500 14px var(--sans); cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--card2); color: var(--text); }
+  section { display: none; flex-direction: column; gap: 14px; flex: 1; }
+  section.on { display: flex; }
+  #log { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 240px; }
+  .msg { padding: 12px 16px; border-radius: 20px; max-width: 88%; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user { align-self: flex-end; background: var(--lav); color: #1a1625; }
+  .msg.bot { align-self: flex-start; background: var(--card); }
+  .msg.bot.err { color: var(--coral); }
+  .meta { font: 11px var(--mono); color: var(--dim); align-self: flex-start; margin-top: -6px; padding-left: 6px; }
+  form { display: flex; gap: 10px; align-items: flex-end; }
+  textarea { flex: 1; resize: vertical; min-height: 52px; max-height: 50vh; padding: 14px 16px; border-radius: 20px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: 14px/1.5 var(--sans); outline: none; }
+  textarea:focus { border-color: #4a4a52; }
+  textarea.code { font: 13px/1.55 var(--mono); min-height: 260px; }
+  .go { border: 0; border-radius: 999px; padding: 14px 22px; background: var(--text); color: var(--bg); font: 600 14px var(--sans); cursor: pointer; white-space: nowrap; }
+  .go:disabled { opacity: .4; cursor: default; }
+  .row { display: flex; justify-content: flex-end; }
+  #verdict { display: none; flex-direction: column; gap: 10px; }
+  .vhead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .chip { padding: 4px 12px; border-radius: 999px; font: 600 12px var(--mono); text-transform: uppercase; color: #141416; }
+  .block { background: var(--coral); } .review { background: var(--yellow); } .clean { background: var(--green); }
+  .find { background: var(--card); border-radius: 20px; padding: 14px 16px; display: grid; gap: 6px; }
+  .find .top { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font: 12px var(--mono); }
+  .sev { padding: 2px 10px; border-radius: 999px; color: #141416; }
+  .sev.critical, .sev.high { background: var(--coral); } .sev.medium { background: var(--yellow); } .sev.low { background: var(--blue); }
+  .ev { font: 12px var(--mono); color: var(--dim); overflow-x: auto; white-space: pre; }
+  .fix { color: var(--green); font-size: 14px; }
+  footer { font: 11px var(--mono); color: var(--dim); text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Local model <span>· Gemma 4</span></h1>
+    <span class="pill"><span class="dot" id="dot"></span><span id="status">checking…</span></span>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="chat">Chat</button>
+    <button role="tab" aria-selected="false" data-tab="scan">Private scan</button>
+  </div>
+
+  <section id="chat" class="on">
+    <div id="log"></div>
+    <form id="chatForm">
+      <textarea id="q" rows="1" placeholder="Ask anything. It stays on this Mac."></textarea>
+      <button class="go" id="send">Send</button>
+    </form>
+  </section>
+
+  <section id="scan">
+    <textarea id="code" class="code" spellcheck="false"></textarea>
+    <div class="row"><button class="go" id="scanBtn">Scan</button></div>
+    <div id="verdict"></div>
+  </section>
+
+  <footer>127.0.0.1 · oMLX · nothing leaves this machine</footer>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+$('code').value = `import express from 'express';
+import mysql from 'mysql2';
+
+const AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+const db = mysql.createConnection({ host: 'db', user: 'root', password: 'root' });
+const app = express();
+
+app.get('/user', (req, res) => {
+  db.query("SELECT * FROM users WHERE name = '" + req.query.name + "'", (err, rows) => {
+    res.json(rows);
+  });
+});
+
+app.get('/file', (req, res) => res.sendFile('/srv/files/' + req.query.path));
+app.listen(3000);`;
+
+// Status
+async function refresh() {
+  try {
+    const h = await (await fetch('/api/local/health')).json();
+    $('dot').className = 'dot ' + (h.ok && h.available ? 'ok' : 'bad');
+    $('status').textContent = h.ok ? (h.available ? h.model : h.model + ' not loaded') : 'oMLX offline';
+  } catch {
+    $('dot').className = 'dot bad';
+    $('status').textContent = 'demo server offline';
+  }
+}
+refresh();
+setInterval(refresh, 15000);
+
+// Tabs
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach((x) => x.setAttribute('aria-selected', x === b));
+  document.querySelectorAll('section').forEach((s) => s.classList.toggle('on', s.id === b.dataset.tab));
+}));
+
+// Chat (streamed over SSE from a POST)
+const history = [];
+function bubble(cls, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls;
+  d.textContent = text;
+  $('log').appendChild(d);
+  d.scrollIntoView({ block: 'end' });
+  return d;
+}
+async function send(e) {
+  e?.preventDefault();
+  const text = $('q').value.trim();
+  if (!text || $('send').disabled) return;
+  $('q').value = '';
+  $('send').disabled = true;
+  history.push({ role: 'user', content: text });
+  bubble('user', text);
+  const out = bubble('bot', '…');
+  let answer = '';
+  try {
+    const res = await fetch('/api/local/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: history }) });
+    if (!res.ok) throw new Error((await res.json()).error || res.statusText);
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n\n')) >= 0) {
+        const block = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        const ev = /^event: (\w+)/m.exec(block)?.[1];
+        const data = JSON.parse(/^data: (.*)$/m.exec(block)?.[1] || '{}');
+        if (ev === 'token') { answer += data.t; out.textContent = answer; out.scrollIntoView({ block: 'end' }); }
+        if (ev === 'error') throw new Error(data.error);
+        if (ev === 'done') {
+          const m = document.createElement('div');
+          m.className = 'meta';
+          m.textContent = `${(data.ms / 1000).toFixed(1)} s${data.tps ? ' · ' + Math.round(data.tps) + ' tok/s' : ''}`;
+          $('log').appendChild(m);
+        }
+      }
+    }
+    history.push({ role: 'assistant', content: answer });
+  } catch (err) {
+    history.pop();
+    out.classList.add('err');
+    out.textContent = err.message;
+  } finally {
+    $('send').disabled = false;
+    $('q').focus();
+  }
+}
+$('chatForm').addEventListener('submit', send);
+$('q').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) send(e); });
+
+// Scan
+$('scanBtn').addEventListener('click', async () => {
+  const code = $('code').value;
+  if (!code.trim()) return;
+  const btn = $('scanBtn');
+  const v = $('verdict');
+  btn.disabled = true;
+  btn.textContent = 'Scanning…';
+  v.style.display = 'none';
+  try {
+    const res = await fetch('/api/local/scan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
+    const r = await res.json();
+    if (!res.ok) throw new Error(r.error || res.statusText);
+    v.innerHTML = `<div class="vhead"><span class="chip ${r.verdict}">${r.verdict}</span><span>${esc(r.summary)}</span></div>` +
+      r.findings.map((f) => `<div class="find"><div class="top"><span class="sev ${f.severity}">${f.severity}</span><span>${esc(f.kind)}</span><span style="color:var(--dim)">line ${f.line}</span></div>` +
+        `<div class="ev">${esc(f.evidence)}</div><div>${esc(f.why)}</div><div class="fix">${esc(f.fix)}</div></div>`).join('') +
+      `<div class="meta">${(r.ms / 1000).toFixed(1)} s · ${esc(r.model)}</div>`;
+  } catch (err) {
+    v.innerHTML = `<div class="find" style="color:var(--coral)">${esc(err.message)}</div>`;
+  } finally {
+    v.style.display = 'flex';
+    btn.disabled = false;
+    btn.textContent = 'Scan';
+  }
+});
+</script>
+</body>
+</html>

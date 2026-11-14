@@ -617,7 +617,7 @@
      the rebuilds with it; a judge may only argue with sentences quoted from the requirement. Seconds, not
      minutes. The tree is the same story, told for one function. */
   const NODE_TONE = { reproduced: 'ok', differs: 'bad', unclear: 'warn' };
-  const NODE_WORD = { reproduced: 'Reproduced', differs: 'Differs', unclear: 'You decide' };
+  const NODE_WORD = { reproduced: 'Correct', differs: 'Wrong', unclear: 'Check it' };
   const NODE_STRATEGY = ['To the letter', 'Edge cases first', 'Smallest change'];
   function nodeStory(node, r) {
     const d = node.m, uniq = (a) => [...new Set(a)];
@@ -658,23 +658,33 @@
       verdict: { score: null, label: r ? NODE_WORD[v] : 'Reviewing', tone: r ? NODE_TONE[v] : 'warn', win, facts },
     };
   }
+  /* Trust in the whole PR: the share of its changed lines that are settled (reproduced by the agents or read by
+     a person), the same number as the bar. `gain` is what this one function adds once it is settled. */
+  function prTrust(id) {
+    const total = S.math?.summary?.lines?.total;
+    if (!total || typeof mathOpen !== 'function') return null;
+    const need = mathOpen().reduce((n, x) => n + linesOfNode(x), 0);
+    const node = mathNodes().find((n) => n.id === id);
+    return { now: Math.round(100 * (total - need) / total), gain: node ? Math.max(1, Math.round(100 * linesOfNode(node) / total)) : 0 };
+  }
   function renderNodeCard(s) {
     const r = s.result; if (!r) { CARD.innerHTML = ''; return; }
-    const built = s.agents.filter((a) => a.built), v = r.verdict, id = r.id;
-    const against = new Set(r.differences.filter((x) => x.grounded && x.right === 'replica').map((x) => x.replica));
-    const agree = v === 'reproduced' ? built.length : v === 'differs' ? Math.max(0, built.length - Math.max(1, against.size)) : null;
+    const built = s.agents.filter((a) => a.built), v = r.verdict, id = r.id, t = prTrust(id);
     const d = r.differences.find((x) => x.grounded && x.right === 'replica') || r.differences[0];
+    const sub = !t ? '' : v === 'reproduced' ? `up from ${Math.max(0, t.now - t.gain)}%` : v === 'differs' ? 'this function holds it back' : `+${t.gain}% if you confirm it`;
+    const say = r.explanation || (v === 'reproduced' ? 'The agents wrote the same function.' : !built.length ? 'The agents could not rewrite this function.' : 'The agents could not settle it.');
     const H = [`<div class="fvk">${esc(s.spot.where)} · ${esc(r.node.name)}</div>
-      <div class="fvs"><span class="fvn">${agree ?? '?'}<small>/${built.length}</small></span><span class="fvcap">agents wrote<br>what the PR did</span><span class="fchip" style="background:${PAL[NODE_TONE[v]]}">${NODE_WORD[v]}</span></div>
-      <p class="fvl"><i style="background:${PAL[NODE_TONE[v]]}"></i>${esc(r.explanation || (v === 'reproduced' ? 'The agents wrote the same function.' : 'The agents could not settle it.'))}</p>`];
+      <div class="fvs">${t ? `<span class="fvn">${t.now}<small>%</small></span><span class="fvcap">trust in this PR<br>${esc(sub)}</span>` : '<span class="fvcap"></span>'}<span class="fchip" style="background:${PAL[NODE_TONE[v]]}">${NODE_WORD[v]}</span></div>
+      <p class="fvl"><i style="background:${PAL[NODE_TONE[v]]}"></i>${esc(say)}</p>`];
     if (d && v !== 'reproduced') H.push(`<div class="fdiff"><code>${esc(d.input)}</code><div><span>The PR</span><b>${esc(d.pr)}</b></div><div><span>${esc(d.replica || 'Agents')}</span><b>${esc(d.other)}</b></div>${d.rule ? `<p>${d.grounded ? '' : 'Not found in the requirement: '}“${esc(d.rule)}”</p>` : '<p>The requirement does not decide this.</p>'}</div>`);
     if (r.fix) H.push(`<div class="fvh">The fix · ${esc(r.fix.from)}'s version</div><pre class="fcode">${r.fix.diff.map((x) => `<span class="${x.t === '+' ? 'a' : 'r'}">${x.t} ${esc(x.l.slice(0, 96))}</span>`).join('\n')}</pre>`);
-    H.push(`<ul>${s.verdict.facts.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`);
-    H.push(`<div class="fvb">${v === 'reproduced' ? '<button class="cta" id="fnDone">Done</button>' : r.fix ? '<button class="cta" id="fnCopy">Copy the fix</button><button class="cta ghost" id="fnKeep">Keep the PR\'s</button>' : '<button class="cta" id="fnKeep">I read it: it is right</button><button class="cta ghost" id="fnDone">Leave it open</button>'}</div><button type="button" class="fnagain" id="fnAgain">Ask the agents again</button>`);
+    if (built.length) H.push(`<ul><li>${built.length} ${built.length === 1 ? 'agent' : 'agents'} rewrote it from ${esc(String(r.requirement?.label || 'the requirement').toLowerCase())} without seeing the PR</li></ul>`);
+    const plus = t && v === 'unclear' ? ` · +${t.gain}%` : '';
+    H.push(`<div class="fvb">${v === 'reproduced' ? '<button class="cta" id="fnDone">Done</button>' : r.fix ? '<button class="cta" id="fnApply">Implement the fix</button><button class="cta ghost" id="fnKeep">Keep the PR\'s</button>' : `<button class="cta" id="fnKeep">It is right${plus}</button><button class="cta ghost" id="fnDone">Leave it open</button>`}</div><button type="button" class="fnagain" id="fnAgain">Ask the agents again</button>`);
     CARD.innerHTML = H.join('');
     if ($('fnDone')) $('fnDone').onclick = () => closeTree();
     if ($('fnKeep')) $('fnKeep').onclick = async () => { await markNode(id, 'read'); closeTree(); };
-    if ($('fnCopy')) $('fnCopy').onclick = async () => { try { await navigator.clipboard.writeText(r.fix.code); $('fnCopy').textContent = 'Copied'; } catch { showText(`The fix · ${r.fix.from}'s version`, r.fix.code); } };
+    if ($('fnApply')) $('fnApply').onclick = async () => { $('fnApply').disabled = true; closeTree(); setTimeout(() => applyFix(id), 450); }; // the agents implement it: the spot turns green
     if ($('fnAgain')) $('fnAgain').onclick = () => { const n = G.nodes.get(id); if (n) openNode(n, true); };
   }
   async function openNode(node, force) {

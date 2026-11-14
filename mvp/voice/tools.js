@@ -39,10 +39,12 @@ TOOLS.push(
   { name: 'graph_overview', description: 'What mathematics settled in the open pull request, without any AI: how many changed functions are proved (the edit cannot change behaviour), cleared (nothing flagged, not a proof), uncertain and risky, how many lines still need someone, and the open spots in order. Use it for "how risky is this", "what did the maths say", "can I approve".', parameters: T() },
   { name: 'prove_it', description: 'Open "Prove it" on one changed function of the graph: the card grows into the full list of engineering principles it is held to without any AI (same behaviour, contract intact, public API stable, guards kept, errors not swallowed, no dangerous APIs or secrets, no blocking on async, reached by a test, used, simple, small, small interface, written once), each pass / warn / fail with its exact value. Use it for "prove it", "why is this green", "what does it fail", "show me the principles", "amplíame la info de este punto". query: the function name or file:line; empty = the spot already selected.', parameters: T({ query: { type: 'STRING' } }) },
   { name: 'mark_read', description: 'The user says they read a spot and accept it: mark that function as read by them so it turns green. query: the function name or file:line. Only when the user says so.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
+  { name: 'decide_pull_request', description: 'The person gives their OK on the open pull request. decision "accept": accept and merge the pull request that is OPEN right now (the user says "merge it", "haz el merge", "acepta el pull request" while inside it): only possible when it is all green; the app itself goes back to the branch tree (the four demo branches) and that branch is seen merging into the base line. Do not open, list or expand anything else for this. decision "request_changes": send it back to the author (when the agents wrote a spot differently). ONLY when the user clearly says so ("ok, merge it", "accept it", "acéptalo", "haz el merge", "send it back", "pide cambios"). It is a visual decision kept for this session only: nothing is merged in git.', parameters: T({ decision: { type: 'STRING', enum: ['accept', 'apply_fix', 'request_changes'], description: 'apply_fix: the agents implement their version of the spot(s) they wrote differently (they turn green, then the branch can be accepted). On the user\'s OWN branch ("yours", outgoing) it fixes every such spot and request_changes is not possible: your own work is fixed, never sent back. On someone else\'s branch it works for ONE spot; with two or more the merge is blocked and only request_changes (back to its author) is possible.' } }, ['decision']) },
+  { name: 'why_the_maths', description: 'WHY mathematics gave a spot its colour (proved, cleared, uncertain, risky), with the exact algorithms and numbers behind it: PageRank percentile and fan-in/dependents in the call graph, tests that reach it, cyclomatic/cognitive complexity and nesting, the token-level equivalence proof, the principle gate (Kleene: every criterion must pass), entropy of its parts, sensitivity. Use it whenever the user asks why a spot is green, amber or red, "por qué", "en qué se basa". query: function name; empty = the selected spot.', parameters: T({ query: { type: 'STRING' } }) },
   { name: 'show_ai_session', description: 'Open the panel with the AI agent session (recorded by Entire) behind one commit: which agent and model made it, the prompt that led to it and the conversation up to it, with a button to reopen it in its agent. ONLY when the user explicitly and directly asks for it: the prompt, the AI session, the conversation, or which AI made a commit ("¿con qué prompt se hizo este commit?", "enséñame la sesión de Claude del último commit", "which AI wrote this"). NEVER call it on your own initiative, to illustrate something else, or as part of a review. query: a commit (sha, words from its message, "last"/"first"); empty = the newest commit with a session. branch: optional branch, else the one unfolded or open, else the history of the base line.', parameters: T({ query: { type: 'STRING' }, branch: { type: 'STRING' } }) },
   { name: 'close_ai_session', description: 'Close the AI session panel.', parameters: T() },
   { name: 'look_deeper', description: 'The user wants the change looked at harder: launches a Deep review (up to 15 min, real cost). ASK FOR A YES FIRST.', parameters: T() },
-  { name: 'run_tests', description: 'The second way to settle a spot: back it with EXECUTABLE TESTS instead of agents. The full pipeline (contract, alternatives rebuilt from the base, attacks, a probe that runs) on the chosen functions; only this moves "% tested" on the bar. Only changed C# functions; takes minutes and real model cost, bounded by the depth: quick (90 s, cannot settle a spot), standard (5 min), deep (15 min). ASK FOR A YES FIRST. scope: "spot" (query, else the one open, else the next pending one), "all" (the whole change), "continue" (same contract, new budget, after a review that ended with not enough evidence). Use it for "test this", "back it with tests", "run the tests on this spot", "test the whole change", "continue the investigation".', parameters: T({ scope: { type: 'STRING', enum: ['spot', 'all', 'continue'] }, query: { type: 'STRING' }, depth: { type: 'STRING', enum: ['quick', 'standard', 'deep'], description: 'Optional: change the review depth first.' } }, ['scope']) },
+  { name: 'run_tests', description: 'The second way to settle a spot: back it with EXECUTABLE TESTS instead of agents. The full pipeline (contract, alternatives rebuilt from the base, attacks, a probe that runs) on the chosen functions; only this moves "backed by tests" in the depth menu. Only changed C# functions; takes minutes and real model cost, bounded by the depth: quick (90 s, cannot settle a spot), standard (5 min), deep (15 min). ASK FOR A YES FIRST. scope: "spot" (query, else the one open, else the next pending one), "all" (the whole change), "continue" (same contract, new budget, after a review that ended with not enough evidence). Use it for "test this", "back it with tests", "run the tests on this spot", "test the whole change", "continue the investigation".', parameters: T({ scope: { type: 'STRING', enum: ['spot', 'all', 'continue'] }, query: { type: 'STRING' }, depth: { type: 'STRING', enum: ['quick', 'standard', 'deep'], description: 'Optional: change the review depth first.' } }, ['scope']) },
   { name: 'open_report', description: 'Open the report of the last full review of this pull request: the verdict card with the score, what was and was not checked and the evidence; it is where the person signs or sends it back. Use it for "show me the report / the verdict / the score", "I want to sign". If there is no review yet it says so (start_verification runs one).', parameters: T() },
   { name: 'explain_context', description: 'What things ARE, in words, so you can explain them instead of reciting numbers. about "project": what this repository is and does (its own README) and how it is laid out. about "change": what the open pull request was asked to do (the linked issue, the recorded prompt or its commit messages) and which parts it touches. about "spot": what one function does: its own comment, its code, who calls it, what it calls and which tests reach it (query: the function; empty = the one open). Call it BEFORE explaining what something does or why it matters, and whenever the user asks "what is this", "what does it do", "what is this for", "explain it", "why does this matter".', parameters: T({ about: { type: 'STRING', enum: ['project', 'change', 'spot'] }, query: { type: 'STRING' } }, ['about']) },
   { name: 'open_project', description: 'Switch to another project (repository), or with an empty query show the project picker with every project and how many branches each has to review. Use it for "open the project X", "change project", "show me the projects".', parameters: T({ query: { type: 'STRING', description: 'Project name or part of it; empty = show the picker.' } }) },
@@ -54,6 +56,23 @@ const RETIRED = new Set(['show_agent_debate', 'debate_step', 'open_agent', 'clos
 for (let i = TOOLS.length - 1; i >= 0; i--) if (RETIRED.has(TOOLS[i].name)) TOOLS.splice(i, 1);
 for (const t of TOOLS) t.behavior = 'BLOCKING';
 
+const screen = () => TOOL_FN._screen();
+/* What decides the open branch NOW (the graph: mathematics + the agents per function), in words, with the next step.
+   The full-pipeline report, if an old one exists, is not this. */
+function branchStatus() {
+  const s = app(); if (!s?.cur || !s.math || view() === 'home') return null;
+  const nodes = (s.math.nodes || []).filter((n) => n.verdict !== 'context'), marks = s.marks || {};
+  const by = (st) => nodes.filter((n) => marks[n.id]?.state === st).map((n) => n.qname || n.name);
+  const blocker = call('mergeBlocker') || '', own = s.cur.direction === 'outgoing', notReviewed = nodes.filter((n) => !marks[n.id]).map((n) => n.qname || n.name);
+  const differs = by('differs');
+  const next = !blocker ? 'It can be merged now (decide_pull_request accept).'
+    : notReviewed.length ? 'The agents have not reviewed it yet: offer review_all (three agents rebuild each changed function blind and compare).'
+    : differs.length && own ? 'Offer apply_fix: the agents implement their fix on the user\'s own branch, then merge.'
+    : differs.length === 1 ? 'Offer apply_fix (the agents have a one-line fix), or request_changes to send it back.'
+    : differs.length ? 'Merge is blocked: offer request_changes (back to its author).' : 'Open spots remain: open_spot / where_to_look.';
+  return { whose: own ? 'the user\'s own branch' : 'someone else\'s branch, wanting in', state: (typeof state === 'function' ? state(s.cur).label : ''), changedFunctions: nodes.map((n) => n.qname || n.name), notReviewedByAgentsYet: notReviewed, reproducedByAgents: by('reproduced'), agentsWroteDifferently: differs, mergeBlockedBecause: blocker || null, next,
+    note: 'Describe THIS state in one or two sentences. Do not talk about tests or "insufficient evidence" unless asked for the full report.' };
+}
 function allPRs() {
   const s = app(); if (!s) return [];
   return [...(s.prs?.incoming || []).map((p) => ({ ...p, yours: false })), ...(s.prs?.outgoing || []).map((p) => ({ ...p, yours: true }))];
@@ -154,11 +173,22 @@ function briefOf(b, section = 'summary') {
 }
 const TOOL_FN = {
   async get_screen() {
+    return { ...(await screen()), branchStatus: branchStatus() || undefined };
+  },
+  async get_verification_details({ section = 'summary' } = {}) {
+    const s = app();
+    if (!s?.cur || view() === 'home') return { error: 'No pull request is open. Open one first.' };
+    const st = branchStatus();
+    if (st) return { pullRequest: s.cur.branch, ...st, olderFullReview: s.run?.brief ? 'There is an older full-pipeline report for this branch; it is NOT what decides here. Mention it only if asked for the full report.' : undefined };
+    if (!s.run?.brief) return { verified: false, note: 'This pull request has not been verified yet.', plan: s.plan ? { files: s.plan.totals?.files, added: s.plan.totals?.added, removed: s.plan.totals?.removed } : null };
+    return { pullRequest: s.cur.branch, ...briefOf(s.run.brief, section) };
+  },
+  async _screen() {
     const s = app(); const v = view(); const p = s?.cur && v !== 'home' ? s.cur : null;
     const project = s?.projects?.find((x) => x.id === s.pid);
     const f = v === 'commits' ? s.focus : v === 'zoom' ? s.zoom : null;
     return {
-      view: v, project: project?.name, base: s?.base, pullRequest: p ? prBrief(p, allPRs().findIndex((x) => x.id === p.id)) : null, verification: p ? briefOf(s.run?.brief, 'summary') : null, verifyingNow: !!s?.es,
+      view: v, project: project?.name, base: s?.base, pullRequest: p ? prBrief(p, allPRs().findIndex((x) => x.id === p.id)) : null, verification: p && !s?.math ? briefOf(s.run?.brief, 'summary') : null, verifyingNow: !!s?.es,
       projects: v === 'projects' ? projectList() : undefined,
       graphNodes: v === 'graph' && !s?.math ? graphSummary() : undefined,
       mathematics: (v === 'graph' || v === 'code') && s?.math ? { proved: s.math.summary.nodes.proved, cleared: s.math.summary.nodes.cleared, uncertain: s.math.summary.nodes.uncertain, risky: s.math.summary.nodes.risky, openNow: (call('mathQueue') || []).slice(0, 8).map((x) => ({ name: x.name, state: x.state, why: x.why })), selected: s.fixTarget?.label || null, backedByTests: tested(), reviewDepth: s.profile } : undefined,
@@ -332,12 +362,6 @@ const TOOL_FN = {
     return { started };
   },
   async leave_debate() { call('closeDebate'); act('Back to the graph'); return { ok: true }; },
-  async get_verification_details({ section = 'summary' } = {}) {
-    const s = app();
-    if (!s?.cur || view() === 'home') return { error: 'No pull request is open. Open one first.' };
-    if (!s.run?.brief) return { verified: false, note: 'This pull request has not been verified yet.', plan: s.plan ? { files: s.plan.totals?.files, added: s.plan.totals?.added, removed: s.plan.totals?.removed } : null };
-    return { pullRequest: s.cur.branch, ...briefOf(s.run.brief, section) };
-  },
   async open_spot({ query = '' } = {}) {
     if (!inGraph()) return { error: 'Open a pull request first.' };
     await toGraph();
@@ -413,6 +437,52 @@ const TOOL_FN = {
     const g = d.principleGate || {};
     return { spot: d.qname, colour: d.verdict, passes: `${g.passed}/${g.applicable}`, failing: d.principles.filter((p) => p.state === 'warn' || p.state === 'fail').map((p) => ({ principle: p.name, value: p.value, why: p.detail })), passing: d.principles.filter((p) => p.state === 'pass' || p.state === 'inherited').map((p) => `${p.name}: ${p.value}`), note: 'Say first which principles it does not meet and why, in plain words; then that the rest pass. Passing a check is not proof of correctness; only "Same behaviour" is a proof. What principles cannot say (does it do what was asked) is what the agents check.' };
   },
+  async decide_pull_request({ decision }) {
+    const s = app(); if (!inGraph() || !s?.math || !s.cur) return { error: 'Open a pull request first.' };
+    const left = call('mathQueue') || [], differs = Object.values(s.marks || {}).filter((m) => m.state === 'differs').length, name = s.cur.branch;
+    const own = s.cur.direction === 'outgoing';
+    if (decision === 'accept' && (own || !differs)) { // the agents review what is left (and fix your own branch) and it merges
+      act(`Merging · ${name}`);
+      const r = await call('mergeFlow');
+      if (r?.ok) return { ok: true, decision, screen: 'home', note: 'The agents checked what was left and it merged: back on the branch tree, the branch is merging into the base line. Say it in one short sentence.' };
+      return { error: r?.error || 'It could not be merged.', note: r?.differs ? 'The agents found faults in someone else\'s branch: offer apply_fix (one fault) or request_changes.' : undefined };
+    }
+    if (decision === 'request_changes' && own) return { error: 'This is the user\'s own branch: it is not sent back. If the agents found faults, offer apply_fix: they implement the fix.' };
+    if (decision === 'apply_fix' && own && differs) {
+      const f = await call('applyFix');
+      if (!f) return { error: 'The fix could not be applied.' };
+      act(`Fixed · ${name}`, 'ok');
+      return { ok: true, ...f, note: 'The agents implemented the fix on the user\'s own branch; the spots are green. Say what they changed in one sentence, then ask whether to merge (decision accept).' };
+    }
+    if (decision === 'apply_fix') {
+      if (differs !== 1) return { error: differs ? `Merge blocked: the agents wrote ${differs} spots differently. That is not a small fix; offer to request changes.` : 'There is nothing to fix here.' };
+      const f = await call('applyFix');
+      if (!f) return { error: 'The fix could not be applied.' };
+      act(`Fixed · ${f.spot}`, 'ok');
+      return { ok: true, ...f, note: 'The spot is green now. Say in one sentence what the agents changed and why, then ask whether to merge (decision accept).' };
+    }
+    if (decision === 'accept' && left.length) return { error: differs > 1 ? `Merge blocked: the agents wrote ${differs} spots differently. Warn the user and offer to request changes.` : differs ? 'It cannot be accepted as it is: the agents wrote one spot differently, and they have a small fix. Offer apply_fix, then accept.' : `It cannot be accepted yet: ${left.length} spot(s) still open. Review them first (review_all).`, open: left.slice(0, 5).map((n) => n.name) };
+    const why = decision === 'accept' ? call('mergeBlocker') : '';
+    if (why) return { error: why, hint: /not been reviewed/.test(why) ? 'Offer review_all, then apply_fix if a spot differs, then accept.' : undefined };
+    if (!call('decidePR', decision === 'accept' ? 'merged' : 'returned')) return { error: 'Could not record the decision.' };
+    act(decision === 'accept' ? `Merged · ${name}` : `Changes requested · ${name}`, decision === 'accept' ? 'ok' : 'bad');
+    return { ok: true, decision, screen: 'home', note: decision === 'accept' ? 'Back on the branch tree: the branch is merging into the base line right now. Say it in one short sentence.' : 'Back on the branch tree: the branch is marked as sent back to its author. Say it in one short sentence.' };
+  },
+  async why_the_maths({ query = '' } = {}) {
+    const s = app(); if (!inGraph() || !s?.math) return { error: 'Open a pull request first.' };
+    const node = query ? (call('findNodes', query) || []).find((n) => n.m && n.kind !== 'ctx') : s.fixTarget;
+    const d = node?.m; if (!d) return { error: query ? `No changed spot matches "${query}".` : 'Say which spot.' };
+    const c = d.centrality || {}, g = d.principleGate || {}, mt = d.metrics || {};
+    return {
+      spot: d.qname, colour: d.verdict, claim: d.claim,
+      callGraph: { pagerankPercentile: c.pagerankPct != null ? Math.round(c.pagerankPct * 100) : null, fanIn: c.fanIn ?? null, transitiveDependents: c.dependents ?? null, testsThatReachIt: c.testedBy ?? null, impact: d.impact, likelihood: d.likelihood, priority: d.priority },
+      complexity: mt.cyclomatic != null ? { cyclomatic: mt.cyclomatic, before: mt.before, cognitive: mt.cognitive, nesting: mt.nesting, loc: mt.loc } : null,
+      proof: d.proof ? `proved equivalent at level ${d.proof.level}` : 'no equivalence proof (behaviour changed)',
+      principleGate: `${g.passed ?? '?'} of ${g.applicable ?? '?'} criteria pass`, failing: (d.principles || []).filter((p) => !p.info && (p.state === 'warn' || p.state === 'fail')).map((p) => `${p.name}: ${p.value}`),
+      evidence: (d.evidence || []).map((r) => `${r.label}: ${r.value}`), entropyOfParts: (d.parts || []).map((p) => p.nats).slice(0, 4), sensitivity: d.sensitive?.label || 'normal',
+      note: 'Answer in ONE or TWO short, technical sentences, naming the algorithms and the numbers that decided it (e.g. "PageRank in the 94th percentile with 17 callers, cyclomatic 9, no equivalence proof: amber"). No filler, no analogies. Only expand if asked.',
+    };
+  },
   async mark_read({ query }) {
     const s = app(); if (!inGraph() || !s?.math) return { error: 'Open a pull request first.' };
     const node = (call('findNodes', query) || []).find((n) => n.kind === 'sym' || n.kind === 'grp');
@@ -455,7 +525,7 @@ const TOOL_FN = {
     const r = await call('openTree', { force: true, focusNodes: focus });
     if (!r || r.started === false || r.error) return { started: false, error: r?.error || 'The review could not start. The bar says why.' };
     act(`Testing ${scope === 'all' ? 'the whole change' : name.split('.').pop()}`);
-    return { started: true, scope: name, depth: s.profile, note: `A real review is running now, up to ${{ quick: '90 seconds', standard: '5 minutes', deep: '15 minutes' }[s.profile]}: the tree grows live and ends in a verdict card.${s.profile === 'quick' ? ' At Quick depth it cannot settle the spot: say so.' : ''} "% tested" on the bar moves only if the tests back it.` };
+    return { started: true, scope: name, depth: s.profile, note: `A real review is running now, up to ${{ quick: '90 seconds', standard: '5 minutes', deep: '15 minutes' }[s.profile]}: the tree grows live and ends in a verdict card.${s.profile === 'quick' ? ' At Quick depth it cannot settle the spot: say so.' : ''} "Backed by tests" in the depth menu moves only if the tests back it.` };
   },
   async open_report() {
     const s = app(); if (!s?.cur || !inGraph()) return { error: 'Open a pull request first.' };
