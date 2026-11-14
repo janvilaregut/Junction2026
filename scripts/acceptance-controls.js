@@ -9,9 +9,11 @@ import { blindCopy } from '../server/pipeline/sandbox.js';
 import { out, git } from '../server/git.js';
 import { validateContract } from '../server/pipeline/contract.js';
 import { evaluate, attackOutcome } from '../server/pipeline/evidence.js';
+import {repairOriginal} from '../server/pipeline/repair.js';
 import { within } from '../server/execution.js';
 
-const project = process.argv[2] ? getProject(process.argv[2]) : listProjects().find(p => /messagepack/i.test(p.origin || p.path));
+const projectId = process.argv.slice(2).find(a=>!a.startsWith('--'));
+const project = projectId ? getProject(projectId) : listProjects().find(p => /messagepack/i.test(p.origin || p.path));
 if (!project) throw new Error('Open the Tieto MessagePack repository in Katse before running controls.');
 const pr = await findPullRequest(project, 'in:ju26-issue-2283');
 const it = await intake(project, pr);
@@ -27,7 +29,7 @@ public class KatsePreparedControl {
  }" }.RunAsync();
  }
 }` }] }];
-await within(Date.now() + 240000, async () => {
+await within(Date.now() + 480000, async () => {
   const originalDir = path.join(base, 'original'); const controlDir = path.join(base, 'control');
   await blindCopy(it.repo, originalDir, it.headSha); await blindCopy(it.repo, controlDir, it.headSha);
   const file = path.join(controlDir, 'src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs');
@@ -38,6 +40,14 @@ await within(Date.now() + 240000, async () => {
   const results = [];
   for (const version of versions) results.push(await evaluate({ version, attacks, contract, tc: it.toolchain, environment: { control: true, platform: process.platform }, artifacts: artifactDir }));
   const report = { prepared: true, purpose: 'Acceptance controls, not agent discoveries', original: it.headSha, contract, attacks, results, falseAllegationDiscarded: attackOutcome(attacks[0], results[0]) === 'passed', knownRegressionDetected: attackOutcome(attacks[0], results[1]) === 'failed' };
-  writeJSON(path.join(artifactDir, 'controls.json'), report); console.log(JSON.stringify({ artifactDir, falseAllegationDiscarded: report.falseAllegationDiscarded, knownRegressionDetected: report.knownRegressionDetected, results: results.map(r => ({ status: r.status, ran: r.ran })) }));
+  if(process.argv.includes('--repair')) {
+    await git(controlDir,['-c','user.name=Katse','-c','user.email=katse@localhost','-c','commit.gpgsign=false','commit','-qm','Prepared regression control']);
+    const badHead=await out(controlDir,['rev-parse','HEAD']);
+    const changedLine=code.split('\n').findIndex(l=>l.includes('            report(diagnostic);'))+1;
+    const state={contract,attacks,evidence:[{...results[1],version:'original'}],requirementContext:'Preserve MsgPack004 for source-defined public members without Key attributes.',sourceChanges:[{path:'src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs',hunks:[{newStart:changedLine,newLines:1}]}],environment:{control:true,platform:process.platform},harness:[],suiteOverlay:[]};
+    report.repair=await repairOriginal({it:{...it,repo:controlDir,headSha:badHead},state,artifacts:artifactDir,tempRoot:base,emit:()=>{}});
+    if(report.repair.status!=='validated-proposal')process.exitCode=1;
+  }
+  writeJSON(path.join(artifactDir, 'controls.json'), report); console.log(JSON.stringify({ artifactDir, falseAllegationDiscarded: report.falseAllegationDiscarded, knownRegressionDetected: report.knownRegressionDetected, repair:report.repair, results: results.map(r => ({ status: r.status, ran: r.ran })) }));
   if (!report.falseAllegationDiscarded || !report.knownRegressionDetected) process.exitCode = 1;
 });

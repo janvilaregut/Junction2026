@@ -53,13 +53,14 @@ Supported executable scenarios:
 - metadata: library is compiled to a separate assembly. source uses it with [MessagePackObject]. Katse adds its own attributed resolver class in a separate syntax tree; do not declare a resolver or supply a resolver field. The repository verifier executes MessagePackGenerator AND all MessagePack diagnostic analyzers. The harness checks NO analyzer/generator errors and actual generation of its resolver. Use valid attributed types, members and [Key] attributes. A property name MUST differ from any nested type name in the same class. No assertions about runtime serialization.
 - analyzer: source is checked by MsgPack00xMessagePackAnalyzer. Expected diagnostics use Roslyn markup, e.g. public int {|MsgPack004:Value|} { get; set; }. MarkupOptions.UseFirstDescriptor is configured. Include using MessagePack;. No library or resolver required. Keep source C# 7.3-compatible for this mode.
 Describe the expected absence of exceptions and generation of the harness-owned resolver, without guessing a filename.
-No tools. Do not output a C# test class, imports for the harness, or files. Only supply the small scenario sources. Do not assume unspecified metadata diagnostic policy.`;
+No tools. Do not output a C# test class, imports for the harness, or files. Only supply the small scenario sources. Prefer single-line C# sources with spaces between declarations to avoid double-escaped newline separators. Do not assume unspecified metadata diagnostic policy.`;
 
 const literal = s => '@"' + String(s || '').replaceAll('"', '""') + '"';
 export function materializeScenario(attack, id) {
   let t = attack.test;
   if (!t || !['metadata', 'analyzer'].includes(t.kind) || typeof t.source !== 'string' || t.source.length > 12000) throw new Error('scenario-schema');
   if (t.kind === 'metadata' && (typeof t.library !== 'string' || t.library.length > 12000)) throw new Error('scenario-metadata-schema');
+  for (const source of [t.source,t.library].filter(Boolean)) if (/;\\[rn]|}\\[rn]|\\n(?:using|namespace|public)/.test(source)) throw new Error('scenario-escaped-source');
   const name = `Katse${id.replace(/[^a-zA-Z0-9]/g, '')}`;
   // Resolver setup is test infrastructure, not an adversarial decision. Keep it
   // in its own tree so model sources can use either file-scoped or block namespaces.

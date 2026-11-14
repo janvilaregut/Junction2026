@@ -1,3 +1,6 @@
+> Current graph-directed workflow and executable node checks: [implementation and limits](docs/graph-directed-review.md). Historical measurements below describe their original versions.
+> Latest local validation: [real runs, profiles and remaining limits (14/11/2026)](docs/validation-2026-11-14.md).
+
 # Katse
 
 Valida cambios generados por IA mediante reconstrucción desde la base, ataques ejecutables y una decisión humana respaldada por evidencia. Proyecto para Junction 2026, reto Tieto «Earned Trust in AI Code».

@@ -121,6 +121,33 @@ body.dive .lane.pulse .tipring{animation-play-state:paused}
 .back b{font:600 18px var(--head)}
 .back small{display:block;font:400 12px var(--mono);color:var(--fg2);margin-top:2px}
 .fbar{position:absolute;left:50%;bottom:32px;transform:translateX(-50%);display:flex;align-items:center;gap:16px;padding:10px 10px 10px 24px;border-radius:999px;background:var(--card);border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.5);white-space:nowrap;z-index:2;min-height:64px}
+/* Review depth: a pill in the bar, its menu opens upwards (depthPill in app.js) */
+.depth{position:relative;display:flex}
+.dpill{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:var(--card2);font:500 12.5px var(--body);color:var(--fg);transition:background .2s}
+.dpill:hover,.depth.open .dpill{background:var(--card3)}
+.dpill b{font-weight:500}
+.dpill small{font:400 11.5px var(--mono);color:var(--fg2)}
+.dpill u{width:1px;height:14px;background:var(--line2);margin:0 2px}
+.dpill svg{width:9px;height:6px;fill:none;stroke:var(--fg2);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s cubic-bezier(.2,.9,.25,1)}
+.depth.open .dpill svg{transform:rotate(180deg)}
+.ring{flex:0 0 14px;height:14px;border-radius:50%;background:conic-gradient(var(--ok) calc(var(--p,0)*1%),var(--card3) 0);-webkit-mask:radial-gradient(circle,transparent 3.6px,#000 4.2px);mask:radial-gradient(circle,transparent 3.6px,#000 4.2px)}
+.depth.open .ring,.dpill:hover .ring{background:conic-gradient(var(--ok) calc(var(--p,0)*1%),var(--fg3) 0)}
+.dmenu{position:absolute;left:50%;bottom:calc(100% + 22px);width:340px;max-width:calc(100vw - 32px);padding:8px;border-radius:22px;background:var(--card2);border:1px solid var(--line2);box-shadow:0 24px 70px rgba(0,0,0,.55);white-space:normal;opacity:0;visibility:hidden;transform:translate(-50%,8px);transition:opacity .2s ease,transform .3s cubic-bezier(.2,.9,.25,1),visibility 0s .3s}
+.depth.open .dmenu{opacity:1;visibility:visible;transform:translate(-50%,0);transition:opacity .2s ease,transform .3s cubic-bezier(.2,.9,.25,1)}
+.dmenu .dk{display:flex;justify-content:space-between;gap:12px;padding:8px 12px 6px;font:500 11px var(--mono);color:var(--fg3)}
+.dmenu .dk span+span{color:var(--fg2)}
+.dmenu .dn{padding:0 12px 8px;font-size:12px;line-height:1.45;color:var(--fg3)}
+.dmenu button{display:grid;grid-template-columns:8px auto 1fr;align-items:baseline;column-gap:10px;width:100%;padding:10px 12px;border-radius:14px;text-align:left;transition:background .15s}
+.dmenu button:hover,.dmenu button:focus-visible{background:var(--card3);outline:0}
+.dmenu button i{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--fg3);align-self:center}
+.dmenu button[aria-checked=true] i{background:var(--fg);border-color:var(--fg)}
+.dmenu button b{font:500 13.5px var(--head);color:var(--fg)}
+.dmenu button em{font:400 11.5px var(--mono);font-style:normal;color:var(--fg2);justify-self:end}
+.dmenu button span{grid-column:2/-1;margin-top:3px;font-size:12px;line-height:1.4;color:var(--fg2)}
+.dmenu button[aria-checked=false] b{color:var(--fg2)}
+.dacts{padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.dacts button{grid-template-columns:auto 1fr}
+.dacts button span{grid-column:auto;margin:0;justify-self:end;font:400 11.5px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 body:has(#drawer:not([hidden])) .fbar{left:calc((100vw - min(520px,100vw - 24px) - 12px) / 2)} /* centre in the space left of the drawer */
 body:has(#drawer:not([hidden])) .flegend{display:none}
 .fbar .num{font:600 26px var(--head);letter-spacing:-.02em}

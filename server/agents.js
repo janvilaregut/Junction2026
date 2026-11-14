@@ -81,6 +81,8 @@ export const estimateInputTokens = prompt => Math.ceil(Buffer.byteLength(prompt,
 // Fixed local validation messages only: never echo restored private source or
 // arbitrary model output into an unscanned retry prompt.
 const validationHints = {
+  'scenario-node-ids': 'Return the required nodeIds array from the schema, selecting only supplied functions exercised by the scenario.',
+  'scenario-escaped-source': 'The C# source contains double-escaped newlines. Return each source as one line using spaces between statements; do not emit literal backslash-n separators.',
   'scenario-metadata-schema': 'test.library must be a C# source string of at most 12000 characters. Put the consuming scenario inside test.source. Katse supplies the attributed resolver; do not supply a resolver field.',
   'scenario-schema': 'test.kind must be metadata or analyzer and test.source must be a C# source string of at most 12000 characters.',
   'unfounded-expectation': 'expectations must contain only grounded contract IDs explicitly supplied in the prompt.',

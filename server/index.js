@@ -22,7 +22,9 @@ import { resolveProfile } from './profiles.js';
 import { session, models } from './agents.js';
 import { analyze as mathAnalyze } from './math/index.js';
 import { marksOf, setMark } from './math/marks.js';
-import { reviewNode, savedReview } from './math/nodereview.js';
+import { graphScope, trustProgress, eligible } from './graph-review.js';
+import { runIndex } from './runs.js';
+import { reviewNode, savedReview, requirementOf } from './math/nodereview.js';
 import { attention as attentionOf } from './math/attention.js';
 
 const PORT = Number(process.env.PORT || 4173);
@@ -233,7 +235,13 @@ async function api(req, res, url) {
       }
       const pr = await findPullRequest(project, url.searchParams.get('pr'));
       const m = await mathAnalyze(project, pr, { force: url.searchParams.get('force') === '1' });
-      return send(res, 200, { ...m, marks: marksOf(project.id, m.head) });
+      let trust = null;
+      try {
+        const scope = graphScope(m, m.nodes.filter(eligible).map(n=>n.id), await requirementOf(project,pr));
+        const reports = runIndex(project.id).filter(r=>r.prId===pr.id && r.head===m.head).slice(-50).flatMap(r=>{try {const run=getRun(project.id,r.runId); return run.brief?.graphReview && verifyIntegrity(run.brief,run.dir+'/artifacts').ok ? [run.brief] : [];}catch{return [];}});
+        trust = trustProgress(scope,reports);
+      } catch {}
+      return send(res, 200, { ...m, trust, marks: marksOf(project.id, m.head) });
     }
     if (sub === 'plan') {
       const pr = await findPullRequest(project, url.searchParams.get('pr'));
@@ -245,7 +253,14 @@ async function api(req, res, url) {
       if (body.baseRef && (!/^[\w./-]+$/.test(body.baseRef) || body.baseRef.startsWith('-'))) throw new Error('Referencia base no válida');
       const pr = body.proposedRef ? { id: `ref:${body.proposedRef}`, ref: body.proposedRef, branch: body.proposedRef, title: body.proposedRef, direction: 'incoming', requirementText: body.requirement || '' } : await findPullRequest(project, body.pr);
       if (body.requirement) pr.requirementText = String(body.requirement);
-      const run = await startRun(body.baseRef ? { ...project, base: body.baseRef } : project, pr, body.options || {});
+      const options = {...(body.options || {})};
+      delete options.graphScope; // scope is derived server-side, never trusted from a caller
+      if (options.focusNodes) {
+        const m = await mathAnalyze(project,pr);
+        options.graphScope = graphScope(m,options.focusNodes,await requirementOf(project,pr));
+        options.mode = 'completo';
+      }
+      const run = await startRun(body.baseRef ? { ...project, base: body.baseRef } : project, pr, options);
       return send(res, 200, { runId: run.id, options: run.options });
     }
     if (sub === 'prompt' && method === 'POST') {
@@ -291,7 +306,13 @@ async function api(req, res, url) {
         const input = previous.brief.input;
         const pr = previous.prId.startsWith('ref:') ? { id:previous.prId,ref:input.proposedRef,branch:input.proposedRef,title:previous.branch,direction:'incoming' } : await findPullRequest(project, previous.prId);
         if(input.requirement?.id==='user-input') pr.requirementText=input.requirement.body;
-        const next = await startRun({ ...project, base:input.targetRef }, pr, { mode:'completo', profile:body.profile || 'deep', resumeRunId:runId });
+        let scope = null;
+        if (previous.brief.graphReview) {
+          const scopedProject={...project,base:input.targetRef};
+          scope=graphScope(await mathAnalyze(scopedProject,pr),previous.brief.graphReview.scope.nodes.map(n=>n.id),await requirementOf(scopedProject,pr));
+          if(scope.key!==previous.brief.graphReview.scope.key) throw new Error('El alcance o requisito ha cambiado: inicia una revisión nueva.');
+        }
+        const next = await startRun({ ...project, base:input.targetRef }, pr, { mode:'completo', profile:body.profile || 'deep', resumeRunId:runId, graphScope:scope });
         return send(res,200,{runId:next.id,options:next.options});
       }
       if (action === 'events') {
@@ -322,6 +343,7 @@ async function api(req, res, url) {
         const decision = body.decision === 'devolver' ? 'devolver' : 'aprobar';
         if (!signer) throw new Error('Falta tu nombre: la firma es de una persona.');
         if (decision === 'aprobar') {
+          if (b.graphReview && (b.graphReview.scope.denominator.some(n=>!b.graphReview.nodes.some(v=>v.id===n.id && v.status==='verified')) || b.graphReview.scope.partial)) throw new Error('Esta revisión es de alcance limitado. Completa una revisión global antes de firmar el PR.');
           if (b.version >= 2) {
             const integrity = verifyIntegrity(b, path.join(r.dir, 'artifacts'));
             if (!integrity.ok) throw new Error(`Evidencia modificada: ${integrity.errors.join(', ')}`);
@@ -345,6 +367,7 @@ async function api(req, res, url) {
         };
         saveSignoff(project.id, runId, signoff);
         if (decision === 'aprobar') {
+          if (b.graphReview && (b.graphReview.scope.denominator.some(n=>!b.graphReview.nodes.some(v=>v.id===n.id && v.status==='verified')) || b.graphReview.scope.partial)) throw new Error('Esta revisión es de alcance limitado. Completa una revisión global antes de firmar el PR.');
           record(project.id, {
             type: 'signoff', pr: b.pr.id, branch: b.pr.branch, head: b.pr.head, runId, lane: b.lane.id, signer, answers: signoff.answers,
             residualRisk: risk, briefHash: signoff.briefHash, areas: (b.areas || []).map((a) => a.area), read: b.residue.lines, total: b.totals.lines,

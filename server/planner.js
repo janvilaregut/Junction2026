@@ -1,4 +1,8 @@
 import { initialPopulation, priority } from './execution.js';
+export function finalValidationCandidates(candidates, selected, {profile, scoped}) {
+  return candidates.filter(c=>c.status==='built' && (scoped || profile!=='deep' || c.id===selected))
+    .sort((a,b)=>Number(b.id===selected)-Number(a.id===selected)).slice(0,2);
+}
 export function populationPlan(groups,profile,{remainingMs,tokens,buildMs=45000,validationMs=40000}={}) {
   const proposed=initialPopulation(groups), cap=profile.id==='quick'?0:profile.id==='standard'?2:4;
   // One runner: every candidate must have time to be tested, not merely generated.

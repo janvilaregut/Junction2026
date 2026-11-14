@@ -21,6 +21,10 @@ export function runIndex(projectId) {
 export function latestByPr(projectId) {
   const map = {};
   for (const r of runIndex(projectId)) if (!map[r.prId] || map[r.prId].finishedAt < r.finishedAt) map[r.prId] = r;
+  for (const r of Object.values(map)) {
+    const b=readJSON(path.join(dirOf(projectId,r.runId),'artifacts','brief.json'),null);
+    if(b?.graphReview && b.graphReview.scope.denominator.some(n=>!b.graphReview.nodes.some(v=>v.id===n.id && v.status==='verified'))) {r.lane='decision';r.laneName='Selected scope reviewed; other nodes pending';r.tone='warn';}
+  }
   return map;
 }
 

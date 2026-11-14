@@ -10,8 +10,15 @@ const VWORD = { proved: 'Proved', cleared: 'Cleared', settled: 'Reviewed', uncer
 const VTONE = { proved: 'ok', cleared: 'ok', settled: 'ok', uncertain: 'warn', risky: 'bad', context: 'ctx' };
 const MARK_WORD = { reproduced: 'Agents reproduced it', read: 'You read it', differs: 'Agents wrote it differently', unclear: 'Agents could not settle it' };
 const mathNodes = () => (S.math?.nodes || []).filter((n) => n.verdict !== 'context');
-/* What a node counts as now: the mathematics, unless an agent review or a person has since settled it. */
+/* What the executable track (server/graph-review.js) says about a node: verified, failed or pending. Only
+   changed C# functions are in it; undefined for everything else. */
+const trustOf = (id) => S.math?.trust?.nodes?.find((x) => x.id === id);
+/* What a node counts as now. Executed evidence comes first; then what the agents or a person settled; then the
+   mathematics. The share "backed by tests" is counted apart (trust): reading or agreeing never moves it. */
 function nodeState(n) {
+  const executed = trustOf(n.id)?.status;
+  if (executed === 'verified') return 'settled';
+  if (executed === 'failed') return 'risky';
   const m = S.marks?.[n.id]?.state;
   return m === 'reproduced' || m === 'read' ? 'settled' : m === 'differs' ? 'risky' : n.verdict;
 }
@@ -95,7 +102,7 @@ function proofView(d, v) {
   const mark = S.marks?.[d.id];
   const [tone, title, sub] = v === 'proved' ? ['ok', 'Proved: it behaves as before', d.claim]
     : v === 'cleared' ? ['ok', `Green: meets all ${g.applicable} criteria`, 'Each one below was measured on the code and passed. Not a proof that the new behaviour is right: that is what the agents check.']
-    : v === 'settled' ? ['ok', mark?.state === 'read' ? 'Read by a person' : 'Reproduced by the agents', `${mark?.note ? mark.note + ' ' : ''}${g.passed} of ${g.applicable} criteria met on their own; the rest was settled by review.`]
+    : v === 'settled' ? ['ok', trustOf(d.id)?.status === 'verified' ? 'Checked with executable evidence' : mark?.state === 'read' ? 'Read by a person' : 'Reproduced by the agents', `${mark?.note ? mark.note + ' ' : ''}${g.passed} of ${g.applicable} criteria met on their own; the rest was settled by review.`]
     : failing.length ? [failing.some((p) => p.state === 'fail') || v === 'risky' ? 'bad' : 'warn', `Misses ${failing.length === 1 ? 'one criterion' : failing.length + ' criteria'}`, failing.map((p) => esc(p.name)).join(' · ')]
     : [v === 'risky' ? 'bad' : 'warn', `Meets all ${g.applicable} criteria, but not green`, mark && MARK_WORD[mark.state] ? `${esc(MARK_WORD[mark.state])}. ${esc(mark.note || '')}` : esc(d.claim)];
   const head = `<div class="pv-sum ${tone}"><b>${title}</b><span>${v === 'proved' || v === 'cleared' || v === 'settled' ? esc(sub) : sub}</span></div>`;
@@ -174,7 +181,10 @@ function reviewNext() {
   return n ? mathTap(n) : false;
 }
 
-/* The bar of a branch, said with the mathematics: how many lines still need someone, and one action. */
+/* The bar of a branch, said with the mathematics: how many lines still need someone, and one action.
+   Two ways to settle a node. The agents (the main button): they rebuild one function blind, in any language, in
+   seconds. The tests (the depth pill, depthPill in app.js): the full pipeline on the chosen functions, bounded by
+   the depth; only changed C# functions, and only that moves "backed by tests". */
 function mathBar() {
   const M = S.math; if (!M) return null;
   const open = mathOpen(), s = M.summary, total = s.lines.total;
@@ -182,16 +192,36 @@ function mathBar() {
   const b = S.run?.brief, so = S.run?.signoff;
   const lv = !open.length ? ['ok', 'Settled'] : open.some((n) => nodeState(n) === 'risky') ? ['bad', `${open.filter((n) => nodeState(n) === 'risky').length} risky`] : ['warn', `${open.length} uncertain`];
   const target = S.fixTarget?.m;
-  const full = so ? 'View sign-off' : b ? 'Review & sign' : 'Full review';
+  const full = b?.graphReview ? 'View scoped report' : so ? 'View sign-off' : b ? 'Review & sign' : 'Full review';
   const todo = reviewable(open);
   if (BUSY.size || BUSY.total) return `<span class="spin"></span><span class="txt live" style="color:var(--fg)">Agents rebuild ${BUSY.total - BUSY.done > 1 ? `${BUSY.total - BUSY.done} spots` : 'the last spot'} blind</span><span class="txt">${BUSY.done} / ${BUSY.total}</span><button class="cta" disabled>Reviewing…</button>`;
   const cta = target ? `${['reproduced', 'differs', 'unclear'].includes(S.marks?.[target.id]?.state) ? 'See the review' : 'Review with agents'} <small class="spot">${esc(short(target.name, 18))}</small>` : todo.length ? `Review all <small class="spot">${todo.length} ${todo.length === 1 ? 'spot' : 'spots'}</small>` : open.length ? `Next <small class="spot">${open.length} left for you</small>` : full;
   return `<span class="num">${need}<small> / ${total}</small></span><span class="txt">${need === 1 ? 'line needs' : 'lines need'} a look</span><span class="chip ${lv[0]}" style="background:${PAL[lv[0]]}">${lv[1]}</span>`
+    + depthPill(testRows(target, b, so), M.trust)
     + (target || open.length ? `<button class="cta ghost" id="bFull">${full}</button>` : '') + `<button class="cta" id="bReview">${cta}</button>`;
 }
+/* The next function the tests should take: the one selected if it is in their scope, else the most pressing pending one. */
+function testTarget(target) {
+  const pending = (S.math?.trust?.nodes || []).filter((t) => t.status !== 'verified');
+  if (target && pending.some((t) => t.id === target.id)) return target;
+  return mathNodes().filter((n) => pending.some((t) => t.id === n.id)).sort((a, b) => b.priority - a.priority)[0] || null;
+}
+/* The rows the depth menu gets on a mathematical graph: what the tests can be sent to. */
+function testRows(target, b, so) {
+  const t = S.math?.trust, next = t ? testTarget(target) : null, R = [];
+  if (next) R.push(`<button role="menuitem" data-act="spot"><b>${next.id === target?.id ? 'Test this spot' : 'Test the next spot'}</b><span>${esc(short(next.name, 26))}</span></button>`);
+  if (t?.total > 1 && t.pending + t.failed > 0) R.push(`<button role="menuitem" data-act="all"><b>Test the whole change</b><span>${t.total} functions</span></button>`);
+  if (b?.contract && !so) R.push('<button role="menuitem" data-act="continue"><b>Continue the investigation</b><span>same contract, new budget</span></button>');
+  return R.join('');
+}
 function bindMathBar() {
-  const open = mathOpen(), target = S.fixTarget;
-  if ($('bFull')) $('bFull').onclick = () => { hideNodeCard(); openReview({ full: true }); };
+  const open = mathOpen(), target = S.fixTarget, trust = S.math?.trust;
+  const act = (name, fn) => { const x = $('fbar').querySelector(`[data-act="${name}"]`); if (x) x.onclick = () => { hideNodeCard(); closeDepth(); fn(); }; };
+  act('spot', () => { const n = testTarget(target?.m); if (n) openTree({ force: true, focusNodes: [n.id] }); });
+  act('all', () => openTree({ force: true, focusNodes: 'all' }));
+  act('continue', () => continueReview());
+  // A first full review of C# goes through the graph, so every function gets its own executable check; any other language keeps the plain full review.
+  if ($('bFull')) $('bFull').onclick = () => { hideNodeCard(); S.run?.brief || !trust ? openReview({ full: true }) : openTree({ focusNodes: 'all' }); };
   if ($('bReview')) $('bReview').onclick = () => (target ? openReview({ node: target }) : reviewable(open).length ? reviewAll() : open.length ? reviewNext() : openReview({ full: true }));
 }
 /* ── Review all: every open function goes to the agents at once, three at a time; the graph settles live ── */

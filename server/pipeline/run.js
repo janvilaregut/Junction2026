@@ -35,6 +35,7 @@ export function normalizeOptions(o = {}, agentsAvailable = []) {
     ...resolveProfile(o), profile: resolveProfile(o).id,
     resumeRunId: typeof o.resumeRunId === 'string' && /^[\w.-]+$/.test(o.resumeRunId) ? o.resumeRunId : null,
     controls: !!o.controls,
+    graphScope: o.graphScope || null,
     privacy: o.privacy || process.env.KATSE_PRIVACY_MODE || 'auto',
     providers: o.providers || {}, concurrency: { models: 2, runners: 1 },
     mutants: Number.isFinite(+o.mutants) ? Math.max(0, Math.min(12, +o.mutants)) : 4,
