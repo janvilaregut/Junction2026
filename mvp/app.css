@@ -312,3 +312,6 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 .sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--fg2);transition:transform .25s cubic-bezier(.3,1.4,.5,1),background .2s}
 .sw:checked{background:var(--ok)}.sw:checked::after{transform:translateX(18px);background:#16161a}
 .sw:disabled{opacity:.5;cursor:default}
+
+.dbody code,.dbody .lead,.dbody .li2{overflow-wrap:anywhere}
+.dbody .sec .link{margin:4px 6px 4px 0}

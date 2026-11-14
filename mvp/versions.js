@@ -3,7 +3,7 @@
    end (right): the PR as written on top, one lane per agent below, its bubble writing at the tip. They talk
    (bubbles meet between lanes), an attacker runs the same test on every version, a judge scores the PR.
    Under the lanes, the code map: every region the PR changed, and who else wrote it. Where the versions
-   converge you can trust it; where only the PR wrote code, that is what you read.
+   overlap in changed locations, this is a navigation aid, never correctness evidence.
    Data: the real run (events, brief) and /runs/:id/versions. Uses app.js globals ($, esc, mk, base, S, PAL,
    spring, RM, CAND, VERDICT, modelName, secs, api, openGraph, attach, alive, openSeq, renderBar, store). */
 (() => {
@@ -101,14 +101,15 @@
     return merged;
   }
   function verdictOf(r) {
-    const agents = V.lanes.filter((l) => l.kind === 'agent' && !l.dim).length;
+    const agents = V.lanes.filter((l) => l.kind === 'agent' && !l.dim).map(l=>l.id);
     if (r.kind === 'doc' || r.kind === 'derived') return 'quiet';
     if (r.kind === 'test') return 'tests';
-    if (!agents) return 'none';
-    return r.who.length >= agents ? 'same' : r.who.length ? 'some' : 'only';
+    if (V.live || !agents.length) return 'none'; // Previous-run overlaps are not current evidence.
+    const overlaps = r.who.filter(id=>agents.includes(id)).length;
+    return overlaps >= agents.length ? 'same' : overlaps ? 'some' : 'only';
   }
-  const VCOL = { same: PAL.ok, some: PAL.file, only: PAL.warn, tests: '#e3dcf4', none: '#3a3a40', quiet: '#2a2a2e' };
-  const VTXT = { same: 'every agent wrote this too: reproduced', some: 'some agents wrote this too', only: 'only the PR wrote this: read it', tests: 'the PR’s own tests: checked by running them, red before and green after', none: 'not compared yet', quiet: 'docs or generated' };
+  const VCOL = { same: PAL.file, some: PAL.file, only: PAL.warn, tests: '#e3dcf4', none: '#3a3a40', quiet: '#2a2a2e' };
+  const VTXT = { same: 'all alternatives changed this region; behavior is not proven', some: 'some alternatives changed this region; behavior is not proven', only: 'only the PR wrote this: read it', tests: 'tests added by the PR; inspect actual execution in the review', none: 'not compared yet', quiet: 'docs or generated' };
   function drawMap() {
     MAP.innerHTML = '';
     const g = V.g; if (!g || !V.regions.length) return;
@@ -122,7 +123,7 @@
     const x0 = g.narrow ? 16 : 110, x1 = g.W - (g.narrow ? 16 : 110), lw = g.narrow ? 0 : 170;
     mk('text', { x: x0, y: g.mapTop, class: 'vmh' }, MAP).textContent = 'Where to look';
     const lg = mk('g', { transform: `translate(${x1},${g.mapTop})` }, MAP);
-    [['only', 'only the PR: read it'], ['same', 'agents wrote it too'], ['tests', 'the PR’s tests']].forEach(([k, t], i) => { const gx = -i * 170 - 150; mk('circle', { cx: gx, cy: -4, r: 4, fill: VCOL[k] }, lg); mk('text', { x: gx + 10, y: 0, class: 'vlab dim' }, lg).textContent = t; });
+    [['only', 'only the PR: read it'], ['same', 'overlapping edits'], ['tests', 'the PR’s tests']].forEach(([k, t], i) => { const gx = -i * 170 - 150; mk('circle', { cx: gx, cy: -4, r: 4, fill: VCOL[k] }, lg); mk('text', { x: gx + 10, y: 0, class: 'vlab dim' }, lg).textContent = t; });
     V.pills = [];
     const rows = files.slice(0, maxRows).map((f) => ({ name: base(f), list: code.filter((r) => r.file === f) }));
     if (files.length > maxRows) rows[rows.length - 1].more = files.length - maxRows;
@@ -169,9 +170,9 @@
     const lines = [...r.removed.map((x) => `<span class="r">- ${esc(x)}</span>`), ...r.added.map((x) => `<span class="a">+ ${esc(x)}</span>`)].slice(0, 16);
     pop.innerHTML = `<div class="vk">${esc(base(r.file))} · ${r.start === r.end ? 'line ' + r.start : `lines ${r.start}–${r.end}`}</div>
       <div class="vt"><i style="background:${VCOL[v]}"></i>${esc(VTXT[v])}</div>
-      ${names.length ? `<div class="vw">Also written by ${esc(names.join(', '))}</div>` : ''}
+      ${names.length ? `<div class="vw">Changed nearby by ${esc(names.join(', '))}</div>` : ''}
       <pre class="code">${lines.join('\n')}${r.removed.length + r.added.length > 16 ? '\n<span class="h">…</span>' : ''}</pre>
-      <div class="vb"><button class="cta ghost" id="vdeep">Look deeper here</button></div>`;
+      <div class="vb"><button class="cta ghost" id="vdeep">Continue full Deep review</button></div>`;
     $('vdeep').onclick = (e) => { e.stopPropagation(); lookDeeper(r); };
     place(r.x, r.y);
     return r;
@@ -204,10 +205,11 @@
   }
   function apply(e) {
     if (e.type === 'contract') setState(`Contract: ${e.expectations?.length || 0} expectations from the ticket`);
+    else if (e.type === 'intent') setState(`Requested / implemented: ${e.status}`);
     else if (e.type === 'candidate') {
       const l = ensureLane(e.id);
       if (e.status === 'pending') { l.tp = 0.62; l.status = 'rebuilding from the ticket'; l.b.tr = 10; }
-      else if (e.status === 'built') { l.tp = 1; l.status = 'version ready'; }
+      else if (e.status === 'built') { l.tp = 1; l.status = e.restoredFrom ? 'restored · waiting for tests' : 'version ready'; }
       else { l.tp = Math.max(l.tp, 0.4); l.status = CAND[e.status] || e.status; l.dim = true; l.b.tr = 6; }
       setState(`${l.label}: ${l.status}`);
     } else if (e.type === 'debate') {
@@ -251,7 +253,7 @@
     setTimeout(() => { el.classList.remove('on'); el.classList.add('gone'); setTimeout(() => { el.remove(); V.msgs = V.msgs.filter((x) => x !== m); }, 400); }, 2300);
   }
   function setState(t) { $('vstate').textContent = t; }
-  const DUR = { contract: 700, candidate: 650, debate: 1500, attack: 1500, result: 550, judgment: 1200 };
+  const DUR = { intent: 700, contract: 700, candidate: 650, debate: 1500, attack: 1500, result: 550, judgment: 1200 };
   /* A finished run plays back its own recorded events, compressed to a few seconds. */
   function replay() {
     const r = S.run; if (!r?.events?.length || !brief()) return false;
@@ -267,7 +269,7 @@
   function skip() { V.tok++; V.playing = false; pend.clear(); resetRun(S.run); (S.run?.events || []).filter((e) => DUR[e.type]).forEach((e) => apply(e)); $('vsay').innerHTML = ''; V.msgs = []; finish(); }
   function finish() {
     const b = brief(); $('vreplay').textContent = 'Replay';
-    V.lanes.forEach((l) => { l.b.away = null; if (l.kind === 'agent') l.status = l.dim ? l.status : l.result === 'passed' ? 'its version passes the tests' : l.result ? 'its version fails the tests' : 'version ready'; });
+    V.lanes.forEach((l) => { l.b.away = null; if (l.kind === 'agent') l.status = l.dim ? l.status : l.result === 'passed' ? 'its version passes the tests' : l.result ? 'its version fails the tests' : 'validation pending · see report'; });
     const noAgents = b && !(b.candidates || []).length;
     if (b?.verdict) setState(`${noAgents ? 'No agent could rebuild it · ' : ''}${VERDICT[b.verdict.status]?.[1] || b.verdict.label}${b.verdict.score?.value != null ? ` · ${b.verdict.score.value}/10` : ''} · ${secs(b.timing?.totalMs || 0)} of real work`);
     drawMap();
@@ -346,11 +348,12 @@
   async function versionsData() {
     if (!V.on || !V.p) return;
     if (S.cur?.id === V.p.id) V.p = S.cur; // the list was reloaded: the fresh copy knows it is no longer running
-    const p = V.p, tok = ++V.tok;
+    const p = V.p;
     const b = brief();
     if (S.es) { goLive(); }
     else if (b) { resetRun(S.run); V.lanes.forEach((l) => { if (l.kind === 'agent') { l.p = 0; l.tp = 0; } }); }
     else { resetEmpty(PROFILE_AGENTS()); setState(S.run?.brief ? 'Only an older quick check · Verify to have agents rebuild it' : `Not reviewed yet${S.plan ? ` · ${S.plan.totals.files} files, +${S.plan.totals.added} −${S.plan.totals.removed}` : ''} · Verify to have agents rebuild it`); }
+    const tok = ++V.tok; // goLive also advances this token; capture it after resetting.
     if (V.baseFly) Object.assign(V.baseFly, { tx: V.g.bx, ty: V.g.by });
     const data = await load(p);
     if (tok !== V.tok || V.p !== p) return;
@@ -375,7 +378,7 @@
     V.hideT = setTimeout(() => { if (!V.on) { sec.hidden = true; cancelAnimationFrame(V.raf); V.raf = 0; } }, instant ? 0 : 700);
   }
 
-  /* ── Look deeper: the agents go again, Deep, with this region in focus ── */
+  /* ── Look deeper: the agents go again, Deep, over the complete change ── */
   async function lookDeeper(r) {
     const seq = openSeq, run0 = S.run;
     closePop(); V.focus = r;
@@ -386,7 +389,7 @@
         ? await api(`/projects/${S.pid}/runs/${run0.id}/continue`, { body: { profile: 'deep' } })
         : await api(`/projects/${S.pid}/verify`, { body: { pr: S.cur.id, options: { mode: 'completo', profile: 'deep', mutants: 4 } } });
       S.starting = false;
-      if (alive(seq)) { goLive(); setState(`Deep review · focus on ${base(r.file)}:${r.start}`); attach(res.runId, seq); }
+      if (alive(seq)) { goLive(); setState(`Deep review · complete change (opened from ${base(r.file)}:${r.start})`); attach(res.runId, seq); }
       return { started: true, runId: res.runId };
     } catch (e) { S.starting = false; if (alive(seq)) renderBar(e.message); return { started: false, error: e.message }; }
   }
@@ -407,7 +410,7 @@
   function info() {
     const b = brief();
     return {
-      concept: 'The same ticket went to AI agents who rebuilt the change from the base without seeing the PR. Where their versions converge with the PR it is reproduced; where only the PR wrote code, the human reads it.',
+      concept: 'The same ticket went to AI agents who rebuilt the change from the base without seeing the PR. Overlapping edits help navigate changed locations; they do not prove equivalent behavior or correctness. Only executed tests support the declared contract.',
       run: b ? { id: S.run.id, verdict: b.verdict?.status, score: b.verdict?.score?.value ?? null, replaying: V.playing } : null, live: V.live,
       versions: V.lanes.filter((l) => !l.ghost).map((l) => ({ id: l.id, name: l.label, doing: l.status || (l.kind === 'pr' ? 'the change as written' : ''), lastSaid: l.said || null, tests: l.result ? `${l.result} (${l.ran ?? '?'} tests)` : null })),
       attacker: V.atk ? V.atk.status : null,

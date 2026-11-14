@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ROOT } from '../util.js';
+import { assertLegacyCloudAllowed } from '../privacy.js';
 
 export const TOP_MODEL = process.env.KATSE_GEMINI_MODEL || 'gemini-4-carbon';
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -41,6 +42,7 @@ let thinkingUnsupported = false;
  * Returns { content, text, calls, raw }. `content` is the model turn exactly as returned (keeps thought signatures).
  */
 export async function generate({ model = TOP_MODEL, contents, system, tools, gen = {}, json = false, signal }) {
+  assertLegacyCloudAllowed();
   const key = loadKey();
   if (!key) throw new Error('GEMINI_API_KEY missing (put it in .env)');
   const generationConfig = {};
