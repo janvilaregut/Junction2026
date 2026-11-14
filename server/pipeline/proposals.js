@@ -10,13 +10,19 @@ export function applyProposal(dir, edits, allowedPaths, blocks = []) {
     if(proposed.block && !block) throw new Error('proposal-block');
     const e = block ? {path:block.path,old:block.text,new:proposed.new} : proposed;
     if (!allowedPaths.includes(e.path) || !e.path.startsWith('src/') || !e.path.endsWith('.cs') || e.path.includes('..') || e.path.includes('\\')) throw new Error('proposal-path');
+    const target = path.join(dir, e.path);
+    if (!changes.has(e.path) && !fs.existsSync(target)) { // a new file the change needs: created whole, never overwriting
+      if (e.old !== '' || typeof e.new !== 'string' || !e.new.trim() || e.new.length > 32000) throw new Error('proposal-new-file');
+      changes.set(e.path, e.new.replaceAll('\r\n', '\n'));
+      continue;
+    }
     if (typeof e.old !== 'string' || !e.old.trim() || typeof e.new !== 'string' || e.new.length > 16000) throw new Error('proposal-content');
-    const current = changes.get(e.path) ?? fs.readFileSync(path.join(dir, e.path), 'utf8').replaceAll('\r\n', '\n');
+    const current = changes.get(e.path) ?? fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n');
     const old = e.old.replaceAll('\r\n', '\n');
     if (current.split(old).length !== 2) throw new Error('proposal-match-must-be-unique');
     changes.set(e.path, current.replace(old, () => e.new.replaceAll('\r\n', '\n')));
   }
-  for (const [file, content] of changes) fs.writeFileSync(path.join(dir, file), content);
+  for (const [file, content] of changes) { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), content); }
   return [...changes.keys()];
 }
 
