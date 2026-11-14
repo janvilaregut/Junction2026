@@ -36,6 +36,7 @@ TOOLS.push(
   { name: 'ask_agent', description: 'What one agent did and said in the review: C1, C2 (agents that rebuilt the change from the base), the PR, the attacker, or the judge.', parameters: T({ name: { type: 'STRING' } }, ['name']) },
   { name: 'review_all', description: 'Send every open spot of the graph to the agents at once (three at a time, about 15 seconds each): the nodes turn green when the agents reproduce them, red when they wrote it differently, and stay amber when a person must decide. Use it for "review everything", "check it all", "turn it green".', parameters: T() },
   { name: 'graph_overview', description: 'What mathematics settled in the open pull request, without any AI: how many changed functions are proved (the edit cannot change behaviour), cleared (nothing flagged, not a proof), uncertain and risky, how many lines still need someone, and the open spots in order. Use it for "how risky is this", "what did the maths say", "can I approve".', parameters: T() },
+  { name: 'prove_it', description: 'Open "Prove it" on one changed function of the graph: the card grows into the full list of engineering principles it is held to without any AI (same behaviour, contract intact, public API stable, guards kept, errors not swallowed, no dangerous APIs or secrets, no blocking on async, reached by a test, used, simple, small, small interface, written once), each pass / warn / fail with its exact value. Use it for "prove it", "why is this green", "what does it fail", "show me the principles", "amplíame la info de este punto". query: the function name or file:line; empty = the spot already selected.', parameters: T({ query: { type: 'STRING' } }) },
   { name: 'mark_read', description: 'The user says they read a spot and accept it: mark that function as read by them so it turns green. query: the function name or file:line. Only when the user says so.', parameters: T({ query: { type: 'STRING' } }, ['query']) },
   { name: 'look_deeper', description: 'The user wants the change looked at harder: launches a Deep review (up to 15 min, real cost). ASK FOR A YES FIRST.', parameters: T() },
 );
@@ -293,6 +294,17 @@ const TOOL_FN = {
     return { settledByMathematics: { proved: m.nodes.proved, cleared: m.nodes.cleared }, open: { uncertain: m.nodes.uncertain, risky: m.nodes.risky, now: q.length }, lines: { total: m.lines.total, proved: m.lines.proved, cleared: m.lines.cleared, needSomeone: q.reduce((n, x) => n + x.lines, 0) },
       first: q.slice(0, 5).map((x) => ({ name: x.name, where: `${x.file}:${x.line}`, state: x.state, why: x.why })), dependencyGraph: m.graph, decisionModel: m.routing?.status === 'used' ? `asked, raised ${m.routing.adopted.length} node(s)` : m.routing?.status,
       meaning: 'proved = a proof that the edit cannot change behaviour (same tokens, or only local variables renamed). cleared = nothing flagged and low exposure, NOT a proof. uncertain / risky = behaviour changed and mathematics cannot vouch for it: these go to the agents and to the person. Node size = how much code depends on it.', limits: s.math.limits };
+  },
+  async prove_it({ query = '' } = {}) {
+    const s = app(); if (!inGraph() || !s?.math) return { error: 'Open a pull request first.' };
+    if (call('treeOpen')) { call('closeTree'); await sleep(600); }
+    const node = query ? (call('findNodes', query) || []).find((n) => n.m?.principles) : s.fixTarget?.m?.principles ? s.fixTarget : null;
+    if (!node) return { error: query ? `No changed function with principles matches "${query}".` : 'Say which function: nothing is selected.' };
+    const d = call('proveNode', node.id);
+    if (!d) return { error: 'That spot has no principles (documentation, configuration or an unchanged neighbour).' };
+    act(`Prove it · ${node.label}`);
+    const g = d.principleGate || {};
+    return { spot: d.qname, colour: d.verdict, passes: `${g.passed}/${g.applicable}`, failing: d.principles.filter((p) => p.state === 'warn' || p.state === 'fail').map((p) => ({ principle: p.name, value: p.value, why: p.detail })), passing: d.principles.filter((p) => p.state === 'pass' || p.state === 'inherited').map((p) => `${p.name}: ${p.value}`), note: 'Say first which principles it does not meet and why, in plain words; then that the rest pass. Passing a check is not proof of correctness; only "Same behaviour" is a proof. What principles cannot say (does it do what was asked) is what the agents check.' };
   },
   async mark_read({ query }) {
     const s = app(); if (!inGraph() || !s?.math) return { error: 'Open a pull request first.' };

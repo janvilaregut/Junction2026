@@ -24,6 +24,7 @@ const { NgramModel, lexemes, baselineOf, surprise } = await part('./entropy.js',
 const { proveEquivalent, classifyChange, sameUsingSet } = await part('./proof.js', { proveEquivalent: () => null, classifyChange: () => ({ kind: 'logic' }), sameUsingSet: () => null });
 const { buildGraph, centrality, forwardReach, neighbourhood } = await part('./graph.js', { buildGraph: null });
 const { runChecks } = await part('./checks.js', { runChecks: () => [] });
+const { principles, gate: principleGate, applyGate, PRINCIPLES } = await part('./principles.js', { principles: () => null, gate: () => null, applyGate: () => {}, PRINCIPLES: [] });
 const { fileHistoryStats, selectHistory, changeEntropy } = await part('./history.js', { fileHistoryStats: null, changeEntropy: (files) => ({ bits: 0, normalized: 0, files: files.length, dirs: 0, subsystems: 0 }) });
 // The history of a base commit is the same for every branch cut from it: one `git log`, kept.
 const HISTORY = new Map();
@@ -35,7 +36,7 @@ function historyOf(repo, base) {
 import { verdict, summarize, POLICY, WEIGHTS } from './risk.js';
 import { lexicon, decide, merge } from './sensitivity.js';
 
-export const VERSION = 10; // part of the cache key: raise it whenever a measurement or the model changes
+export const VERSION = 11; // part of the cache key: raise it whenever a measurement or the model changes
 const MAX_UNITS = 44, MAX_CONTEXT = 22;
 // A call that can fail a test: assert/expect/should/verify/ensure/check families, and the Roslyn verifier runs (VerifyCS.Test.RunDefaultAsync).
 // Things a function can do that no static graph can follow, per language. A changed function that does one of
@@ -57,6 +58,7 @@ export const METHODS = [
   { id: 'entropy', level: 'measure', name: 'Naturalness', basis: 'Cross-entropy under an n-gram model of this repository; buggy lines are on average more surprising (Hindle et al. 2012; Ray et al. 2016).' },
   { id: 'clones', level: 'measure', name: 'Duplication', basis: 'Winnowing fingerprints find every shared run of 40 or more normalised tokens (Schleimer, Wilkerson & Aiken 2003), unless the run is one short unit repeated or the search was cut short. Counted in tokens, against the base and against the other functions of the same pull request; runs that appear in ten or more places are house style and are not counted.' },
   { id: 'history', level: 'measure', name: 'Change history', basis: 'Size, spread and past fixes of a change predict defects (Kamei et al. 2013; Hassan 2009).' },
+  { id: 'principles', level: 'fact', name: 'Principles (Kleene gate)', basis: 'Each changed function is held to engineering principles (DRY, KISS, small units, errors not swallowed, no dangerous APIs, reached by a test…), each pass, warn or fail on an exact definition; the gate is the minimum in Kleene\'s three-valued order. Selection and limits from the Quality Lab experiments.' },
   { id: 'risk', level: 'policy', name: 'Risk = likelihood × impact', basis: 'Evidence added in log-odds (Good 1950); weights from the literature, not fitted to this repository.' },
 ];
 
@@ -264,6 +266,7 @@ export async function analyze(project, pr, { force = false, decisions = true } =
     if (!u) u = live.find((x) => x.file === f.file) || null;
     if (u) u.findings.push({ id: f.id, severity: f.severity, title: f.title, detail: f.detail, line: f.line, basis: f.basis });
   }
+  let touchedBase = null; // base ids of every function this pull request touches, for clone siblings
   // The functions this pull request wrote, indexed among themselves: a block pasted twice in one pull request
   // matches nothing in the base, which has never seen it. Tests are left out: tests repeat their scaffold by design.
   const cloneable = (u) => u._h && u._H && !u.isTest && !u.proof?.proved && u._h.bodyB - u._h.bodyA >= 40;
@@ -297,6 +300,15 @@ export async function analyze(project, pr, { force = false, decisions = true } =
     if (s && H && models.clones && !u.proof?.proved && s.bodyB - s.bodyA >= 40) guard('clones', () => {
       const q = (F, sym) => models.clones.query(F.tokens.slice(sym.bodyA, sym.bodyB), { exclude: new Set([u._b?.id, s.id].filter(Boolean)) });
       const now = q(H, s), was = u._b ? q(u._B, u._b) : [];
+      // Clone class of the old version: near-whole copies elsewhere. Editing one copy and not its siblings is the
+      // most robust duplication risk measured (partial updates in 86% of classes of 3+, Quality Lab E7).
+      if (u.status === 'modified' && u._b && was.length && (was.distinct ?? was.length) <= 8) {
+        const sibs = was.filter((m) => m.coverage >= 0.7 && (!m.meta?.test || u.isTest));
+        if (sibs.length) {
+          touchedBase ||= new Set(units.map((x) => x._b?.id).filter(Boolean));
+          u.cloneClass = { members: sibs.length + 1, siblings: sibs.map((m) => ({ id: m.id, name: m.meta?.name, where: `${path.basename(m.meta?.file || '')}:${m.meta?.start ?? ''}`, edited: touchedBase.has(m.id) })) };
+        }
+      }
       // Only the duplication this pull request introduced, counted in tokens (a ratio grows when a function
       // merely gets shorter): tokens matched now, minus the ones matched against the same place before, minus
       // house style (`common`: runs present in ten or more places of the base, the rule MOSS applies with -m).
@@ -338,6 +350,9 @@ export async function analyze(project, pr, { force = false, decisions = true } =
         evidence: [...[...bad, ...warn].slice(0, 2).map((f) => ({ id: 'check:' + f.id, label: 'Check', value: f.title, tone: f.severity === 'bad' ? 'bad' : 'warn', detail: f.detail })), ...(u.helper ? [] : [{ id: 'assert', label: 'Checks', value: String(u.assertions || 0), tone: u.assertions ? 'ok' : 'bad', detail: 'Calls that can fail the test (assert, expect, verify…).' }]), { id: 'change', label: 'Change', value: `${u.lines.added + u.lines.removed} lines`, tone: 'ok', detail: '' }] });
       u.priority = u.likelihood * u.impact;
     } else Object.assign(u, verdict(u, prStats));
+    // Principles: what the function can be held to. They can only lower the colour, never raise it.
+    u.principles = guard('principles', () => principles(u), null);
+    if (u.principles) { u.principleGate = principleGate(u.principles); applyGate(u); }
   }
 
   // ── Files that are not code ──────────────────────────────────────────────────────────────────────────
@@ -395,6 +410,7 @@ export async function analyze(project, pr, { force = false, decisions = true } =
     metrics: u.metrics?.after ? { cyclomatic: u.metrics.after.cyclomatic, cognitive: u.metrics.after.cognitive, nesting: u.metrics.after.nesting, loc: u.metrics.after.loc, before: u.metrics.before ? u.metrics.before.cyclomatic : null } : null,
     sensitive: u.sensitive?.level !== 'normal' ? u.sensitive : null, proof: u.proof?.proved ? { level: u.proof.level, renames: u.proof.renames || null } : null,
     centrality: u.centrality ? { fanIn: u.centrality.fanIn, dependents: u.centrality.dependents, testedBy: u.centrality.testedBy, unlinked: u.centrality.unlinked || 0 } : null,
+    principles: u.principles || null, principleGate: u.principleGate || null,
   });
   const groupNodes = [...folded].map(([gid, ids]) => {
     const ctx = gid.startsWith('tests:ctx:'), file = gid.slice(ctx ? 10 : 6), us = ids.map((id) => unitBySymbol.get(id)).filter(Boolean);
@@ -416,6 +432,7 @@ export async function analyze(project, pr, { force = false, decisions = true } =
   summary.graph = graph ? { symbols: graph.stats?.symbols ?? graph.nodes.size, edges: graph.stats?.edges ?? 0, files: headFiles.size } : null;
   summary.baseline = models.baseline ? { mean: round(models.baseline.mean), sd: round(models.baseline.sd), n: models.baseline.n } : null;
   summary.policy = POLICY; summary.weights = WEIGHTS;
+  summary.principles = PRINCIPLES.map((p) => { const all = live.map((u) => u.principles?.find((x) => x.id === p.id)).filter((x) => x && x.state !== 'na'); return { id: p.id, name: p.name, group: p.group, pass: all.filter((x) => x.state === 'pass' || x.state === 'inherited').length, warn: all.filter((x) => x.state === 'warn').length, fail: all.filter((x) => x.state === 'fail').length }; });
   const result = { version: VERSION, partial: MISSING.length > 0 || limits.some((l) => / could not run: /.test(l)), key, head, base: mb, ms: Math.round(performance.now() - t0), stages, summary, nodes, edges, methods: METHODS, limits: [...new Set(limits)],
     files: diffFiles.map((f) => ({ path: f.path, kind: kindOf(f.path), add: f.add, del: f.del, status: f.status })) };
   RESULTS.set(key, result); if (RESULTS.size > 40) RESULTS.delete(RESULTS.keys().next().value);

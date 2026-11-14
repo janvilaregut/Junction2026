@@ -61,16 +61,17 @@ function mathLegend() {
 const NC = document.createElement('div');
 NC.className = 'ncard'; NC.setAttribute('role', 'dialog'); NC.setAttribute('aria-label', 'Evidence for this spot');
 $('full').appendChild(NC);
-let ncId = null, ncRaf = 0;
+let ncId = null, ncRaf = 0, ncProof = false;
 function hideNodeCard() {
   if (!ncId) return;
-  ncId = null; NC.classList.remove('on'); cancelAnimationFrame(ncRaf);
+  ncId = null; ncProof = false; NC.classList.remove('on', 'wide'); cancelAnimationFrame(ncRaf);
   if (S.fixTarget) { S.fixTarget = null; if (S.cur && !$('full').hidden) renderBar(); }
 }
 function placeNodeCard() {
-  const [fx, fy] = focusPoint(), w = NC.offsetWidth || 320, h = NC.offsetHeight || 240, narrow = innerWidth < 760;
   const bar = $('fbar').getBoundingClientRect().top || innerHeight - 100;
-  const left = narrow ? (innerWidth - w) / 2 : Math.min(innerWidth - w - 24, fx + 84);
+  NC.style.maxHeight = ncProof ? `${Math.max(240, bar - 92 - 16)}px` : ''; // the proof is long: it scrolls inside the card, above the bar
+  const [fx, fy] = focusPoint(), w = NC.offsetWidth || 320, h = NC.offsetHeight || 240, narrow = innerWidth < 760;
+  const left = narrow ? (innerWidth - w) / 2 : Math.max(16, Math.min(innerWidth - w - 24, fx + 84));
   const top = narrow ? Math.max(84, bar - h - 12) : Math.max(92, Math.min(bar - h - 16, fy - h / 2));
   NC.style.transform = `translate(${Math.round(left)}px,${Math.round(top)}px)`;
 }
@@ -81,7 +82,42 @@ function watchNodeCard() {
   if (!on) return hideNodeCard();
   ncRaf = requestAnimationFrame(watchNodeCard);
 }
-function showNodeCard(n) {
+/* ── Prove it: the principles one function is held to, each with its state and how it was decided ── */
+const PGROUP = { proof: 'Proved', fact: 'Checked', measure: 'Measured' };
+const PICON = { pass: '✓', inherited: '✓', warn: '!', fail: '✕' };
+const PTONE = { pass: 'ok', inherited: 'ok', warn: 'warn', fail: 'bad' };
+/* The criteria view. Its headline is the node's colour said in words, so the card and the graph never disagree:
+   green = every required criterion was measured and passed; amber/red names what is missing, or why not. */
+function proofView(d, v) {
+  const ps = d.principles || [], g = d.principleGate || { passed: 0, applicable: 0, failing: [] };
+  const on = ps.filter((p) => p.state !== 'na'), off = ps.filter((p) => p.state === 'na');
+  const failing = on.filter((p) => !p.info && (p.state === 'warn' || p.state === 'fail'));
+  const mark = S.marks?.[d.id];
+  const [tone, title, sub] = v === 'proved' ? ['ok', 'Proved: it behaves as before', d.claim]
+    : v === 'cleared' ? ['ok', `Green: meets all ${g.applicable} criteria`, 'Each one below was measured on the code and passed. Not a proof that the new behaviour is right: that is what the agents check.']
+    : v === 'settled' ? ['ok', mark?.state === 'read' ? 'Read by a person' : 'Reproduced by the agents', `${mark?.note ? mark.note + ' ' : ''}${g.passed} of ${g.applicable} criteria met on their own; the rest was settled by review.`]
+    : failing.length ? [failing.some((p) => p.state === 'fail') || v === 'risky' ? 'bad' : 'warn', `Misses ${failing.length === 1 ? 'one criterion' : failing.length + ' criteria'}`, failing.map((p) => esc(p.name)).join(' · ')]
+    : [v === 'risky' ? 'bad' : 'warn', `Meets all ${g.applicable} criteria, but not green`, mark && MARK_WORD[mark.state] ? `${esc(MARK_WORD[mark.state])}. ${esc(mark.note || '')}` : esc(d.claim)];
+  const head = `<div class="pv-sum ${tone}"><b>${title}</b><span>${v === 'proved' || v === 'cleared' || v === 'settled' ? esc(sub) : sub}</span></div>`;
+  const order = { fail: 0, warn: 1, inherited: 2, pass: 3 };
+  const rows = ['proof', 'fact', 'measure'].map((grp) => {
+    const xs = on.filter((p) => p.group === grp).sort((a, b) => (!!a.info - !!b.info) || order[a.state] - order[b.state]);
+    if (!xs.length) return '';
+    return `<div class="pv-g">${PGROUP[grp]}</div>` + xs.map((p) => {
+      const info = p.info && p.state !== 'pass', t = info ? 'ctx' : PTONE[p.state];
+      return `<div class="pv-r ${t}${p.info ? ' info' : ''}" title="${esc(p.basis || '')}"><i>${info ? '·' : PICON[p.state]}</i><b>${esc(p.name)}</b><span>${esc(p.value || '')}${p.state === 'inherited' ? ' · was already so' : ''}${p.info ? ' · not required' : ''}</span>${!p.info && (p.state === 'warn' || p.state === 'fail') ? `<p>${esc(p.detail || '')}</p>` : ''}${p.how ? `<p class="how">${esc(p.how)}</p>` : ''}</div>`;
+    }).join('');
+  }).join('');
+  return `<div class="pv">${head}${rows}${off.length ? `<div class="pv-na" title="${esc(off.map((p) => `${p.name}: ${p.value}`).join('\n'))}">Not applicable: ${off.map((p) => esc(p.name)).join(', ')}</div>` : ''}<div class="pv-foot">${g.passed} / ${g.applicable} pass · green needs every one, low stakes and no high exposure</div></div>`;
+}
+function proveNode(id) {
+  const n = G.nodes.get(id); if (!n?.m?.principles) return null;
+  if (ncId !== id) { focusOn([id], { noTip: true }); S.fixTarget = n.kind === 'sym' ? n : null; }
+  showNodeCard(n, true); renderBar();
+  return n.m;
+}
+function showNodeCard(n, proof) {
+  if (proof != null) ncProof = proof; else if (ncId !== n.id) ncProof = !!n.m?.principles && n.m.verdict !== 'context'; // the criteria first: why it has this colour
   const d = n.m, v = nodeState(d), mark = S.marks?.[d.id];
   const where = d.kind === 'doc' || d.kind === 'config' || d.kind === 'generated' ? (d.files?.length > 1 ? `${d.files.length} files` : d.file) : `${base(d.file)}:${d.start}`;
   const kind = { function: 'function', method: 'method', ctor: 'constructor', property: 'property', type: 'declarations', test: 'test', doc: 'documentation', config: 'configuration', generated: 'generated' }[d.kind] || d.kind;
@@ -89,12 +125,15 @@ function showNodeCard(n) {
   const rows = (d.evidence || []).map((r) => `<div class="nrow" title="${esc(r.detail || '')}"><i style="background:${PAL[r.tone] || PAL.no}"></i><b>${esc(r.label)}</b><span>${esc(r.value)}</span></div>`).join('');
   const sens = d.sensitive ? `<div class="nrow" title="${esc(d.sensitive.why || '')}"><i style="background:var(--warn)"></i><b>Stakes</b><span>${esc(d.sensitive.label)}${d.sensitive.source === 'decision' ? ' · decision model' : ''}</span></div>` : '';
   const open = v === 'uncertain' || v === 'risky', ctx = d.verdict === 'context', byAgents = ['reproduced', 'differs', 'unclear'].includes(mark?.state);
-  const code = !['doc', 'config', 'generated'].includes(d.kind) && d.status !== 'removed';
+  const code = !['doc', 'config', 'generated', 'test'].includes(d.kind) && d.status !== 'removed'; // agents rebuild product code from the requirement; a test is read, not rebuilt
+  const g = d.principleGate, prove = !ctx && d.principles ? `<button class="cta${open || ncProof ? ' ghost' : ''}" id="nProve">${ncProof ? 'Evidence' : 'Prove it'}${g && !ncProof ? ` <small class="spot">${g.passed}/${g.applicable}</small>` : ''}</button>` : '';
+  NC.classList.toggle('wide', ncProof);
   NC.innerHTML = `<div class="nk">${esc(where)} · ${esc(kind)}${status ? ' · ' + status : ''}</div>
     <div class="nt"><span>${esc(d.qname || d.name)}</span><em class="fchip" style="background:${ctx ? 'var(--card3)' : PAL[VTONE[v]]};${ctx ? 'color:var(--fg2)' : ''}">${VWORD[v]}</em></div>
-    <p class="ncl">${mark && MARK_WORD[mark.state] ? `<b>${esc(MARK_WORD[mark.state])}.</b> ` : ''}${esc(mark?.note || d.claim)}</p>
-    ${rows || sens ? `<div class="nrows">${rows}${sens}</div>` : ''}
-    ${ctx ? '' : `<div class="nb">${code ? `<button class="cta${open ? '' : ' ghost'}" id="nReview">${byAgents ? 'See the agents\' review' : open ? 'Review this spot' : 'Review anyway'}</button>` : ''}${open ? '<button class="cta ghost" id="nRead">I read it</button>' : mark?.state === 'read' ? '<button class="cta ghost" id="nUnread">Undo</button>' : ''}</div>`}`;
+    ${ncProof ? '' : `<p class="ncl">${mark && MARK_WORD[mark.state] ? `<b>${esc(MARK_WORD[mark.state])}.</b> ` : ''}${esc(mark?.note || d.claim)}</p>`}
+    ${ncProof ? proofView(d, v) : rows || sens ? `<div class="nrows">${rows}${sens}</div>` : ''}
+    ${ctx ? '' : `<div class="nb">${prove}${code ? `<button class="cta${open ? '' : ' ghost'}" id="nReview">${byAgents ? 'See the agents\' review' : open ? 'Review this spot' : 'Review anyway'}</button>` : ''}${open ? '<button class="cta ghost" id="nRead">I read it</button>' : mark?.state === 'read' ? '<button class="cta ghost" id="nUnread">Undo</button>' : ''}</div>`}`;
+  if ($('nProve')) $('nProve').onclick = () => { ncProof = !ncProof; showNodeCard(n); };
   if ($('nReview')) $('nReview').onclick = () => openReview({ node: n });
   if ($('nRead')) $('nRead').onclick = () => markNode(d.id, 'read');
   if ($('nUnread')) $('nUnread').onclick = () => markNode(d.id, 'none');
@@ -156,7 +195,7 @@ function bindMathBar() {
 /* ── Review all: every open function goes to the agents at once, three at a time; the graph settles live ── */
 const BUSY = new Set(); BUSY.total = 0; BUSY.done = 0;
 /* What agents can rebuild: functions with code at the head that they have not reviewed yet. */
-const reviewable = (open) => open.filter((n) => !['doc', 'config', 'generated', 'type'].includes(n.kind) && n.status !== 'removed' && !['differs', 'unclear'].includes(S.marks?.[n.id]?.state));
+const reviewable = (open) => open.filter((n) => !['doc', 'config', 'generated', 'type', 'test'].includes(n.kind) && n.status !== 'removed' && !['differs', 'unclear'].includes(S.marks?.[n.id]?.state));
 function paintBusy() { for (const n of G.nodes.values()) if (n.el) n.el.classList.toggle('busy', BUSY.has(n.id)); }
 async function reviewAll() {
   if (BUSY.total || !S.math || !S.cur) return false;
@@ -194,4 +233,6 @@ addEventListener('keydown', (e) => {
   if (!S.math || $('full').hidden || e.target.closest?.('input, textarea') || !$('modal').hidden || $('full').classList.contains('infix')) return;
   if (e.key === 'n' || e.key === 'ArrowRight') { if (reviewNext()) e.preventDefault(); }
   else if (e.key === 'Enter' && ncId && $('nReview')) { e.preventDefault(); $('nReview').click(); }
+  else if (e.key === 'p' && ncId && $('nProve')) { e.preventDefault(); $('nProve').click(); }
+  else if (e.key === 'Escape' && ncProof && ncId) { const n = G.nodes.get(ncId); if (n) { e.preventDefault(); ncProof = false; showNodeCard(n); } }
 });

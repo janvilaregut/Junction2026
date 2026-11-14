@@ -5,7 +5,9 @@
 //   colour = CONFIDENCE  what the mathematics can say about the change itself:
 //              proved     a proof that the edit cannot change behaviour (same tokens, or a renaming of locals)
 //              cleared    NOT a proof: nothing was flagged, every measurement is under its threshold and the
-//                         exposure is low. It only means there is no reason to look here first
+//                         exposure is low. It only means there is no reason to look here first. principles.js
+//                         (applyGate) also clears an uncertain node when every criterion it is held to ran and
+//                         passed, the stakes are not critical and the exposure is not high
 //              uncertain  the mathematics cannot decide; this is what the agents and the person are for
 //              risky      a deterministic check failed, or the likelihood is high
 //   order  = exposure x impact, a review-order index in the spirit of risk exposure (Boehm 1991). It says

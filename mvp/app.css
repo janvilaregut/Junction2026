@@ -422,6 +422,28 @@ input[type=text]:focus,textarea:focus{border-color:var(--line2)}
 .ncard .nrow span{color:var(--fg);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ncard .nb{display:flex;gap:8px;margin-top:14px}.ncard .nb .cta{flex:1;padding:11px 14px;font-size:13px}
 #full.infix .ncard,#full.indebate .ncard{opacity:0;pointer-events:none}
+.ncard .nb{flex-wrap:wrap}
+.ncard .nb:has(#nRead) #nProve,.ncard .nb:has(#nUnread) #nProve{flex-basis:100%}
+#nProve .spot{margin-left:6px}
+.ncard.wide{width:440px;overflow:auto;overscroll-behavior:contain}
+.ncard .ncl,.pv-r p,.pv-sum span{overflow-wrap:anywhere}
+.pv{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.pv-sum{display:grid;gap:3px;padding:11px 13px;border-radius:14px;background:var(--card3);font-size:12px;line-height:1.4;color:var(--fg2)}
+.pv-sum b{font:600 13px var(--head);color:var(--fg)}
+.pv-sum.ok b{color:var(--ok)}.pv-sum.warn b{color:var(--warn)}.pv-sum.bad b{color:var(--bad)}
+.pv-g{margin:14px 0 6px;font:500 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--fg3)}
+.pv-r{display:grid;grid-template-columns:18px 132px 1fr;align-items:baseline;gap:8px;padding:5px 0;font-size:12px;cursor:help}
+.pv-r i{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:600 10px var(--body);font-style:normal;color:var(--bg);background:var(--ok);transform:translateY(3px)}
+.pv-r.warn i{background:var(--warn)}.pv-r.bad i{background:var(--bad)}.pv-r.ctx i{background:var(--card3);color:var(--fg2)}
+.pv-r b{font-weight:500;color:var(--fg)}
+.pv-r span{color:var(--fg2);font:400 11.5px var(--mono);overflow-wrap:anywhere}
+.pv-r p{grid-column:2 / -1;margin:2px 0 4px;font-size:11.5px;line-height:1.45;color:var(--fg2)}
+.pv-r.warn b{color:var(--warn)}.pv-r.bad b{color:var(--bad)}
+.pv-na{margin-top:12px;font-size:11px;color:var(--fg3);cursor:help}
+.pv-foot{margin-top:6px;font:400 10.5px var(--mono);color:var(--fg3)}
+.pv-r p.how{margin:0 0 3px;font-size:11px;line-height:1.4;color:var(--fg3)}
+.pv-r.info b{color:var(--fg2)}.pv-r.ok:not(.info) b{color:var(--fg)}
+@media (max-width:760px){.ncard.wide{width:calc(100vw - 32px)}.pv-r{grid-template-columns:18px 1fr}.pv-r span{grid-column:2}}
 @media (prefers-reduced-motion:reduce){.nd .halo{animation:none;stroke-opacity:.4}.ncard{transition:none}}
 .fdiff{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--bg);display:grid;gap:6px;font-size:12px}
 .fdiff code{font:400 11px/1.5 var(--mono);color:var(--fg2);overflow-wrap:anywhere}
