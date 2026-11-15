@@ -44,7 +44,7 @@ All of these are computed from each review's brief and the trust ledger ([server
 - **False accusation control:** a planted false bug was refuted by executing it, so 0 fake findings survived.
 - **Reviewer stability:** in 5 of 6 repeated reviews at the same commit and depth, the lane was the same. The exception is #2283 in full mode, where the lane moved from *you decide* to *reproduced* **between two pipeline versions**. Moving to deeper evidence can also change a lane (#2234: quick = *send back*, full = *you decide*, both with "insufficient evidence").
 - **Cost:** Standard review of #2283 took **4 min 29 s and 40,247 tokens**. Deep took 11 min and 114k tokens. Maths layer: the whole graph in **475 ms**, no model.
-- **Katse's own test suite:** 456 automated tests, 455 pass, 0 failures, 1 platform-only skip.
+- **Katse's own test suite:** 470/470 pass on macOS (15 Nov). On Windows (14 Nov): 455/456, with one POSIX-only skip.
 
 ## What we cannot claim yet
 

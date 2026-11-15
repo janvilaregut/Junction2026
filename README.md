@@ -6,6 +6,13 @@
 Junction 2026 · Tieto challenge <i>Earned Trust in AI Code</i> · MLH <i>Best Use of Entire</i></p>
 
 <p align="center">
+<img alt="tests" src="https://img.shields.io/badge/tests-470%20passing-7ee0a8?style=flat-square">
+<img alt="maths layer" src="https://img.shields.io/badge/maths%20layer-no%20AI-b7a4ff?style=flat-square">
+<img alt="privacy" src="https://img.shields.io/badge/privacy-Gemma%204%20on%20device-8fd3ff?style=flat-square">
+<img alt="merge" src="https://img.shields.io/badge/merges-only%20a%20human-f2d675?style=flat-square">
+</p>
+
+<p align="center">
 <a href="https://youtu.be/2JLW1lM3XFo"><b>▶ Demo video on YouTube (2:44)</b></a> ·
 <a href="submission/katse-pitch.pdf"><b>Slides (PDF)</b></a> ·
 <a href="CONCEPT_CARD.md"><b>Concept card</b></a> ·
@@ -31,29 +38,94 @@ Junction 2026 · Tieto challenge <i>Earned Trust in AI Code</i> · MLH <i>Best U
 
 ## The idea in 30 seconds
 
-AI writes code faster than anyone can read it, so people just press Enter. Asking *another* AI "is this fine?" is just as bad: **"the AI said it was fine"** is exactly what the challenge rules out.
+AI writes code faster than anyone can read it, so people just press Enter. Asking *another* AI "is this fine?" doesn't help either: **"the AI said it was fine"** is exactly what the challenge rules out.
 
-Science doesn't trust a paper because a reviewer read it twice. It trusts it when **another lab reproduces it**. Banks don't re-read every entry. They **reconcile two independent ledgers** and investigate only the mismatch.
+> 🔬 Science doesn't trust a paper because a reviewer read it twice. It trusts it when **another lab reproduces it**.
+> 🏦 Banks don't re-read every entry. They **reconcile two independent ledgers** and look only at the mismatch.
 
-**Katse does the same for code.** An agent's change is cheap to produce, so it is cheap to reproduce. Katse rebuilds it independently and compares:
+**Katse does the same for code.** An agent's change is cheap to produce, so it is cheap to reproduce:
 
-- whatever **reproduces** (or is proved, or passes a test that really bites) is backed by **evidence**;
-- whatever **doesn't** is the **residue**, and that is all the named owner reads, questions and signs.
+| ✅ What reproduces, is proved, or passes a test that bites | ❓ What doesn't |
+|---|---|
+| backed by **evidence**, so nobody needs to read it | the **residue**: the only part the named owner reads, questions and signs |
 
 > **AI reviews. A named human stays accountable.** Katse has no approve button and never merges.
 
-## How it works: four layers
+---
 
-<p align="center"><img src="submission/layers.png" alt="Four layers: Privacy, Maths, Reproduce, You" width="820"></p>
+## How it works
+
+```mermaid
+flowchart TD
+    PR(["🤖 Agent-written pull request + requirement ID"]):::input
+
+    PR --> P
+    subgraph L1["① PRIVACY · on your laptop"]
+        P["🔒 Local Gemma 4 swaps secrets and<br/>internal names for aliases"]
+    end
+    P -. "scan incomplete" .-> BLOCK(["⛔ Nothing leaves. The review waits"]):::stop
+
+    P --> G
+    subgraph L2["② MATHS · no AI, same input, same answer"]
+        G["🕸️ Call graph straight from git"] --> RANK["📈 PageRank ranks every function<br/>by blast radius"]
+        RANK --> PROOF{"What can maths prove?"}
+    end
+    PROOF -- "proved · cleared" --> OK(["✅ Evidence"]):::ok
+    PROOF -- "risky: a check failed" --> RES
+    PROOF -- "uncertain" --> CON
+
+    INTENT(["📜 Intent: Entire prompt › issue › commit message"]):::input --> CON
+    subgraph L3["③ REPRODUCE · AI, but checked by execution"]
+        CON["📋 Contract: every expectation<br/>quotes the requirement"] --> REB["🧪 Blind rebuilds from the base<br/>Gemini + NVIDIA Nemotron"]
+        REB --> RUN["⚔️ Run everything: red→green tests,<br/>seeded bugs, attacks, probes"]
+        RUN --> SAME{"Same as the PR?"}
+    end
+    SAME -- "yes" --> OK
+    SAME -- "no: the judge must quote<br/>the deciding sentence" --> RES(["❓ Residue + open questions<br/>+ what was not checked"]):::warn
+
+    OK --> BRIEF
+    RES --> BRIEF
+    subgraph L4["④ YOU · a named human"]
+        BRIEF["🧾 Trust brief:<br/>checked · not checked · not decided"] --> SIGN["✍️ Answer, write the risk you accept, sign<br/>bound to the commit and report hash"]
+    end
+    SIGN --> MERGE(["🚀 You merge. Katse never does"]):::human
+
+    classDef input fill:#1f2433,stroke:#b7a4ff,color:#ffffff
+    classDef ok fill:#123524,stroke:#7ee0a8,color:#ffffff
+    classDef warn fill:#3a3012,stroke:#f2d675,color:#ffffff
+    classDef stop fill:#3a1616,stroke:#f29b9b,color:#ffffff
+    classDef human fill:#2a2150,stroke:#b7a4ff,color:#ffffff
+```
+
+<details>
+<summary><b>The four layers in one table</b></summary>
 
 | | Layer | What happens | AI? |
 |---|---|---|---|
-| **1** | **Privacy** | Gemma 4 runs **on your laptop** and swaps secrets and internal names for aliases before any code reaches the cloud. Fail-closed: if the scan can't finish, nothing is sent. | Local model |
-| **2** | **Maths** | Call graph straight from git. **PageRank** sizes each function by blast radius, **proofs** mark edits that can't change behaviour, **deterministic checks** catch leaked keys, deleted tests and silenced errors. 1,307 changed lines become 55 worth reading. | **None** |
-| **3** | **Reproduce** | Back to the **intent** (the exact prompt, saved by **Entire** in git, else the issue). Agents from **two model families** rebuild the change **blind**. A difference has to be settled by a judge who **quotes the requirement sentence**, and that quote is checked by plain string search. New tests must go **red→green**, and seeded bugs must be caught. | AI, checked by execution |
-| **4** | **You** | Read the residue, answer the open questions, write the risk you accept, **sign**. The signature is bound to the commit and the report hash, and it expires if the branch moves. | **Human** |
+| **1** | 🔒 **Privacy** | Gemma 4 runs **on your laptop** and swaps secrets and internal names for aliases before any code reaches the cloud. Fail-closed: if the scan can't finish, nothing is sent. | Local model |
+| **2** | 🕸️ **Maths** | Call graph from git. **PageRank** sizes each function by blast radius, **proofs** mark edits that can't change behaviour, **deterministic checks** catch leaked keys, deleted tests and silenced errors. | **None** |
+| **3** | 🧪 **Reproduce** | Back to the **intent** (the exact prompt saved by **Entire**, else the issue). Agents from **two model families** rebuild the change **blind**. A difference has to be settled by a judge who **quotes the requirement**, and the quote is string-checked. Tests must go **red→green**, and seeded bugs must be caught. | AI, checked by execution |
+| **4** | ✍️ **You** | Read the residue, answer the questions, write the accepted risk, **sign**. The signature expires if the branch moves. | **Human** |
+
+How many agents? `n = min(4, 2 + ⌈log₂ G⌉ + H)`: 2 witnesses minimum, more for more behaviours (G) and risky ones (H), capped at 4 because correlated agents add little. Then capped again by the depth you pick: **Quick** 90 s · **Standard** 5 min · **Deep** 15 min.
+</details>
 
 **Two rules hold everywhere:** *Evidence is executable, or it isn't evidence.* · *Consensus directs attention. It never approves.*
+
+## What it looks like
+
+<table>
+<tr>
+<td width="50%"><img src="docs/img/app-tree.jpg" alt="Branch tree"><br><b>Every branch at a glance.</b> Incoming PRs branch up, yours down, coloured by where each review stands.</td>
+<td width="50%"><img src="docs/img/app-colour.jpg" alt="Dependency graph"><br><b>Maths shows where to look.</b> Size = blast radius (PageRank). Colour = what maths can prove.</td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/img/app-judge.jpg" alt="Blind rebuilds and the judge"><br><b>Rebuilt blind, judged by a quote.</b> Three agents disagree with the PR, and the requirement sentence settles it.</td>
+<td width="50%"><img src="docs/img/app-sign.jpg" alt="Sign and merge"><br><b>You sign. You merge.</b> Katse never merges on its own.</td>
+</tr>
+</table>
+
+<sub>Frames from the demo video, on the synthetic `easy/lz4-guards` branch. Numbers on Tieto's own branches are below.</sub>
 
 ---
 
@@ -110,6 +182,51 @@ Science doesn't trust a paper because a reviewer read it twice. It trusts it whe
 | [#2129](https://github.com/MessagePack-CSharp/MessagePack-CSharp/issues/2129) new feature | 1,043 | **New public API** → *full read*, ordered by the report | 450 lines |
 
 Katse says **"don't trust this yet"** as readily as "this is fine".
+
+---
+
+## How trust is earned and measured
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**What a human actually reads**, on Tieto #2297
+
+```mermaid
+pie showData
+    title 1,392 changed lines
+    "Reproduced or mechanical" : 1360
+    "Residue the human reads" : 32
+```
+
+</td>
+<td width="50%" valign="top">
+
+**Trust is earned per area, and lost in one go**
+
+```mermaid
+stateDiagram-v2
+    direction TB
+    [*] --> Probation
+    Probation --> Earned : 5 clean sign-offs
+    Earned --> Withdrawn : 1 escape
+    Probation --> Withdrawn : 1 escape
+    Withdrawn --> Probation : start over
+    Probation : 🟡 Probation · full read + 2nd reviewer
+    Earned : 🟢 Earned · residue-only review
+    Withdrawn : 🔴 Withdrawn · full read again
+```
+
+</td>
+</tr>
+</table>
+
+| 📉 Human attention | 🎯 Findings are real | 🔁 The reviewer is reviewed | 🚨 Outcomes |
+|---|---|---|---|
+| lines read ÷ changed: **4%** on #2283 + #2297 | seeded bugs caught **3/4**, false accusation refuted **1/1** | same commit, same lane: **5/6** | escapes per area, reverts, incidents |
+
+> **Safety condition:** review time may only go down while escapes don't go up. Details in [docs/MEASUREMENT.md](docs/MEASUREMENT.md).
 
 ---
 
