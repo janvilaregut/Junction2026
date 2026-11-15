@@ -1,0 +1,227 @@
+1
+00:00:00,950 --> 00:00:04,007
+AI writes code faster than anyone can read it.
+
+2
+00:00:04,007 --> 00:00:05,503
+So we just press enter.
+
+3
+00:00:09,000 --> 00:00:10,906
+That's what happens without Katse.
+
+4
+00:00:12,656 --> 00:00:15,546
+Katse turns review around. Don't read the
+
+5
+00:00:15,546 --> 00:00:16,990
+change. Reproduce it.
+
+6
+00:00:18,890 --> 00:00:21,998
+Layer one: privacy. Gemma 4 runs right on your
+
+7
+00:00:21,998 --> 00:00:25,040
+laptop. Before any code reaches the cloud, it
+
+8
+00:00:25,040 --> 00:00:28,016
+swaps secrets and internal names for aliases.
+
+9
+00:00:28,566 --> 00:00:30,400
+Pick any repository.
+
+10
+00:00:31,500 --> 00:00:34,039
+Pull requests coming in branch up. Yours
+
+11
+00:00:34,039 --> 00:00:36,826
+branch down. Colour tells you where each one
+
+12
+00:00:36,826 --> 00:00:37,260
+stands.
+
+13
+00:00:38,760 --> 00:00:42,848
+Open one, and layer two begins: pure maths, no
+
+14
+00:00:42,848 --> 00:00:45,457
+AI. Katse maps who calls whom.
+
+15
+00:00:45,757 --> 00:00:48,295
+PageRank, the algorithm Google used to rank
+
+16
+00:00:48,295 --> 00:00:51,006
+the web, ranks every function by how much code
+
+17
+00:00:51,006 --> 00:00:53,371
+depends on it. Bigger node, bigger blast
+
+18
+00:00:53,371 --> 00:00:53,775
+radius.
+
+19
+00:00:54,125 --> 00:00:57,442
+Colour is what maths can prove. Ringed: the
+
+20
+00:00:57,442 --> 00:01:00,833
+edit can't change behaviour. Green: cleared.
+
+21
+00:01:00,833 --> 00:01:04,150
+Amber: uncertain. Red: a check failed, like
+
+22
+00:01:04,150 --> 00:01:05,355
+that leaked key.
+
+23
+00:01:05,755 --> 00:01:08,957
+No AI grading AI: maths is deterministic. Same
+
+24
+00:01:08,957 --> 00:01:12,023
+input, same answer. Like attention, it turns
+
+25
+00:01:12,023 --> 00:01:14,748
+thirteen hundred changed lines into the
+
+26
+00:01:14,748 --> 00:01:16,451
+fifty-five worth reading.
+
+27
+00:01:16,851 --> 00:01:19,645
+Click any spot, or just ask.
+
+28
+00:01:20,045 --> 00:01:22,486
+— Hey Katse, why is this one amber?
+
+29
+00:01:22,766 --> 00:01:25,538
+Katse: Forty-eight functions depend on it, and no
+
+30
+00:01:25,538 --> 00:01:28,439
+Katse: proof covers its new check. Worth sending to
+
+31
+00:01:28,439 --> 00:01:29,148
+Katse: the agents.
+
+32
+00:01:29,848 --> 00:01:32,662
+Layer three brings in AI, but backwards. Katse
+
+33
+00:01:32,662 --> 00:01:35,236
+goes back to why the code was written: the
+
+34
+00:01:35,236 --> 00:01:37,930
+issue, or the exact prompt behind the commit.
+
+35
+00:01:38,230 --> 00:01:41,264
+Entire saves every AI session in git, so Katse
+
+36
+00:01:41,264 --> 00:01:43,846
+can walk back, prompt by prompt, to the
+
+37
+00:01:43,846 --> 00:01:44,879
+original intent.
+
+38
+00:01:45,379 --> 00:01:48,164
+From that intent alone, independent agents
+
+39
+00:01:48,164 --> 00:01:50,754
+rebuild it blind. How many? Not a fixed
+
+40
+00:01:50,754 --> 00:01:53,474
+number: a formula sizes the sample to the
+
+41
+00:01:53,474 --> 00:01:56,517
+change and its risk, within the mode you pick.
+
+42
+00:01:56,517 --> 00:01:58,072
+Quick, Standard or Deep.
+
+43
+00:01:58,372 --> 00:02:01,492
+Same tokens as the pull request? Reproduced.
+
+44
+00:02:01,492 --> 00:02:04,681
+Different? A judge must quote the requirement
+
+45
+00:02:04,681 --> 00:02:07,940
+sentence that decides, checked by plain string
+
+46
+00:02:07,940 --> 00:02:09,673
+search. No made-up rules.
+
+47
+00:02:10,073 --> 00:02:13,087
+Here, the agents wrote greater-or-equal. The
+
+48
+00:02:13,087 --> 00:02:16,035
+pull request, greater-than. The requirement
+
+49
+00:02:16,035 --> 00:02:18,580
+sides with the agents: a one-line fix.
+
+50
+00:02:19,480 --> 00:02:23,562
+Layer four is you. Everything green? Sign, and
+
+51
+00:02:23,562 --> 00:02:26,776
+merge. Katse never merges on its own.
+
+52
+00:02:27,376 --> 00:02:30,440
+Gemma guards privacy on your device. Gemini
+
+53
+00:02:30,440 --> 00:02:33,712
+rebuilds, judges and focuses attention. Gemini
+
+54
+00:02:33,712 --> 00:02:36,985
+Live speaks. And NVIDIA Nemotron adds a second
+
+55
+00:02:36,985 --> 00:02:37,891
+model family.
+
+56
+00:02:38,491 --> 00:02:42,755
+Maths finds where to look. AI reproduces it.
+
+57
+00:02:42,755 --> 00:02:43,608
+You sign.

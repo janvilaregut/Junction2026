@@ -1,0 +1,941 @@
+{
+ "version": 2,
+ "createdAt": "2026-11-14T14:09:01.573Z",
+ "project": {
+  "id": "messagepack-csharp-mwfmr6wg",
+  "name": "messagepack-csharp"
+ },
+ "pr": {
+  "id": "in:ju26-issue-2234",
+  "branch": "ju26-issue-2234",
+  "direction": "incoming",
+  "title": "Implementation for #2234 The analyzer does not work if SuppressSourceGeneration = true",
+  "head": "9007cee1163c4a274fd60c3cc20c21ae63622786",
+  "base": "dependabot/nuget/develop/PolySharp-1.15.0",
+  "baseSha": "32258fdbee4bcd653c79f51b4376b5103c6f4d27",
+  "commits": [
+   {
+    "sha": "9007cee11",
+    "subject": "Implementation for #2234 The analyzer does not work if SuppressSourceGeneration = true",
+    "author": "Stelian Vultur"
+   }
+  ]
+ },
+ "requirement": {
+  "id": "MessagePack-CSharp/MessagePack-CSharp#2234",
+  "title": "The analyzer does not work if SuppressSourceGeneration = true",
+  "url": "https://github.com/MessagePack-CSharp/MessagePack-CSharp/issues/2234",
+  "missing": false,
+  "excerpt": "#### Bug description\n\nThe analyzer does not work if SuppressSourceGeneration = true. This has happened since version 3.1.1. It still worked in 3.1.0.\n\n"
+ },
+ "provenance": {
+  "status": "none",
+  "entireInstalled": false,
+  "notes": [],
+  "checkpoints": []
+ },
+ "options": {
+  "mode": "completo",
+  "agents": [
+   "fast",
+   "review"
+  ],
+  "agentsPicked": false,
+  "id": "standard",
+  "budgetMs": 300000,
+  "tokenBudget": 100000,
+  "initialCandidates": 2,
+  "maxDescendants": 0,
+  "finalMissions": 1,
+  "profile": "standard",
+  "resumeRunId": null,
+  "controls": false,
+  "privacy": "auto",
+  "providers": {},
+  "concurrency": {
+   "models": 2,
+   "runners": 1
+  },
+  "mutants": 4,
+  "crossTests": true,
+  "rewind": true,
+  "judge": true,
+  "agentTimeoutMin": 3,
+  "keepTrees": false
+ },
+ "totals": {
+  "files": 4,
+  "added": 262,
+  "removed": 4,
+  "lines": 266
+ },
+ "kinds": {
+  "doc": {
+   "files": 1,
+   "lines": 14
+  },
+  "source": {
+   "files": 1,
+   "lines": 22
+  },
+  "test": {
+   "files": 2,
+   "lines": 230
+  }
+ },
+ "files": [
+  {
+   "path": "README.md",
+   "kind": "doc",
+   "add": 14,
+   "del": 0,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+   "kind": "source",
+   "add": 18,
+   "del": 4,
+   "status": "modified"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.ExecutionTests/SuppressedSourceGenerationTests.cs",
+   "kind": "test",
+   "add": 37,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.Tests/SuppressSourceGenerationAnalyzerTests.cs",
+   "kind": "test",
+   "add": 193,
+   "del": 0,
+   "status": "added"
+  }
+ ],
+ "toolchain": {
+  "kind": "dotnet",
+  "describe": "dotnet · MessagePack.SourceGenerator.Tests",
+  "sdk": "8.0.402"
+ },
+ "recommendation": {
+  "id": "insuficiente",
+  "lista": false,
+  "name": "Evidencia insuficiente",
+  "why": "Comprobaciones deterministas y alcance pendiente",
+  "text": "Evidencia insuficiente"
+ },
+ "lane": {
+  "id": "decision",
+  "name": "Evidencia insuficiente",
+  "tone": "warn",
+  "summary": "Evidencia insuficiente"
+ },
+ "rules": {
+  "fired": [
+   {
+    "id": "requisito-insuficiente",
+    "title": "El requisito no dice qué es correcto",
+    "detail": "El requisito MessagePack-CSharp/MessagePack-CSharp#2234 tiene 149 caracteres y no describe el comportamiento esperado ni cómo reproducirlo.",
+    "lane": "devolver",
+    "evidence": []
+   },
+   {
+    "id": "silencia",
+    "title": "Silencia o relaja comportamiento existente",
+    "detail": "TypeCollector.cs:1008 sale antes de tiempo y omite el resto · TypeCollector.cs:1023 omite una inserción si ya existe, sin avisar · TypeCollector.cs:1039 omite una inserción si ya existe, sin avisar · TypeCollector.cs:1148 sale antes de tiempo y omite el resto",
+    "lane": "decision",
+    "evidence": []
+   },
+   {
+    "id": "tests-sin-dientes",
+    "title": "Hay tests nuevos que ya pasaban sin el cambio",
+    "detail": "MemberWithoutKeyIsReported, AllowPrivateRequiredIsReported, MemberTypeMustBeMessagePackObjectIsReported, SourceGenerationOnlyDiagnosticsAreNotReportedWhenSuppressed",
+    "lane": "decision",
+    "evidence": [
+     {
+      "label": "Tests nuevos sobre la base",
+      "artifact": "red.log"
+     }
+    ]
+   },
+   {
+    "id": "tests-no-ejecutados",
+    "title": "Hay tests nuevos que el sandbox no ha podido ejecutar",
+    "detail": "2 de 10: NoFormatterIsGeneratedForSuppressedType, SuppressedTypeRoundTripsThroughDynamicResolver",
+    "lane": "decision",
+    "evidence": []
+   }
+  ],
+  "notFired": [
+   {
+    "id": "conflicto",
+    "title": "No se mezcla limpio"
+   },
+   {
+    "id": "no-compila",
+    "title": "No compila"
+   },
+   {
+    "id": "sin-evidencia-ejecutable",
+    "title": "La ejecuci�n de tests est� incompleta"
+   },
+   {
+    "id": "suite-rota",
+    "title": "Rompe tests que antes pasaban"
+   },
+   {
+    "id": "tests-propios-fallan",
+    "title": "Los tests del propio PR fallan"
+   },
+   {
+    "id": "api-publica",
+    "title": "Cambia la superficie pública"
+   },
+   {
+    "id": "seguridad",
+    "title": "Toca una zona sensible de seguridad"
+   },
+   {
+    "id": "area-retirada",
+    "title": "El área ha perdido la confianza"
+   },
+   {
+    "id": "compilacion-condicional",
+    "title": "Parte del cambio solo existe en algunos targets"
+   },
+   {
+    "id": "sin-tests",
+    "title": "Cambia código sin añadir tests"
+   },
+   {
+    "id": "anomalia-mecanica",
+    "title": "Un fichero derivado cambia distinto a los demás"
+   },
+   {
+    "id": "residuo",
+    "title": "Queda código sin reproducir"
+   }
+  ]
+ },
+ "claims": [
+  {
+   "id": "merge",
+   "text": "Se mezcla limpio sobre 32258fdbee4bcd653c79f51b4376b5103c6f4d27 y compila",
+   "status": "reproducido",
+   "detail": "dotnet · MessagePack.SourceGenerator.Tests · 22 s",
+   "evidence": [
+    {
+     "label": "Registro de compilación",
+     "artifact": "build-merged.log"
+    }
+   ]
+  },
+  {
+   "id": "rojo-verde",
+   "text": "Los 10 tests nuevos fallan sin el cambio y pasan con él",
+   "status": "parcial",
+   "detail": "4 de 10 · 2 no se han podido ejecutar en el sandbox",
+   "evidence": [
+    {
+     "label": "Tests nuevos sobre la base",
+     "artifact": "red.log"
+    },
+    {
+     "label": "Suite con el PR",
+     "artifact": "suite-merged.log"
+    }
+   ]
+  },
+  {
+   "id": "suite",
+   "text": "No rompe los tests existentes (175 ejecutados)",
+   "status": "reproducido",
+   "detail": "175 pasan · 15 s",
+   "evidence": [
+    {
+     "label": "Suite con el PR",
+     "artifact": "suite-merged.log"
+    }
+   ]
+  },
+  {
+   "id": "mutacion",
+   "text": "Los tests detectarían un defecto en las líneas cambiadas",
+   "status": "no-ejecutado",
+   "detail": "Desactivado en esta verificación.",
+   "evidence": []
+  },
+  {
+   "id": "rebobinar",
+   "text": "Cada cambio de código es necesario para algún test",
+   "status": "no-ejecutado",
+   "detail": "Desactivado en esta verificación.",
+   "evidence": []
+  },
+  {
+   "id": "candidates",
+   "text": "Alternativas reconstruidas desde la base",
+   "status": "no-ejecutado",
+   "detail": "0 alternativas distintas construidas; la comparación se basa en tests ejecutados",
+   "evidence": []
+  },
+  {
+   "id": "courtroom",
+   "text": "Veredicto basado en ejecución y contrato versionado",
+   "status": "parcial",
+   "detail": "Evidencia insuficiente",
+   "evidence": [
+    {
+     "label": "Contrato y trazabilidad",
+     "artifact": "pipeline.json"
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "requisito",
+   "text": "¿Cuál es exactamente el comportamiento esperado?",
+   "why": [
+    "Sin un requisito comprobable, que los tests pasen solo demuestra que el código hace lo que el agente decidió.",
+    "Cualquier implementación podría parecer correcta."
+   ],
+   "evidence": [
+    {
+     "label": "Requisito MessagePack-CSharp/MessagePack-CSharp#2234",
+     "url": "https://github.com/MessagePack-CSharp/MessagePack-CSharp/issues/2234"
+    }
+   ],
+   "options": [
+    "Aclarar el requisito y volver a verificar",
+    "Aceptar con el requisito actual"
+   ],
+   "source": "regla"
+  },
+  {
+   "id": "silencia",
+   "text": "El cambio sale antes de tiempo y omite el resto en TypeCollector.cs:1008. ¿Es aceptable y está dentro de lo que pide el requisito?",
+   "why": [
+    "El requisito MessagePack-CSharp/MessagePack-CSharp#2234 no pide explícitamente silenciar nada.",
+    "Lo que se silencia deja de verse: si es un error, nadie se entera."
+   ],
+   "evidence": [
+    {
+     "label": "TypeCollector.cs:1008 · continue; // The key kind does not match the other members; the diagnostic is reported, so skip this member."
+    },
+    {
+     "label": "TypeCollector.cs:1023 · if (!intMembers.ContainsKey(member.IntKey))"
+    },
+    {
+     "label": "TypeCollector.cs:1039 · if (!stringMembers.ContainsKey(member.StringKey))"
+    },
+    {
+     "label": "TypeCollector.cs:1148 · continue; // The key kind does not match the other members; the diagnostic is reported, so skip this member."
+    }
+   ],
+   "options": [
+    "Aceptar tal cual",
+    "Devolver al autor",
+    "Separar en otro cambio"
+   ],
+   "source": "regla"
+  },
+  {
+   "id": "dientes",
+   "text": "4 test(s) nuevo(s) pasan también sin el cambio. ¿Prueban algo del requisito?",
+   "why": [
+    "Un test que no falla antes del cambio no demuestra que el cambio haga falta."
+   ],
+   "evidence": [
+    {
+     "label": "MemberWithoutKeyIsReported"
+    },
+    {
+     "label": "AllowPrivateRequiredIsReported"
+    },
+    {
+     "label": "MemberTypeMustBeMessagePackObjectIsReported"
+    },
+    {
+     "label": "SourceGenerationOnlyDiagnosticsAreNotReportedWhenSuppressed"
+    }
+   ],
+   "options": [
+    "Aceptar tal cual",
+    "Devolver al autor",
+    "Separar en otro cambio"
+   ],
+   "source": "regla"
+  },
+  {
+   "id": "no-ejecutados",
+   "text": "2 test(s) nuevo(s) del PR no se han podido ejecutar aquí. ¿Los has visto pasar en otro entorno?",
+   "why": [
+    "Su proyecto de test no compila en este sandbox ni siquiera sin el PR, así que no es culpa del cambio.",
+    "Sin ejecutarlos no hay evidencia de lo que afirman."
+   ],
+   "evidence": [
+    {
+     "label": "NoFormatterIsGeneratedForSuppressedType"
+    },
+    {
+     "label": "SuppressedTypeRoundTripsThroughDynamicResolver"
+    }
+   ],
+   "options": [
+    "Los he ejecutado yo y pasan",
+    "Devolver al autor",
+    "Acepto no tener esa evidencia"
+   ],
+   "source": "regla"
+  }
+ ],
+ "residue": {
+  "lines": 0,
+  "total": 266,
+  "items": [
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+    "start": 1008,
+    "end": 1008,
+    "lines": 1,
+    "why": [
+     "sale antes de tiempo y omite el resto",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 1008,
+      "removed": [],
+      "added": [
+       "                            continue; // The key kind does not match the other members; the diagnostic is reported, so skip this member."
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+    "start": 1023,
+    "end": 1026,
+    "lines": 5,
+    "why": [
+     "omite una inserción si ya existe, sin avisar",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 1023,
+      "removed": [
+       "                        intMembers.Add(member.IntKey, (member, item.Type));"
+      ],
+      "added": [
+       "                        if (!intMembers.ContainsKey(member.IntKey))",
+       "                        {",
+       "                            intMembers.Add(member.IntKey, (member, item.Type));",
+       "                        }"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+    "start": 1039,
+    "end": 1042,
+    "lines": 5,
+    "why": [
+     "omite una inserción si ya existe, sin avisar",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 1039,
+      "removed": [
+       "                        stringMembers.Add(member.StringKey, (member, item.Type));"
+      ],
+      "added": [
+       "                        if (!stringMembers.ContainsKey(member.StringKey))",
+       "                        {",
+       "                            stringMembers.Add(member.StringKey, (member, item.Type));",
+       "                        }"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+    "start": 1148,
+    "end": 1148,
+    "lines": 1,
+    "why": [
+     "sale antes de tiempo y omite el resto",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 1148,
+      "removed": [],
+      "added": [
+       "                            continue; // The key kind does not match the other members; the diagnostic is reported, so skip this member."
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+    "start": 1163,
+    "end": 1166,
+    "lines": 5,
+    "why": [
+     "omite una inserción si ya existe, sin avisar",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 1163,
+      "removed": [
+       "                        intMembers.Add(member.IntKey, (member, item.Type));"
+      ],
+      "added": [
+       "                        if (!intMembers.ContainsKey(member.IntKey))",
+       "                        {",
+       "                            intMembers.Add(member.IntKey, (member, item.Type));",
+       "                        }"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/TypeCollector.cs",
+    "start": 1179,
+    "end": 1182,
+    "lines": 5,
+    "why": [
+     "omite una inserción si ya existe, sin avisar",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 1179,
+      "removed": [
+       "                        stringMembers.Add(member.StringKey, (member, item.Type));"
+      ],
+      "added": [
+       "                        if (!stringMembers.ContainsKey(member.StringKey))",
+       "                        {",
+       "                            stringMembers.Add(member.StringKey, (member, item.Type));",
+       "                        }"
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "notChecked": [
+  {
+   "what": "Tests de MessagePack.SourceGenerator.ExecutionTests",
+   "why": "Ese proyecto no compila en este sandbox ni siquiera sin el PR. No es atribuible al cambio."
+  },
+  {
+   "what": "Otros 6 proyectos de test del repo",
+   "why": "Solo se ejecutan los proyectos de test afectados por el cambio."
+  },
+  {
+   "what": "Defectos sembrados",
+   "why": "Desactivado en esta verificación."
+  },
+  {
+   "what": "Prompt original del autor",
+   "why": "El commit no trae el prompt guardado (ni sesión de Entire ni nota). La intención se ha reconstruido desde el requisito."
+  },
+  {
+   "what": "Rendimiento",
+   "why": "El pipeline no ejecuta benchmarks."
+  },
+  {
+   "what": "Seguridad en profundidad",
+   "why": "No hay análisis de seguridad dedicado, solo reglas sobre zonas sensibles."
+  },
+  {
+   "what": "generation: Privacy blocked cloud transmission: local Gemma unavailable, incomplete or scan budget exhausted",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "No testable contract",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "No contract behavior has executable support",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "Original relevant suite incomplete or failing",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "Review budget exhausted or pipeline incomplete",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "Final missions incomplete",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "Semantic review missing or unresolved",
+   "why": "Evidencia pendiente del pipeline completo"
+  }
+ ],
+ "audit": true,
+ "areas": [
+  {
+   "area": "src/MessagePack.SourceGenerator/CodeAnalysis",
+   "state": "prueba",
+   "signoffs": 0,
+   "escapes": 0,
+   "sinceEscape": 0,
+   "remaining": 5,
+   "lastEscape": null
+  }
+ ],
+ "l1": {
+  "groups": []
+ },
+ "l2": {
+  "suite": {
+   "ok": true,
+   "ran": 175,
+   "passed": 175,
+   "failed": 0,
+   "skipped": 0,
+   "ms": 14521
+  },
+  "newTests": [
+   {
+    "name": "NoFormatterIsGeneratedForSuppressedType",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "SuppressedTypeRoundTripsThroughDynamicResolver",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "MemberWithoutKeyIsReported",
+    "green": "Passed",
+    "red": "Passed"
+   },
+   {
+    "name": "AllowPrivateRequiredIsReported",
+    "green": "Passed",
+    "red": "Passed"
+   },
+   {
+    "name": "MemberTypeMustBeMessagePackObjectIsReported",
+    "green": "Passed",
+    "red": "Passed"
+   },
+   {
+    "name": "DuplicateIntKeysAreReportedWithoutAnalyzerFailure",
+    "green": "Passed",
+    "red": "Failed"
+   },
+   {
+    "name": "DuplicateStringKeysAreReportedWithoutAnalyzerFailure",
+    "green": "Passed",
+    "red": "Failed"
+   },
+   {
+    "name": "MixedKeyKindsAreReportedWithoutAnalyzerFailure",
+    "green": "Passed",
+    "red": "Failed"
+   },
+   {
+    "name": "DuplicateKeysAreReportedWithoutAnalyzerFailureForGeneratedTypes",
+    "green": "Passed",
+    "red": "Failed"
+   },
+   {
+    "name": "SourceGenerationOnlyDiagnosticsAreNotReportedWhenSuppressed",
+    "green": "Passed",
+    "red": "Passed"
+   }
+  ],
+  "newFailures": [],
+  "preexisting": [],
+  "redBuilt": true,
+  "teeth": 4,
+  "detail": "175 de 175 tests pasan con el PR · 4 de 10 tests nuevos fallan sin el cambio y pasan con él"
+ },
+ "mutation": {
+  "skipped": true,
+  "reason": "Desactivado en esta verificación.",
+  "mutants": []
+ },
+ "rewind": {
+  "skipped": true,
+  "reason": "Desactivado en esta verificación.",
+  "steps": []
+ },
+ "budget": {
+  "profile": "standard",
+  "tokenLimit": 100000,
+  "limitMs": 300000,
+  "generationEnd": 1794665464548,
+  "finalEnd": 1794665534548,
+  "deadline": 1794665564548,
+  "concurrency": {
+   "models": 2,
+   "runners": 1
+  },
+  "maxCandidates": 2,
+  "maxGenerations": 1,
+  "formula": "two independent candidates; additional work only for unresolved risks within profile",
+  "priorityFormula": "R*(1+U+D)/(C*(1+N))",
+  "heuristics": true,
+  "elapsedMs": 77026,
+  "exhausted": false,
+  "remainingMs": 222974,
+  "tokens": 0,
+  "cumulativeTokens": 0,
+  "accounting": {
+   "limit": 100000,
+   "observed": 0,
+   "reserved": 0,
+   "unknownReserved": 0,
+   "remaining": 100000,
+   "reportReserve": 12000,
+   "attempts": 0,
+   "usageIncomplete": false,
+   "exceeded": false,
+   "enforcement": "estimated admission reservations; per-request output cap; observed provider usage reconciled after every attempt"
+  },
+  "usageIncomplete": false
+ },
+ "l3": null,
+ "timing": {
+  "totalMs": 77028,
+  "stages": [
+   {
+    "id": "entrada",
+    "name": "Leer el PR, el requisito y la procedencia",
+    "ms": 377,
+    "status": "done"
+   },
+   {
+    "id": "l1",
+    "name": "Nivel 1 · Ficheros derivados y cambios mecánicos",
+    "ms": 0,
+    "status": "done"
+   },
+   {
+    "id": "merge",
+    "name": "Mezclar sobre 32258fdbee4bcd653c79f51b4376b5103c6f4d27 en una copia aislada",
+    "ms": 581,
+    "status": "done"
+   },
+   {
+    "id": "build",
+    "name": "Compilar (dotnet · MessagePack.SourceGenerator.Tests, MessagePack.SourceGenerator.ExecutionTests)",
+    "ms": 47281,
+    "status": "done"
+   },
+   {
+    "id": "l2",
+    "name": "Nivel 2 · Tests: rojo antes, verde después",
+    "ms": 27051,
+    "status": "done"
+   },
+   {
+    "id": "mutacion",
+    "name": "Defectos sembrados en las líneas cambiadas",
+    "ms": 0,
+    "status": "skip"
+   },
+   {
+    "id": "rebobinar",
+    "name": "Rebobinar: quitar cada cambio y ver si algún test lo nota",
+    "ms": 0,
+    "status": "skip"
+   },
+   {
+    "id": "l3",
+    "name": "Nivel 3 · Réplicas",
+    "ms": 0,
+    "status": "skip"
+   }
+  ]
+ },
+ "cost": {
+  "usd": 0
+ },
+ "contract": null,
+ "candidates": [],
+ "attacks": [],
+ "evidence": [],
+ "verdict": {
+  "status": "insufficient-evidence",
+  "label": "Evidencia insuficiente",
+  "confirmed": [],
+  "verified": [],
+  "pending": [
+   "generation: Privacy blocked cloud transmission: local Gemma unavailable, incomplete or scan budget exhausted",
+   "No testable contract",
+   "No contract behavior has executable support",
+   "Original relevant suite incomplete or failing",
+   "Review budget exhausted or pipeline incomplete",
+   "Final missions incomplete",
+   "Semantic review missing or unresolved"
+  ],
+  "findings": [],
+  "support": [],
+  "score": {
+   "version": 1,
+   "value": null,
+   "max": 10,
+   "label": "Confianza de revisión",
+   "heuristic": true,
+   "scope": "Comportamientos del contrato y suite pertinente declarados",
+   "components": [
+    {
+     "id": "contract",
+     "label": "Cumplimiento del requisito",
+     "max": 4,
+     "earned": 0,
+     "expectations": [],
+     "evidence": [],
+     "reason": "0/0 expectativas respaldadas; ponderadas por criticidad."
+    },
+    {
+     "id": "regressions",
+     "label": "Preservación de comportamientos",
+     "max": 3,
+     "earned": 0,
+     "expectations": [],
+     "evidence": [],
+     "reason": "Suite pertinente del original pendiente o con fallos."
+    },
+    {
+     "id": "attacks",
+     "label": "Ataques válidos superados",
+     "max": 2,
+     "earned": 0,
+     "expectations": [],
+     "evidence": [],
+     "reason": "0 grupos de riesgo comprobados; objetivo 3. Repeticiones del mismo grupo no suman."
+    },
+    {
+     "id": "reproducibility",
+     "label": "Reproducibilidad",
+     "max": 1,
+     "earned": 0,
+     "expectations": [],
+     "evidence": [],
+     "reason": "Falta repetición independiente con la misma identidad de ejecución."
+    }
+   ],
+   "caps": [
+    {
+     "max": 7,
+     "reason": "Revisión incompleta, ambigua o inestable."
+    }
+   ],
+   "explanation": "No evaluable: falta contrato o ejecución de pruebas."
+  },
+  "auditWarnings": [
+   "Final candidate did not complete a passing relevant suite; this alone does not invalidate the original.",
+   "No candidate Entire checkpoint recovered.",
+   "Provider availability: Verda/Nemotron: switched off in settings; any model substitution is recorded and reduces model-family diversity.",
+   "Provider availability: Entire: version check failed (exit -2); any model substitution is recorded and reduces model-family diversity."
+  ],
+  "residualRisks": [
+   "Tests cover declared behaviors, not all inputs.",
+   "Local Windows isolation is a working-copy boundary, not an OS security sandbox."
+  ],
+  "semantic": null
+ },
+ "input": {
+  "proposed": "9007cee1163c4a274fd60c3cc20c21ae63622786",
+  "proposedRef": "refs/remotes/origin/ju26-issue-2234",
+  "target": "32258fdbee4bcd653c79f51b4376b5103c6f4d27",
+  "targetRef": "dependabot/nuget/develop/PolySharp-1.15.0",
+  "historicalBase": "32258fdbee4bcd653c79f51b4376b5103c6f4d27",
+  "requirement": {
+   "id": "MessagePack-CSharp/MessagePack-CSharp#2234",
+   "number": 2234,
+   "repo": "MessagePack-CSharp/MessagePack-CSharp",
+   "url": "https://github.com/MessagePack-CSharp/MessagePack-CSharp/issues/2234",
+   "title": "The analyzer does not work if SuppressSourceGeneration = true",
+   "body": "#### Bug description\n\nThe analyzer does not work if SuppressSourceGeneration = true. This has happened since version 3.1.1. It still worked in 3.1.0.\n\n",
+   "labels": [],
+   "state": "open"
+  }
+ },
+ "finalMissions": [],
+ "providers": {
+  "models": {
+   "fast": "google/gemini-4-hydrogen",
+   "review": "google/gemini-4-carbon",
+   "diverse": "verda-nemotron/nemotron"
+  },
+  "opencode": "1.19.5",
+  "entire": null,
+  "tools": {
+   "opencode": true,
+   "entire": false
+  },
+  "available": {
+   "fast": true,
+   "review": true,
+   "diverse": false
+  },
+  "errors": [
+   "Verda/Nemotron: switched off in settings",
+   "Entire: version check failed (exit -2)"
+  ],
+  "authenticated": false,
+  "preflight": {
+   "cached": false,
+   "checkedAt": "2026-11-14T14:07:45.631Z",
+   "attempts": {
+    "Google": 1
+   },
+   "partial": true
+  }
+ },
+ "debate": [],
+ "privacy": {
+  "mode": "strict",
+  "model": "gemma4:e2b-it-qat",
+  "local": true,
+  "scannedChunks": 0,
+  "cacheHits": 0,
+  "replacements": 0,
+  "ms": 2,
+  "blocked": 1,
+  "limitation": "Detection is best effort, not a proof of anonymity. Strict mode blocks unavailable, malformed, uncertain or incomplete scans. Only the v2 review uses this gateway."
+ },
+ "allocation": {
+  "groups": []
+ },
+ "binding": "3f94b77d4beb3e93956389da4751fd97258821b7b46dfb7ab6567e1690e9637d",
+ "artifactManifest": {
+  "allocation.json": "e02f1d52f7ed6906c3717dd46713f026237cd259a91e8f66d52892fc2c689617",
+  "build-base.log": "1cb7072168f47e8cfba61d44f345d6b3ef367089ddc478d3e59d1a518d178b67",
+  "build-merged.log": "6da1a5ba15ef959cf82244b6d19970110ea480b673d60928117d87ebc1a77e10",
+  "files.json": "d4cc7b90ed80946f57ffd14072daae1906647ef6e10212393ace530c3263c185",
+  "l1.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "pipeline.json": "070f51455dab0f10c8765378e3beb2e7670c148844e54be06e789068a819acbd",
+  "red.log": "d94376b3faf443364590364f7174707614a69fd4ae4e857571e4e892f58a3f04",
+  "requirement.json": "1684976dfef49f55762390ca2c0fb24fc59e7cf7a3550f4aae702d9931436de2",
+  "roslyn-input.json": "d8027ce29a1aa3e6c408ae450ffddee6bd11561daa12f6f77781384b5ce43d2c",
+  "roslyn.json": "fcee001c60721aff4fe06cda11fdaf50b0e6c9bf4e30223c0b8ba2f77dab0935",
+  "suite-merged.log": "6fd643b69adc373dc5778eed24db555618f258e33df2a45602bf6c6f304ceaad"
+ }
+}

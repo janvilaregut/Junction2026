@@ -1,0 +1,2318 @@
+{
+ "version": 2,
+ "createdAt": "2026-11-14T11:25:29.846Z",
+ "project": {
+  "id": "messagepack-csharp-mwfmr6wg",
+  "name": "messagepack-csharp"
+ },
+ "pr": {
+  "id": "in:ju26-issue-2129",
+  "branch": "ju26-issue-2129",
+  "direction": "incoming",
+  "title": "Agentic implementation of #2129 Feature Request: Allow generation of Formatter for a type in a referenced assembly",
+  "head": "083afd994c1c9a994cb2cd5aa0b6ad805a621457",
+  "base": "dependabot/nuget/develop/PolySharp-1.15.0",
+  "baseSha": "32258fdbee4bcd653c79f51b4376b5103c6f4d27",
+  "commits": [
+   {
+    "sha": "083afd994",
+    "subject": "Agentic implementation of #2129 Feature Request: Allow generation of Formatter for a type in a referenced assembly",
+    "author": "Stelian Vultur"
+   }
+  ]
+ },
+ "requirement": {
+  "id": "MessagePack-CSharp/MessagePack-CSharp#2129",
+  "title": "Feature Request: Allow generation of Formatter for a type in a referenced assembly",
+  "url": "https://github.com/MessagePack-CSharp/MessagePack-CSharp/issues/2129",
+  "missing": false,
+  "excerpt": "## Is your feature request related to a problem? Please describe.\n\nGiven the following project structure:\n\n - Project A\n    - `ProjectA.MyType`\n\n - Project B\n    - References\n        - Project A\n    - Package References\n        - MessagePack\n    \nI need to have a source-generated `IMessagePackFormatter` for type `ProjectA.MyType` generated **inside Project B** instead of Project A, because the latter has no (and cannot have) reference to MessagePack nuget package.\n\n## Describe the solution you'd like\n\nAdd a `[GeneratedMessagePackFormatter]` attribute that will work for partial classes implementing `IMessagePackFormatter<T>`.\n\nFor example:\n\n```csharp\n[GeneratedMessagePackFormatter]\npartial cl"
+ },
+ "provenance": {
+  "status": "none",
+  "entireInstalled": false,
+  "notes": [],
+  "checkpoints": []
+ },
+ "options": {
+  "mode": "completo",
+  "agents": [
+   "fast",
+   "review"
+  ],
+  "agentsPicked": false,
+  "id": "standard",
+  "budgetMs": 300000,
+  "tokenBudget": 100000,
+  "initialCandidates": 2,
+  "maxDescendants": 0,
+  "finalMissions": 1,
+  "profile": "standard",
+  "resumeRunId": null,
+  "controls": false,
+  "providers": {},
+  "concurrency": {
+   "models": 2,
+   "runners": 1
+  },
+  "mutants": 4,
+  "crossTests": true,
+  "rewind": true,
+  "judge": true,
+  "agentTimeoutMin": 3,
+  "keepTrees": false
+ },
+ "totals": {
+  "files": 28,
+  "added": 1034,
+  "removed": 9,
+  "lines": 1043
+ },
+ "kinds": {
+  "doc": {
+   "files": 7,
+   "lines": 163
+  },
+  "source": {
+   "files": 10,
+   "lines": 450
+  },
+  "derived": {
+   "files": 2,
+   "lines": 8
+  },
+  "test": {
+   "files": 9,
+   "lines": 422
+  }
+ },
+ "files": [
+  {
+   "path": "README.md",
+   "kind": "doc",
+   "add": 52,
+   "del": 0,
+   "status": "modified"
+  },
+  {
+   "path": "doc/analyzers/MsgPack019.md",
+   "kind": "doc",
+   "add": 26,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "doc/analyzers/MsgPack020.md",
+   "kind": "doc",
+   "add": 23,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "doc/analyzers/MsgPack021.md",
+   "kind": "doc",
+   "add": 23,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "doc/analyzers/MsgPack022.md",
+   "kind": "doc",
+   "add": 31,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "doc/analyzers/index.md",
+   "kind": "doc",
+   "add": 4,
+   "del": 0,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.Annotations/Attributes.cs",
+   "kind": "source",
+   "add": 36,
+   "del": 0,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/AnalyzerReleases.Unshipped.md",
+   "kind": "doc",
+   "add": 4,
+   "del": 0,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+   "kind": "source",
+   "add": 45,
+   "del": 1,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+   "kind": "source",
+   "add": 300,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterRequest.cs",
+   "kind": "source",
+   "add": 13,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/CodeAnalysis/ObjectSerializationInfo.cs",
+   "kind": "source",
+   "add": 7,
+   "del": 0,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/GeneratorUtilities.cs",
+   "kind": "source",
+   "add": 3,
+   "del": 0,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+   "kind": "source",
+   "add": 36,
+   "del": 3,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/Transforms/FormatterTemplate.cs",
+   "kind": "derived",
+   "add": 3,
+   "del": 1,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/Transforms/FormatterTemplate.tt",
+   "kind": "source",
+   "add": 1,
+   "del": 1,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/Transforms/StringKey/StringKeyFormatterTemplate.cs",
+   "kind": "derived",
+   "add": 3,
+   "del": 1,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/Transforms/StringKey/StringKeyFormatterTemplate.tt",
+   "kind": "source",
+   "add": 1,
+   "del": 1,
+   "status": "modified"
+  },
+  {
+   "path": "src/MessagePack.SourceGenerator/Utils/Constants.cs",
+   "kind": "source",
+   "add": 2,
+   "del": 0,
+   "status": "modified"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.ExecutionTests/GeneratedFormatterForExternalTypes.cs",
+   "kind": "test",
+   "add": 50,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.ExecutionTests/GeneratedFormatterForExternalTypesTests.cs",
+   "kind": "test",
+   "add": 95,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+   "kind": "test",
+   "add": 5,
+   "del": 0,
+   "status": "modified"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.ExternalTypes/ExternalPerson.cs",
+   "kind": "test",
+   "add": 15,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.ExternalTypes/ExternalPoint.cs",
+   "kind": "test",
+   "add": 12,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.ExternalTypes/ExternalWidget.cs",
+   "kind": "test",
+   "add": 15,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj",
+   "kind": "test",
+   "add": 17,
+   "del": 0,
+   "status": "added"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.MapModeExecutionTests/MessagePack.SourceGenerator.MapModeExecutionTests.csproj",
+   "kind": "test",
+   "add": 2,
+   "del": 1,
+   "status": "modified"
+  },
+  {
+   "path": "tests/MessagePack.SourceGenerator.Tests/GeneratedMessagePackFormatterTests.cs",
+   "kind": "test",
+   "add": 210,
+   "del": 0,
+   "status": "added"
+  }
+ ],
+ "toolchain": {
+  "kind": "dotnet",
+  "describe": "dotnet · MessagePack.SourceGenerator.Tests, MessagePack.SourceGenerator.ExternalTypes",
+  "sdk": "8.0.402"
+ },
+ "recommendation": {
+  "id": "insuficiente",
+  "lista": false,
+  "name": "Evidencia insuficiente",
+  "why": "La auditoría muestra que no hay resultados de pruebas ejecutables porque todos los artefactos de evidencia tienen estado `harness-incompatible`: `evidence-88c3904f...` (original), `evidence-d375ee3c...` (C1) y `evidence-98ee8d39...` (C2). En consecuencia, no es posible distinguir fallos exclusivos de la versión original ni de los candidatos (C1, C2) para las expectativas E1 y E2. Además, el ataque `A1-1-final` resultó inválido antes de ejecutarse debido a un exceso en el límite de tokens de contexto (35872 sobre 16000). Persiste una ambigüedad material en los requisitos sobre cómo especificar claves de propiedades y configuraciones (como Union) para tipos en ensamblados referenciados que no dependen de MessagePack. Sin evidencia funcional válida, la corrección de C1 y C2 permanece indeterminada.",
+  "text": "Evidencia insuficiente"
+ },
+ "lane": {
+  "id": "decision",
+  "name": "Evidencia insuficiente",
+  "tone": "warn",
+  "summary": "Evidencia insuficiente"
+ },
+ "rules": {
+  "fired": [
+   {
+    "id": "api-publica",
+    "title": "Cambia la superficie pública",
+    "detail": "Tipos públicos nuevos: GeneratedMessagePackFormatterAttribute, GeneratedFormatterRequest. Ficheros de contrato: AnalyzerReleases.Unshipped.md",
+    "lane": "completa",
+    "evidence": []
+   },
+   {
+    "id": "silencia",
+    "title": "Silencia o relaja comportamiento existente",
+    "detail": "GeneratedFormatterCollector.cs:166 sale antes de tiempo y omite el resto · GeneratedFormatterCollector.cs:259 sale antes de tiempo y omite el resto · GeneratedFormatterCollector.cs:264 sale antes de tiempo y omite el resto",
+    "lane": "decision",
+    "evidence": []
+   },
+   {
+    "id": "tests-no-ejecutados",
+    "title": "Hay tests nuevos que el sandbox no ha podido ejecutar",
+    "detail": "8 de 14: ContractlessClassRoundTrips, ContractlessClassUsesStringKeysForPublicReadWriteMembers, ContractlessClassNullRoundTrips",
+    "lane": "decision",
+    "evidence": []
+   }
+  ],
+  "notFired": [
+   {
+    "id": "conflicto",
+    "title": "No se mezcla limpio"
+   },
+   {
+    "id": "no-compila",
+    "title": "No compila"
+   },
+   {
+    "id": "sin-evidencia-ejecutable",
+    "title": "La ejecuci�n de tests est� incompleta"
+   },
+   {
+    "id": "suite-rota",
+    "title": "Rompe tests que antes pasaban"
+   },
+   {
+    "id": "tests-propios-fallan",
+    "title": "Los tests del propio PR fallan"
+   },
+   {
+    "id": "requisito-insuficiente",
+    "title": "El requisito no dice qué es correcto"
+   },
+   {
+    "id": "seguridad",
+    "title": "Toca una zona sensible de seguridad"
+   },
+   {
+    "id": "area-retirada",
+    "title": "El área ha perdido la confianza"
+   },
+   {
+    "id": "compilacion-condicional",
+    "title": "Parte del cambio solo existe en algunos targets"
+   },
+   {
+    "id": "sin-tests",
+    "title": "Cambia código sin añadir tests"
+   },
+   {
+    "id": "tests-sin-dientes",
+    "title": "Hay tests nuevos que ya pasaban sin el cambio"
+   },
+   {
+    "id": "anomalia-mecanica",
+    "title": "Un fichero derivado cambia distinto a los demás"
+   },
+   {
+    "id": "residuo",
+    "title": "Queda código sin reproducir"
+   }
+  ]
+ },
+ "claims": [
+  {
+   "id": "merge",
+   "text": "Se mezcla limpio sobre 32258fdbee4bcd653c79f51b4376b5103c6f4d27 y compila",
+   "status": "reproducido",
+   "detail": "dotnet · MessagePack.SourceGenerator.Tests, MessagePack.SourceGenerator.ExternalTypes · 11 s",
+   "evidence": [
+    {
+     "label": "Registro de compilación",
+     "artifact": "build-merged.log"
+    }
+   ]
+  },
+  {
+   "id": "rojo-verde",
+   "text": "Los 14 tests nuevos fallan sin el cambio y pasan con él",
+   "status": "parcial",
+   "detail": "6 de 14 · 8 no se han podido ejecutar en el sandbox",
+   "evidence": [
+    {
+     "label": "Tests nuevos sobre la base",
+     "artifact": "red.log"
+    },
+    {
+     "label": "Suite con el PR",
+     "artifact": "suite-merged.log"
+    }
+   ]
+  },
+  {
+   "id": "suite",
+   "text": "No rompe los tests existentes (173 ejecutados)",
+   "status": "reproducido",
+   "detail": "173 pasan · 5 s",
+   "evidence": [
+    {
+     "label": "Suite con el PR",
+     "artifact": "suite-merged.log"
+    }
+   ]
+  },
+  {
+   "id": "derivados",
+   "text": "2 ficheros derivados son consecuencia mecánica del cambio",
+   "status": "reproducido",
+   "detail": "0 de 8 líneas son el mismo bloque repetido · los tests que comparan estos ficheros pasan",
+   "evidence": [
+    {
+     "label": "Análisis de ficheros derivados",
+     "artifact": "l1.json"
+    }
+   ]
+  },
+  {
+   "id": "mutacion",
+   "text": "Los tests detectarían un defecto en las líneas cambiadas",
+   "status": "no-ejecutado",
+   "detail": "Desactivado en esta verificación.",
+   "evidence": []
+  },
+  {
+   "id": "rebobinar",
+   "text": "Cada cambio de código es necesario para algún test",
+   "status": "no-ejecutado",
+   "detail": "Desactivado en esta verificación.",
+   "evidence": []
+  },
+  {
+   "id": "candidates",
+   "text": "Alternativas reconstruidas desde la base",
+   "status": "parcial",
+   "detail": "2 alternativas distintas construidas; la comparación se basa en tests ejecutados",
+   "evidence": [
+    {
+     "label": "C1",
+     "artifact": "C1.patch"
+    },
+    {
+     "label": "C2",
+     "artifact": "C2.patch"
+    }
+   ]
+  },
+  {
+   "id": "courtroom",
+   "text": "Veredicto basado en ejecución y contrato versionado",
+   "status": "parcial",
+   "detail": "Evidencia insuficiente",
+   "evidence": [
+    {
+     "label": "Contrato y trazabilidad",
+     "artifact": "pipeline.json"
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "api",
+   "text": "¿Aceptas la nueva superficie pública (GeneratedMessagePackFormatterAttribute, GeneratedFormatterRequest)?",
+   "why": [
+    "Una API pública es un compromiso con quien la usa: después no se puede cambiar sin romper.",
+    "El diseño de una API es una decisión de producto, no algo que se pueda reproducir."
+   ],
+   "evidence": [
+    {
+     "label": "Attributes.cs:166"
+    },
+    {
+     "label": "GeneratedFormatterRequest.cs:13"
+    }
+   ],
+   "options": [
+    "Aceptar el diseño",
+    "Devolver al autor",
+    "Pedir revisión de diseño"
+   ],
+   "source": "regla"
+  },
+  {
+   "id": "silencia",
+   "text": "El cambio sale antes de tiempo y omite el resto en GeneratedFormatterCollector.cs:166. ¿Es aceptable y está dentro de lo que pide el requisito?",
+   "why": [
+    "El requisito MessagePack-CSharp/MessagePack-CSharp#2129 no pide explícitamente silenciar nada.",
+    "Lo que se silencia deja de verse: si es un error, nadie se entera."
+   ],
+   "evidence": [
+    {
+     "label": "GeneratedFormatterCollector.cs:166 · continue;"
+    },
+    {
+     "label": "GeneratedFormatterCollector.cs:259 · continue;"
+    },
+    {
+     "label": "GeneratedFormatterCollector.cs:264 · continue;"
+    }
+   ],
+   "options": [
+    "Aceptar tal cual",
+    "Devolver al autor",
+    "Separar en otro cambio"
+   ],
+   "source": "regla"
+  },
+  {
+   "id": "no-ejecutados",
+   "text": "8 test(s) nuevo(s) del PR no se han podido ejecutar aquí. ¿Los has visto pasar en otro entorno?",
+   "why": [
+    "Su proyecto de test no compila en este sandbox ni siquiera sin el PR, así que no es culpa del cambio.",
+    "Sin ejecutarlos no hay evidencia de lo que afirman."
+   ],
+   "evidence": [
+    {
+     "label": "ContractlessClassRoundTrips"
+    },
+    {
+     "label": "ContractlessClassUsesStringKeysForPublicReadWriteMembers"
+    },
+    {
+     "label": "ContractlessClassNullRoundTrips"
+    },
+    {
+     "label": "ContractlessStructRoundTrips"
+    },
+    {
+     "label": "SurrogateControlsKeysAndMembership"
+    }
+   ],
+   "options": [
+    "Los he ejecutado yo y pasan",
+    "Devolver al autor",
+    "Acepto no tener esa evidencia"
+   ],
+   "source": "regla"
+  }
+ ],
+ "residue": {
+  "lines": 450,
+  "total": 1043,
+  "items": [
+   {
+    "file": "src/MessagePack.Annotations/Attributes.cs",
+    "start": 142,
+    "end": 177,
+    "lines": 36,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 142,
+      "removed": [],
+      "added": [
+       "",
+       "    /// <summary>",
+       "    /// Marks a <see langword=\"partial\"/> class that implements <c>IMessagePackFormatter&lt;T&gt;</c> so that the MessagePack source generator",
+       "    /// writes the formatter implementation for <c>T</c>, even when <c>T</c> is declared in another assembly that cannot reference MessagePack.",
+       "    /// </summary>",
+       "    /// <remarks>",
+       "    /// <para>",
+       "    /// The formatted type <c>T</c> is serialized in contractless mode: every public, non-static, read-write instance property and field",
+       "    /// is serialized using its name as a string key. No attributes are required on <c>T</c>.",
+       "    /// </para>",
+       "    /// <para>",
+       "    /// To control keys and membership without touching <c>T</c>, set <see cref=\"SurrogateType\"/> to a type whose",
+       "    /// <see cref=\"KeyAttribute\"/> and <see cref=\"IgnoreMemberAttribute\"/> annotations describe the wire contract.",
+       "    /// The surrogate is only read at compile time and is never instantiated at run time.",
+       "    /// Surrogate members are matched to members of <c>T</c> by name.",
+       "    /// </para>",
+       "    /// </remarks>",
+       "    /// <example>",
+       "    /// <code>",
+       "    /// [GeneratedMessagePackFormatter]",
+       "    /// public partial class MyObjectFormatter : IMessagePackFormatter&lt;ProjectA.MyObject&gt; { }",
+       "    /// </code>",
+       "    /// </example>",
+       "    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]",
+       "    public class GeneratedMessagePackFormatterAttribute : Attribute",
+       "    {",
+       "        /// <summary>",
+       "        /// Gets or sets a type whose <see cref=\"KeyAttribute\"/> members define the keys and membership of the formatted type.",
+       "        /// </summary>",
+       "        /// <remarks>",
+       "        /// Each surrogate member that carries a <see cref=\"KeyAttribute\"/> must match a public, read-write instance member of the formatted type by name.",
+       "        /// Surrogate members that carry <see cref=\"IgnoreMemberAttribute\"/> are excluded.",
+       "        /// All keys in the surrogate must be the same kind (all integer or all string).",
+       "        /// </remarks>",
+       "        public Type? SurrogateType { get; set; }",
+       "    }"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+    "start": 32,
+    "end": 35,
+    "lines": 4,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 32,
+      "removed": [],
+      "added": [
+       "    public const string GeneratedFormatterMustBePartialId = \"MsgPack019\";",
+       "    public const string GeneratedFormatterMustImplementFormatterId = \"MsgPack020\";",
+       "    public const string GeneratedFormatterDataTypeNotSupportedId = \"MsgPack021\";",
+       "    public const string SurrogateMemberNotFoundId = \"MsgPack022\";"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+    "start": 318,
+    "end": 353,
+    "lines": 36,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 318,
+      "removed": [],
+      "added": [
+       "    public static readonly DiagnosticDescriptor GeneratedFormatterMustBePartial = new(",
+       "        id: GeneratedFormatterMustBePartialId,",
+       "        title: \"Generated formatter must be partial\",",
+       "        category: Category,",
+       "        messageFormat: \"The formatter '{0}' is marked with [GeneratedMessagePackFormatter] and must be declared 'partial' so the source generator can write its implementation\",",
+       "        defaultSeverity: DiagnosticSeverity.Error,",
+       "        isEnabledByDefault: true,",
+       "        helpLinkUri: AnalyzerUtilities.GetHelpLink(GeneratedFormatterMustBePartialId));",
+       "",
+       "    public static readonly DiagnosticDescriptor GeneratedFormatterMustImplementFormatter = new(",
+       "        id: GeneratedFormatterMustImplementFormatterId,",
+       "        title: \"Generated formatter must implement IMessagePackFormatter<T>\",",
+       "        category: Category,",
+       "        messageFormat: \"The formatter '{0}' is marked with [GeneratedMessagePackFormatter] but does not implement IMessagePackFormatter<T> for exactly one data type\",",
+       "        defaultSeverity: DiagnosticSeverity.Error,",
+       "        isEnabledByDefault: true,",
+       "        helpLinkUri: AnalyzerUtilities.GetHelpLink(GeneratedFormatterMustImplementFormatterId));",
+       "",
+       "    public static readonly DiagnosticDescriptor GeneratedFormatterDataTypeNotSupported = new(",
+       "        id: GeneratedFormatterDataTypeNotSupportedId,",
+       "        title: \"Generated formatter data type not supported\",",
+       "        category: Category,",
+       "        messageFormat: \"The formatter '{0}' cannot generate a formatter for '{1}': only accessible, non-generic, non-abstract classes and structs are supported\",",
+       "        defaultSeverity: DiagnosticSeverity.Error,",
+       "        isEnabledByDefault: true,",
+       "        helpLinkUri: AnalyzerUtilities.GetHelpLink(GeneratedFormatterDataTypeNotSupportedId));",
+       "",
+       "    public static readonly DiagnosticDescriptor SurrogateMemberNotFound = new(",
+       "        id: SurrogateMemberNotFoundId,",
+       "        title: \"Surrogate member does not match the formatted type\",",
+       "        category: Category,",
+       "        messageFormat: \"The surrogate member '{0}' has no matching public, read-write instance member with the same name and type on '{1}'\",",
+       "        defaultSeverity: DiagnosticSeverity.Error,",
+       "        isEnabledByDefault: true,",
+       "        helpLinkUri: AnalyzerUtilities.GetHelpLink(SurrogateMemberNotFoundId));",
+       ""
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+    "start": 381,
+    "end": 385,
+    "lines": 6,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 381,
+      "removed": [
+       "        CollidingMemberNamesInForceMapMode);"
+      ],
+      "added": [
+       "        CollidingMemberNamesInForceMapMode,",
+       "        GeneratedFormatterMustBePartial,",
+       "        GeneratedFormatterMustImplementFormatter,",
+       "        GeneratedFormatterDataTypeNotSupported,",
+       "        SurrogateMemberNotFound);"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterCollector.cs",
+    "start": 1,
+    "end": 300,
+    "lines": 300,
+    "why": [
+     "sale antes de tiempo y omite el resto",
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 1,
+      "removed": [],
+      "added": [
+       "// Copyright (c) All contributors. All rights reserved.",
+       "// Licensed under the MIT license. See LICENSE file in the project root for full license information.",
+       "",
+       "using System.Collections.Immutable;",
+       "using MessagePack.SourceGenerator.Analyzers;",
+       "using Microsoft.CodeAnalysis;",
+       "using Microsoft.CodeAnalysis.CSharp;",
+       "using Microsoft.CodeAnalysis.CSharp.Syntax;",
+       "",
+       "namespace MessagePack.SourceGenerator.CodeAnalysis;",
+       "",
+       "/// <summary>",
+       "/// Builds the serialization model for a partial formatter marked with <c>[GeneratedMessagePackFormatter]</c>.",
+       "/// The formatted type may come from an assembly that carries no MessagePack attributes, so its members are read",
+       "/// in contractless mode, or through the keys declared on an optional surrogate type.",
+       "/// </summary>",
+       "internal static class GeneratedFormatterCollector",
+       "{",
+       "    private static readonly SymbolDisplayFormat BinaryWriteTypeFormat = new(",
+       "        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,",
+       "        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.ExpandNullable,",
+       "        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameOnly);",
+       "",
+       "    /// <summary>",
+       "    /// Creates the model for one generated formatter.",
+       "    /// </summary>",
+       "    /// <param name=\"compilation\">The compilation that contains the formatter.</param>",
+       "    /// <param name=\"options\">The analyzer options for the compilation.</param>",
+       "    /// <param name=\"referenceSymbols\">The MessagePack reference symbols.</param>",
+       "    /// <param name=\"reportDiagnostic\">Receives diagnostics about the formatter. May be <see langword=\"null\"/>.</param>",
+       "    /// <param name=\"formatter\">The user-declared partial formatter class.</param>",
+       "    /// <param name=\"surrogate\">The surrogate type, or <see langword=\"null\"/> for contractless mode.</param>",
+       "    /// <param name=\"cancellationToken\">A cancellation token.</param>",
+       "    /// <returns>The model, or <see langword=\"null\"/> if the formatter cannot be generated.</returns>",
+       "    internal static FullModel? Collect(",
+       "        Compilation compilation,",
+       "        AnalyzerOptions options,",
+       "        ReferenceSymbols referenceSymbols,",
+       "        Action<Diagnostic>? reportDiagnostic,",
+       "        INamedTypeSymbol formatter,",
+       "        INamedTypeSymbol? surrogate,",
+       "        CancellationToken cancellationToken)",
+       "    {",
+       "        Location location = formatter.Locations.FirstOrDefault() ?? Location.None;",
+       "        string formatterName = formatter.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);",
+       "",
+       "        if (!IsPartial(formatter, cancellationToken))",
+       "        {",
+       "            reportDiagnostic?.Invoke(Diagnostic.Create(MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustBePartial, location, formatterName));",
+       "            return null;",
+       "        }",
+       "",
+       "        INamedTypeSymbol? openFormatterInterface = compilation.GetTypeByMetadataName($\"{Constants.IMessagePackFormatterInterfaceNamespace}.{Constants.IMessagePackFormatterInterfaceName}`1\");",
+       "        ImmutableArray<INamedTypeSymbol> formatterInterfaces = formatter.AllInterfaces",
+       "            .Where(i => i.IsGenericType && SymbolEqualityComparer.Default.Equals(i.OriginalDefinition, openFormatterInterface))",
+       "            .ToImmutableArray();",
+       "        if (formatterInterfaces.Length != 1)",
+       "        {",
+       "            reportDiagnostic?.Invoke(Diagnostic.Create(MsgPack00xMessagePackAnalyzer.GeneratedFormatterMustImplementFormatter, location, formatterName));",
+       "            return null;"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/GeneratedFormatterRequest.cs",
+    "start": 1,
+    "end": 13,
+    "lines": 13,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 1,
+      "removed": [],
+      "added": [
+       "// Copyright (c) All contributors. All rights reserved.",
+       "// Licensed under the MIT license. See LICENSE file in the project root for full license information.",
+       "",
+       "using Microsoft.CodeAnalysis;",
+       "",
+       "namespace MessagePack.SourceGenerator.CodeAnalysis;",
+       "",
+       "/// <summary>",
+       "/// A partial formatter class marked with <c>[GeneratedMessagePackFormatter]</c>, and the optional surrogate type it names.",
+       "/// </summary>",
+       "/// <param name=\"Formatter\">The user-declared partial formatter class.</param>",
+       "/// <param name=\"Surrogate\">The surrogate type named by <c>SurrogateType</c>, or <see langword=\"null\"/> for contractless mode.</param>",
+       "public sealed record GeneratedFormatterRequest(INamedTypeSymbol Formatter, INamedTypeSymbol? Surrogate);"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ObjectSerializationInfo.cs",
+    "start": 13,
+    "end": 18,
+    "lines": 6,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 13,
+      "removed": [],
+      "added": [
+       "    /// <summary>",
+       "    /// Gets a value indicating whether the formatter is a user-declared <c>partial</c> class marked with",
+       "    /// <c>[GeneratedMessagePackFormatter]</c>, into which the generator writes the formatter body.",
+       "    /// </summary>",
+       "    public bool IsUserDeclaredFormatter { get; init; }",
+       ""
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ObjectSerializationInfo.cs",
+    "start": 168,
+    "end": 168,
+    "lines": 1,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 168,
+      "removed": [],
+      "added": [
+       "            && IsUserDeclaredFormatter == other.IsUserDeclaredFormatter"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/GeneratorUtilities.cs",
+    "start": 35,
+    "end": 36,
+    "lines": 2,
+    "why": [
+     "lectura completa"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 35,
+      "removed": [],
+      "added": [
+       "                // Formatters marked with [GeneratedMessagePackFormatter] are generated by the source generator",
+       "                // and are registered as ObjectSerializationInfo, so they must not also be registered as hand-written formatters."
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/GeneratorUtilities.cs",
+    "start": 38,
+    "end": 38,
+    "lines": 1,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 38,
+      "removed": [],
+      "added": [
+       "                    && !symbol.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == $\"{AttributeNamespace}.{GeneratedMessagePackFormatterAttributeName}\")"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+    "start": 29,
+    "end": 35,
+    "lines": 7,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 29,
+      "removed": [],
+      "added": [
+       "        var generatedFormatters = context.SyntaxProvider.ForAttributeWithMetadataName(",
+       "            $\"{AttributeNamespace}.{GeneratedMessagePackFormatterAttributeName}\",",
+       "            predicate: static (node, _) => node is ClassDeclarationSyntax,",
+       "            transform: static (context, _) => new GeneratedFormatterRequest(",
+       "                (INamedTypeSymbol)context.TargetSymbol,",
+       "                context.Attributes[0].NamedArguments.FirstOrDefault(kvp => kvp.Key == GeneratedMessagePackFormatterSurrogatePropertyName).Value.Value as INamedTypeSymbol));",
+       ""
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+    "start": 37,
+    "end": 37,
+    "lines": 2,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 37,
+      "removed": [
+       "            messagePackObjectTypes.Collect().Combine(unionTypes.Collect());"
+      ],
+      "added": [
+       "            messagePackObjectTypes.Collect().Combine(unionTypes.Collect()).Combine(generatedFormatters.Collect());"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+    "start": 60,
+    "end": 60,
+    "lines": 2,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 60,
+      "removed": [
+       "                foreach (var typeSymbol in s.Left.Left.Left)"
+      ],
+      "added": [
+       "                foreach (var typeSymbol in s.Left.Left.Left.Left)"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+    "start": 65,
+    "end": 65,
+    "lines": 2,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 65,
+      "removed": [
+       "                foreach (var typeSymbol in s.Left.Left.Right)"
+      ],
+      "added": [
+       "                foreach (var typeSymbol in s.Left.Left.Left.Right)"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+    "start": 70,
+    "end": 77,
+    "lines": 8,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 70,
+      "removed": [],
+      "added": [
+       "                foreach (GeneratedFormatterRequest request in s.Left.Left.Right)",
+       "                {",
+       "                    if (GeneratedFormatterCollector.Collect(s.Left.Right, options, referenceSymbols, reportDiagnostic: null, request.Formatter, request.Surrogate, ct) is FullModel generatedModel)",
+       "                    {",
+       "                        modelPerType.Add(generatedModel);",
+       "                    }",
+       "                }",
+       ""
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+    "start": 115,
+    "end": 132,
+    "lines": 18,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 115,
+      "removed": [],
+      "added": [
+       "        // Diagnostics for [GeneratedMessagePackFormatter] classes are reported separately from the models,",
+       "        // so that a rejected formatter produces a diagnostic and no partial output.",
+       "        var generatedFormatterDiagnostics = generatedFormatters",
+       "            .Combine(context.CompilationProvider)",
+       "            .Combine(options)",
+       "            .SelectMany(static (s, ct) =>",
+       "            {",
+       "                List<Diagnostic> diagnostics = new();",
+       "                if (ReferenceSymbols.TryCreate(s.Left.Right, out ReferenceSymbols? referenceSymbols))",
+       "                {",
+       "                    GeneratedFormatterCollector.Collect(s.Left.Right, s.Right, referenceSymbols, diagnostics.Add, s.Left.Left.Formatter, s.Left.Left.Surrogate, ct);",
+       "                }",
+       "",
+       "                return diagnostics.ToImmutableArray();",
+       "            });",
+       "",
+       "        context.RegisterSourceOutput(generatedFormatterDiagnostics, static (context, diagnostic) => context.ReportDiagnostic(diagnostic));",
+       ""
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/Transforms/FormatterTemplate.tt",
+    "start": 14,
+    "end": 14,
+    "lines": 2,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 14,
+      "removed": [
+       "\tinternal sealed class <#= Info.Formatter.GetQualifiedName(Qualifiers.None) #> : MsgPack::Formatters.IMessagePackFormatter<<#= Info.DataType.GetQualifiedName(genericStyle: GenericParameterStyle.Identifiers) #>>"
+      ],
+      "added": [
+       "\t<#= Info.IsUserDeclaredFormatter ? \"partial class\" : \"internal sealed class\" #> <#= Info.Formatter.GetQualifiedName(Qualifiers.None) #> : MsgPack::Formatters.IMessagePackFormatter<<#= Info.DataType.GetQualifiedName(genericStyle: GenericParameterStyle.Identifiers) #>>"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/Transforms/StringKey/StringKeyFormatterTemplate.tt",
+    "start": 18,
+    "end": 18,
+    "lines": 2,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 18,
+      "removed": [
+       "\tinternal sealed class <#= Info.Formatter.GetQualifiedName(Qualifiers.None) #> : global::MessagePack.Formatters.IMessagePackFormatter<<#= Info.DataType.GetQualifiedName() #>>"
+      ],
+      "added": [
+       "\t<#= Info.IsUserDeclaredFormatter ? \"partial class\" : \"internal sealed class\" #> <#= Info.Formatter.GetQualifiedName(Qualifiers.None) #> : global::MessagePack.Formatters.IMessagePackFormatter<<#= Info.DataType.GetQualifiedName() #>>"
+      ]
+     }
+    ]
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/Utils/Constants.cs",
+    "start": 17,
+    "end": 18,
+    "lines": 2,
+    "why": [
+     "lectura completa",
+     "zona de código que requiere revisión: las pruebas solo respaldan los comportamientos declarados"
+    ],
+    "kind": "source",
+    "code": [
+     {
+      "at": 17,
+      "removed": [],
+      "added": [
+       "    internal const string GeneratedMessagePackFormatterAttributeName = \"GeneratedMessagePackFormatterAttribute\";",
+       "    internal const string GeneratedMessagePackFormatterSurrogatePropertyName = \"SurrogateType\";"
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "notChecked": [
+  {
+   "what": "Tests de MessagePack.SourceGenerator.ExecutionTests",
+   "why": "Ese proyecto no compila en este sandbox ni siquiera sin el PR. No es atribuible al cambio."
+  },
+  {
+   "what": "Otros 6 proyectos de test del repo",
+   "why": "Solo se ejecutan los proyectos de test afectados por el cambio."
+  },
+  {
+   "what": "Defectos sembrados",
+   "why": "Desactivado en esta verificación."
+  },
+  {
+   "what": "Prompt original del autor",
+   "why": "El commit no trae el prompt guardado (ni sesión de Entire ni nota). La intención se ha reconstruido desde el requisito."
+  },
+  {
+   "what": "Rendimiento",
+   "why": "El pipeline no ejecuta benchmarks."
+  },
+  {
+   "what": "Seguridad en profundidad",
+   "why": "No hay análisis de seguridad dedicado, solo reglas sobre zonas sensibles."
+  },
+  {
+   "what": "Contract ambiguity unresolved: How property keys and MessagePack settings (such as Union) are specified for referenced-assembly types without a MessagePack dependency (e.g., DataMember, user-defined dummy attributes, or source-generated attributes).",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "A1-1-final: semantic reviewer disputes test validity",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "No contract behavior has executable support",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "E1: no executable support",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "Original relevant suite incomplete or failing",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "Final missions incomplete",
+   "why": "Evidencia pendiente del pipeline completo"
+  },
+  {
+   "what": "Semantic review missing or unresolved",
+   "why": "Evidencia pendiente del pipeline completo"
+  }
+ ],
+ "audit": true,
+ "areas": [
+  {
+   "area": "src/MessagePack.Annotations",
+   "state": "prueba",
+   "signoffs": 0,
+   "escapes": 0,
+   "sinceEscape": 0,
+   "remaining": 5,
+   "lastEscape": null
+  },
+  {
+   "area": "src/MessagePack.SourceGenerator",
+   "state": "prueba",
+   "signoffs": 0,
+   "escapes": 0,
+   "sinceEscape": 0,
+   "remaining": 5,
+   "lastEscape": null
+  },
+  {
+   "area": "src/MessagePack.SourceGenerator/Analyzers",
+   "state": "prueba",
+   "signoffs": 0,
+   "escapes": 0,
+   "sinceEscape": 0,
+   "remaining": 5,
+   "lastEscape": null
+  },
+  {
+   "area": "src/MessagePack.SourceGenerator/CodeAnalysis",
+   "state": "prueba",
+   "signoffs": 0,
+   "escapes": 0,
+   "sinceEscape": 0,
+   "remaining": 5,
+   "lastEscape": null
+  },
+  {
+   "area": "src/MessagePack.SourceGenerator/Transforms",
+   "state": "prueba",
+   "signoffs": 0,
+   "escapes": 0,
+   "sinceEscape": 0,
+   "remaining": 5,
+   "lastEscape": null
+  },
+  {
+   "area": "src/MessagePack.SourceGenerator/Utils",
+   "state": "prueba",
+   "signoffs": 0,
+   "escapes": 0,
+   "sinceEscape": 0,
+   "remaining": 5,
+   "lastEscape": null
+  }
+ ],
+ "l1": {
+  "groups": []
+ },
+ "l2": {
+  "suite": {
+   "ok": true,
+   "ran": 173,
+   "passed": 173,
+   "failed": 0,
+   "skipped": 0,
+   "ms": 5276
+  },
+  "newTests": [
+   {
+    "name": "ContractlessClassRoundTrips",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "ContractlessClassUsesStringKeysForPublicReadWriteMembers",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "ContractlessClassNullRoundTrips",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "ContractlessStructRoundTrips",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "SurrogateControlsKeysAndMembership",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "MessagePackObjectCanContainExternalTypes",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "GeneratedFormattersAreRegisteredInGeneratedResolver",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "Serialize",
+    "green": "NoEjecutado",
+    "red": "NoEjecutado"
+   },
+   {
+    "name": "FormatterMustBePartial",
+    "green": "Passed",
+    "red": "Failed"
+   },
+   {
+    "name": "FormatterMustImplementFormatterOfT",
+    "green": "Passed",
+    "red": "Failed"
+   },
+   {
+    "name": "FormattedTypeMustNotBeAbstract",
+    "green": "Passed",
+    "red": "Failed"
+   },
+   {
+    "name": "SurrogateMemberMustMatchFormattedType",
+    "green": "Passed",
+    "red": "Failed"
+   },
+   {
+    "name": "SurrogateMemberMustHaveMatchingType",
+    "green": "Passed",
+    "red": "Failed"
+   },
+   {
+    "name": "SurrogateKeysMustNotMixStringAndInt",
+    "green": "Passed",
+    "red": "Failed"
+   }
+  ],
+  "newFailures": [],
+  "preexisting": [],
+  "redBuilt": true,
+  "teeth": 6,
+  "detail": "173 de 173 tests pasan con el PR · 6 de 14 tests nuevos fallan sin el cambio y pasan con él"
+ },
+ "mutation": {
+  "skipped": true,
+  "reason": "Desactivado en esta verificación.",
+  "mutants": []
+ },
+ "rewind": {
+  "skipped": true,
+  "reason": "Desactivado en esta verificación.",
+  "steps": []
+ },
+ "budget": {
+  "profile": "standard",
+  "tokenLimit": 100000,
+  "limitMs": 300000,
+  "generationEnd": 1794655696065,
+  "finalEnd": 1794655751065,
+  "deadline": 1794655796065,
+  "concurrency": {
+   "models": 2,
+   "runners": 1
+  },
+  "maxCandidates": 2,
+  "maxGenerations": 1,
+  "formula": "two independent candidates; additional work only for unresolved risks within profile",
+  "priorityFormula": "R*(1+U+D)/(C*(1+N))",
+  "heuristics": true,
+  "initialCandidates": 2,
+  "elapsedMs": 56363,
+  "exhausted": false,
+  "remainingMs": 243637,
+  "tokens": 32460,
+  "cumulativeTokens": 32460,
+  "accounting": {
+   "limit": 100000,
+   "observed": 32460,
+   "reserved": 0,
+   "unknownReserved": 0,
+   "remaining": 67540,
+   "reportReserve": 12000,
+   "attempts": 8,
+   "usageIncomplete": false,
+   "exceeded": false,
+   "enforcement": "estimated admission reservations; per-request output cap; observed provider usage reconciled after every attempt"
+  },
+  "usageIncomplete": true
+ },
+ "l3": null,
+ "timing": {
+  "totalMs": 56366,
+  "stages": [
+   {
+    "id": "entrada",
+    "name": "Leer el PR, el requisito y la procedencia",
+    "ms": 121,
+    "status": "done"
+   },
+   {
+    "id": "l1",
+    "name": "Nivel 1 · Ficheros derivados y cambios mecánicos",
+    "ms": 1,
+    "status": "done"
+   },
+   {
+    "id": "merge",
+    "name": "Mezclar sobre 32258fdbee4bcd653c79f51b4376b5103c6f4d27 en una copia aislada",
+    "ms": 345,
+    "status": "done"
+   },
+   {
+    "id": "build",
+    "name": "Compilar (dotnet · MessagePack.SourceGenerator.Tests, MessagePack.SourceGenerator.ExecutionTests, MessagePack.SourceGenerator.ExternalTypes)",
+    "ms": 20345,
+    "status": "done"
+   },
+   {
+    "id": "l2",
+    "name": "Nivel 2 · Tests: rojo antes, verde después",
+    "ms": 12422,
+    "status": "done"
+   },
+   {
+    "id": "mutacion",
+    "name": "Defectos sembrados en las líneas cambiadas",
+    "ms": 0,
+    "status": "skip"
+   },
+   {
+    "id": "rebobinar",
+    "name": "Rebobinar: quitar cada cambio y ver si algún test lo nota",
+    "ms": 0,
+    "status": "skip"
+   },
+   {
+    "id": "l3",
+    "name": "Nivel 3 · Réplicas",
+    "ms": 0,
+    "status": "skip"
+   }
+  ]
+ },
+ "cost": {
+  "usd": 0
+ },
+ "contract": {
+  "version": 2,
+  "expectations": [
+   {
+    "id": "E1",
+    "behavior": "Applying [GeneratedMessagePackFormatter] to a partial class implementing IMessagePackFormatter<T> generates the formatter implementation for T, including types in referenced assemblies.",
+    "critical": true,
+    "status": "documented",
+    "sources": [
+     {
+      "id": "requirement",
+      "quote": "Add a `[GeneratedMessagePackFormatter]` attribute that will work for partial classes implementing `IMessagePackFormatter<T>`."
+     }
+    ],
+    "existingTests": [],
+    "testIdeas": [
+     "Apply [GeneratedMessagePackFormatter] to a partial class implementing IMessagePackFormatter<ExternalType> for a type in a referenced assembly and verify serialization/deserialization."
+    ],
+    "symbols": [
+     "GeneratedMessagePackFormatterAttribute",
+     "IMessagePackFormatter<T>"
+    ]
+   },
+   {
+    "id": "E2",
+    "behavior": "Existing [GeneratedMessagePackResolver] source generation on partial classes continues to work as before.",
+    "critical": false,
+    "status": "inferred",
+    "sources": [
+     {
+      "id": "base-1",
+      "quote": "This type's name and namespace can be customized by applying `[GeneratedMessagePackResolver]` to a `partial class` that you define"
+     }
+    ],
+    "existingTests": [],
+    "testIdeas": [
+     "Verify [GeneratedMessagePackResolver] on a partial class continues to generate the resolver."
+    ],
+    "symbols": [
+     "GeneratedMessagePackResolverAttribute"
+    ]
+   }
+  ],
+  "sources": [
+   {
+    "id": "requirement",
+    "kind": "requirement",
+    "uri": "https://github.com/MessagePack-CSharp/MessagePack-CSharp/issues/2129",
+    "text": "Feature Request: Allow generation of Formatter for a type in a referenced assembly\n## Is your feature request related to a problem? Please describe.\n\nGiven the following project structure:\n\n - Project A\n    - `ProjectA.MyType`\n\n - Project B\n    - References\n        - Project A\n    - Package References\n        - MessagePack\n    \nI need to have a source-generated `IMessagePackFormatter` for type `ProjectA.MyType` generated **inside Project B** instead of Project A, because the latter has no (and cannot have) reference to MessagePack nuget package.\n\n## Describe the solution you'd like\n\nAdd a `[GeneratedMessagePackFormatter]` attribute that will work for partial classes implementing `IMessagePackFormatter<T>`.\n\nFor example:\n\n```csharp\n[GeneratedMessagePackFormatter]\npartial class MyObjectFormatter: IMessagePackFormatter<MyObject>;\n```\n\nThat's it. The class does not even need to declare a body (no `{` and `}`), because the actual implementation is source-generated by `MessagePack.SourceGenerator.MessagePackGenerator` as usual.\n\nAs for the attribute-based property keys and other settings (such as Union), I can think of 3 alternatives:\n\n1 - Use `System.Runtime.Serialization.DataMember` and related attributes. This is too limited IMO, as it cannot have `Union` and other features.\n\n2 - Allow the generator and analyzers to work with user-defined versions of the MessagePack attributes. This would be similar to how you can declare dummy versions of BCL attributes that the C# compiler expects, such as [`[IsExternalInit]`](https://stackoverflow.com/a/67687186/643085) or `[ModuleInitializer]`. With this, I could simply copy and paste the attribute definitions for MessagePack attributes such as `[Key]` into my Project A, and have the source-generated formatter (as described above) pick them.\n\n3 - Source-generate the attributes themselves using [`IncrementalGeneratorInitializationContext.RegisterPostInitializationOutput`](https://github.com/dotnet/roslyn/blob/main/docs/features/incremental-generators.md#outputting-values) instead of them existing in the `MessagePack.Annotations` assembly. This would allow using the attributes without adding an additional runtime dependency. Only compile-time reference to the analyzer Nuget would be required.\n\n## Motivation\n\nProject A is really a library (Nuget package), and I really want to keep it minimal. It currently has zero dependencies and I would really like to keep it that way.\n\n\n"
+   },
+   {
+    "id": "base-1",
+    "kind": "documentation",
+    "uri": "32258fdbee4bcd653c79f51b4376b5103c6f4d27:README.md",
+    "text": "\nTherefore, in the usual scenario, it will work with AOT Safe without any special handling.\nIf you prefer to restrict your resolver to source-generated formatters, you should use the `MessagePack.GeneratedMessagePackResolver`, which is source generated into your project for that purpose.\nThis type's name and namespace can be customized by applying `[GeneratedMessagePackResolver]` to a `partial class` that you define, at which point that class becomes the resolver for you to use.\n\nAt runtime, if a source generated or hand-written formatter cannot be found for a given `[MessagePackObject]` type, MessagePack will generate the formatters on the fly using [Reflection.Emit](https://learn.microsoft.com/dotnet/api/system.reflection.emit.ilgenerator) to create highly-tuned formatters for each type.\nThis code generation has a minor upfront performance cost.\n\n> Note: When using Unity, dynamic code generation only works when targeting .NET Framework 4.x + mono runtime.\nFor all other Unity targets, AOT is required.\n\n### Customizations\n\nYou can customize the generated source through properties on the `GeneratedMessagePackResolverAttribute`.\n\n```cs\n[GeneratedMessagePackResolver]\npartial class MyResolver\n{\n}\n```\n\nWhen exposing the generated resolver publicly, consumers outside the library should aggregate the resolver using its `Instance` property, which contains *only* the generated formatters.\n\nTwo assembly-level attributes exist to help with mixing in your own custom formatters with the automatically generated ones:\n- `MessagePackKnownFormatterAttribute`\n- `MessagePackAssumedFormattableAttribute`\n\nLearn more about using a mix of your own custom formatters and automatically generated ones in [the Analyzer section](#analyzer).\n\n### MagicOnion\n\n[MagicOnion](https://github.com/Cysharp/MagicOnion) is a code-first gRPC framework based on grpc-dotnet and MessagePack. gRPC usually communicates with Protocol Buffers using IDL. But MagicOnion uses MessagePack for C# and does not need IDL. When communicating C# to C#, schemaless (or rather C# classes as schema) is better than using IDL.\n\n### StreamJsonRpc\n\nThe StreamJsonRpc library is based on [JSON-RPC](https://www.jsonrpc.org/) and includes [a pluggable formatter architecture](https://github.com/microsoft/vs-streamjsonrpc/blob/master/doc/extensibility.md#alternative-formatters) and as of v2.3 includes [MessagePack support](https://github.com/microsoft/vs-streamjsonrpc/blob/master/doc/extensibility.md#message-formatterss).\n\n## How to build\nSee our [contributor's guide](CONTRIBUTING.md).\n\n## <a name=\"coc\"></a>Code of Conduct\n\nThis project has adopted the code of conduct defined by the Contributor Covenant to clarify expected behavior in our community.\nFor more information see the [.NET Foundation Code of Conduct](https://dotnetfoundation.org/code-of-conduct).\n\n## .NET Foundation\n\nThis project is supported by the [.NET Foundation](https://dotnetfoundation.org)."
+   }
+  ],
+  "ambiguities": [
+   "How property keys and MessagePack settings (such as Union) are specified for referenced-assembly types without a MessagePack dependency (e.g., DataMember, user-defined dummy attributes, or source-generated attributes)."
+  ],
+  "hash": "4c95997b28eb3babe823c0c63622d250edf84e3d0f84748dcf314ba6f24a8950",
+  "sessions": [
+   "contract-1794655498622-81do"
+  ],
+  "sessionRecords": [
+   {
+    "id": "contract-1794655498622-81do",
+    "role": "contract",
+    "model": "google/gemini-4-hydrogen",
+    "sessionId": "ses_e26324c03ffevNjyLWxfPYELZk",
+    "history": [
+     {
+      "code": 0,
+      "ms": 10232,
+      "sessionId": "ses_e26324c03ffevNjyLWxfPYELZk",
+      "usage": [
+       {
+        "total": 3386,
+        "input": 1918,
+        "output": 433,
+        "reasoning": 1035,
+        "cache": {
+         "write": 0,
+         "read": 0
+        }
+       }
+      ],
+      "usageIncomplete": false,
+      "inputEstimate": 6409,
+      "outputLimit": 2500
+     }
+    ],
+    "ms": 10233,
+    "promptHash": "e242b51e7a2579ed3d93bc0309285060d61cac977b48b963457e3d8845bd4f8a",
+    "limits": {
+     "noTools": true,
+     "maxOutputTokens": 2500,
+     "maxInputTokens": 16000
+    },
+    "artifact": "contract-1794655498622-81do.json"
+   }
+  ],
+  "semanticReview": "Sources checked literally; Carbon reviews contract and evidence at final judgment"
+ },
+ "candidates": [
+  {
+   "id": "C1",
+   "version": 1,
+   "generation": 1,
+   "parents": [],
+   "model": "google/gemini-4-hydrogen",
+   "requestedModel": "google/gemini-4-hydrogen",
+   "modelFallback": false,
+   "group": "G1",
+   "strategy": "Minimal targeted repair preserving every unrelated diagnostic",
+   "status": "built",
+   "reason": "Independent reconstruction from the historical base",
+   "isolation": {
+    "base": "32258fdbee4bcd653c79f51b4376b5103c6f4d27",
+    "history": "fresh single commit, no remotes",
+    "proposedPatchVisible": false,
+    "changedLocationsVisible": true,
+    "excerptSelection": "prior source at changed locations and expressions cited in the requirement",
+    "osSandbox": false
+   },
+   "application": "Model proposed literal edits; local orchestrator applied and verified unique matches",
+   "session": {
+    "id": "ses_e26321dc2ffe4hKkkW2NVlP1fW",
+    "artifact": "build-C1-1794655510464-s65e.json"
+   },
+   "summary": "Add GeneratedMessagePackFormatterAttribute and register source generation for partial classes implementing IMessagePackFormatter<T>.",
+   "decisions": [
+    "Define GeneratedMessagePackFormatterAttribute in MessagePack.Annotations/Attributes.cs.",
+    "Add GeneratedMessagePackFormatterAttributeName constant in Utils/Constants.cs.",
+    "Register ForAttributeWithMetadataName and RegisterSourceOutput for GeneratedMessagePackFormatterAttribute in MessagePackGenerator.cs."
+   ],
+   "unresolved": [],
+   "patchHash": "8095c59721cf40b25f9dc1ba8e107390d67d613e9a6fd7b461cd4efc644836a9",
+   "patch": "C1.patch",
+   "tree": "8738fc45f9c89fa6a093f6796d63888c5b7b73eb",
+   "lines": 39,
+   "capture": {
+    "status": "unavailable",
+    "reason": "Entire preflight failed"
+   },
+   "commit": "dd9cbe094ea1c233c7285f9d8dab2a786ab8d32a",
+   "checkpoint": {
+    "status": "unavailable"
+   },
+   "ms": 17158
+  },
+  {
+   "id": "C2",
+   "version": 1,
+   "generation": 1,
+   "parents": [],
+   "model": "google/gemini-4-hydrogen",
+   "requestedModel": "verda-nemotron/nemotron",
+   "modelFallback": true,
+   "group": "G1",
+   "strategy": "Guard syntax-dependent diagnostics explicitly before reporting; retain diagnostics for source-defined symbols",
+   "status": "built",
+   "reason": "Independent reconstruction from the historical base",
+   "isolation": {
+    "base": "32258fdbee4bcd653c79f51b4376b5103c6f4d27",
+    "history": "fresh single commit, no remotes",
+    "proposedPatchVisible": false,
+    "changedLocationsVisible": true,
+    "excerptSelection": "prior source at changed locations and expressions cited in the requirement",
+    "osSandbox": false
+   },
+   "application": "Model proposed literal edits; local orchestrator applied and verified unique matches",
+   "session": {
+    "id": "ses_e26321db7ffeSRaWGNoHf3PFJu",
+    "artifact": "build-C2-1794655510477-t68x.json"
+   },
+   "summary": "Add GeneratedMessagePackFormatterAttribute, its constant name, and syntax provider collection in MessagePackGenerator.",
+   "decisions": [
+    "Added GeneratedMessagePackFormatterAttribute to Attributes.cs (B1).",
+    "Added GeneratedMessagePackFormatterAttributeName constant to Constants.cs (B15).",
+    "Added ForAttributeWithMetadataName provider for GeneratedMessagePackFormatterAttribute in MessagePackGenerator.cs (B12) without altering existing resolver pipeline."
+   ],
+   "unresolved": [
+    "Full formatter code generation for referenced-assembly types requires GeneratedFormatterRequest, GeneratedFormatterCollector, and source output wiring beyond the 4-block limit."
+   ],
+   "patchHash": "3cd313ef83fad4fe7a505e1069618f2ee2115b1903dd59e917c31b15ca51ab21",
+   "patch": "C2.patch",
+   "tree": "c57ec69469f04b19f675bb66fb5bb66ce0425765",
+   "lines": 12,
+   "capture": {
+    "status": "unavailable",
+    "reason": "Entire preflight failed"
+   },
+   "commit": "3c0fba0a5feb78ba217680fc2b45c615b34ae1ca",
+   "checkpoint": {
+    "status": "unavailable"
+   },
+   "ms": 18064,
+   "final": true
+  }
+ ],
+ "attacks": [
+  {
+   "id": "A1-1-final",
+   "mission": "New variants of the original bug, not covered by previous attacks",
+   "riskKey": "New variants of the original bug, not covered by previous attacks",
+   "origin": "debate-informed",
+   "originCandidate": "C1, C2",
+   "final": true,
+   "attacker": "google/gemini-4-hydrogen",
+   "requestedAttacker": "verda-nemotron/nemotron",
+   "modelFallback": true,
+   "defender": "google/gemini-4-hydrogen",
+   "labels": {
+    "A": "C2",
+    "B": "original"
+   },
+   "status": "invalid",
+   "error": "attack-A1-1-final: context-limit: 35872 estimated input tokens exceeds 16000",
+   "hash": "80e4eb4a4ed5ffb50e9e8f29098003017706cf137cd47622067d6e554d7df6df"
+  }
+ ],
+ "evidence": [
+  {
+   "id": "88c3904fdb2d845b98ac6a25d614372c8ec03412ec52c17cec7c2886356a2bc5",
+   "cacheKey": "88c3904fdb2d845b98ac6a25d614372c8ec03412ec52c17cec7c2886356a2bc5",
+   "attempt": "initial",
+   "version": "original",
+   "commit": "083afd994c1c9a994cb2cd5aa0b6ad805a621457",
+   "workingDirectory": "/var/folders/tq/61030l6j09d46xywllr2rxrw0000gn/T/katse/ju26-issue-2129-mwgbjn9a/baseline/merged",
+   "codeHash": "f2e8ab6c33c1422ecc806e43f98254c1bb954d32",
+   "testHash": "7fe0c5652b36578caf12a3885597df15269303dab3a13ebe4f37cc9afd57bf63",
+   "contractHash": "4c95997b28eb3babe823c0c63622d250edf84e3d0f84748dcf314ba6f24a8950",
+   "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v24.22.1",
+    "sdk": "8.0.402",
+    "projects": [
+     "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+     "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+     "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj"
+    ],
+    "scope": "C# relevant tests, default build configuration",
+    "runnerHash": "cade68929f2978116e6cd8e67584c6b37a86ecc047d1496cbfcec839e44dc29a",
+    "dependencies": "083afd994c1c9a994cb2cd5aa0b6ad805a621457"
+   },
+   "commands": {
+    "build": [
+     [
+      "dotnet",
+      "build",
+      "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+      "-v",
+      "q",
+      "-nologo",
+      "-clp:NoSummary"
+     ],
+     [
+      "dotnet",
+      "build",
+      "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+      "-v",
+      "q",
+      "-nologo",
+      "-clp:NoSummary"
+     ],
+     [
+      "dotnet",
+      "build",
+      "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj",
+      "-v",
+      "q",
+      "-nologo",
+      "-clp:NoSummary"
+     ]
+    ],
+    "test": [
+     [
+      "dotnet",
+      "test",
+      "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+      "--no-build",
+      "-v",
+      "q",
+      "-nologo",
+      "--results-directory",
+      ".replica-trx",
+      "--logger",
+      "trx;LogFileName=MessagePack.SourceGenerator.Tests.trx"
+     ],
+     [
+      "dotnet",
+      "test",
+      "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+      "--no-build",
+      "-v",
+      "q",
+      "-nologo",
+      "--results-directory",
+      ".replica-trx",
+      "--logger",
+      "trx;LogFileName=MessagePack.SourceGenerator.ExecutionTests.trx"
+     ],
+     [
+      "dotnet",
+      "test",
+      "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj",
+      "--no-build",
+      "-v",
+      "q",
+      "-nologo",
+      "--results-directory",
+      ".replica-trx",
+      "--logger",
+      "trx;LogFileName=MessagePack.SourceGenerator.ExternalTypes.trx"
+     ]
+    ],
+    "full": true
+   },
+   "started": "2026-11-14T11:25:33.704Z",
+   "artifact": "evidence-88c3904fdb2d845b98ac6a25d614372c8ec03412ec52c17cec7c2886356a2bc5.json",
+   "attacks": [],
+   "scope": "relevant-suite",
+   "status": "harness-incompatible",
+   "error": "harness-incompatible: invalid suite overlay",
+   "ms": 1
+  },
+  {
+   "id": "d375ee3c1930b47cb3ae57604a05cd5d591260d965207ed07c5944c917231e0a",
+   "cacheKey": "d375ee3c1930b47cb3ae57604a05cd5d591260d965207ed07c5944c917231e0a",
+   "attempt": "initial",
+   "version": "C1",
+   "commit": "dd9cbe094ea1c233c7285f9d8dab2a786ab8d32a",
+   "workingDirectory": "/var/folders/tq/61030l6j09d46xywllr2rxrw0000gn/T/katse/ju26-issue-2129-mwgbjn9a/C1",
+   "codeHash": "8738fc45f9c89fa6a093f6796d63888c5b7b73eb",
+   "testHash": "7fe0c5652b36578caf12a3885597df15269303dab3a13ebe4f37cc9afd57bf63",
+   "contractHash": "4c95997b28eb3babe823c0c63622d250edf84e3d0f84748dcf314ba6f24a8950",
+   "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v24.22.1",
+    "sdk": "8.0.402",
+    "projects": [
+     "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+     "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+     "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj"
+    ],
+    "scope": "C# relevant tests, default build configuration",
+    "runnerHash": "cade68929f2978116e6cd8e67584c6b37a86ecc047d1496cbfcec839e44dc29a",
+    "dependencies": "083afd994c1c9a994cb2cd5aa0b6ad805a621457"
+   },
+   "commands": {
+    "build": [
+     [
+      "dotnet",
+      "build",
+      "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+      "-v",
+      "q",
+      "-nologo",
+      "-clp:NoSummary"
+     ],
+     [
+      "dotnet",
+      "build",
+      "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+      "-v",
+      "q",
+      "-nologo",
+      "-clp:NoSummary"
+     ],
+     [
+      "dotnet",
+      "build",
+      "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj",
+      "-v",
+      "q",
+      "-nologo",
+      "-clp:NoSummary"
+     ]
+    ],
+    "test": [
+     [
+      "dotnet",
+      "test",
+      "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+      "--no-build",
+      "-v",
+      "q",
+      "-nologo",
+      "--results-directory",
+      ".replica-trx",
+      "--logger",
+      "trx;LogFileName=MessagePack.SourceGenerator.Tests.trx"
+     ],
+     [
+      "dotnet",
+      "test",
+      "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+      "--no-build",
+      "-v",
+      "q",
+      "-nologo",
+      "--results-directory",
+      ".replica-trx",
+      "--logger",
+      "trx;LogFileName=MessagePack.SourceGenerator.ExecutionTests.trx"
+     ],
+     [
+      "dotnet",
+      "test",
+      "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj",
+      "--no-build",
+      "-v",
+      "q",
+      "-nologo",
+      "--results-directory",
+      ".replica-trx",
+      "--logger",
+      "trx;LogFileName=MessagePack.SourceGenerator.ExternalTypes.trx"
+     ]
+    ],
+    "full": true
+   },
+   "started": "2026-11-14T11:25:33.756Z",
+   "artifact": "evidence-d375ee3c1930b47cb3ae57604a05cd5d591260d965207ed07c5944c917231e0a.json",
+   "attacks": [],
+   "scope": "relevant-suite",
+   "status": "harness-incompatible",
+   "error": "harness-incompatible: invalid suite overlay",
+   "ms": 1
+  },
+  {
+   "id": "98ee8d39c01871e832b3fdd9bc433ce4f573d845c5172aad26df4418b7dc2962",
+   "cacheKey": "98ee8d39c01871e832b3fdd9bc433ce4f573d845c5172aad26df4418b7dc2962",
+   "attempt": "initial",
+   "version": "C2",
+   "commit": "3c0fba0a5feb78ba217680fc2b45c615b34ae1ca",
+   "workingDirectory": "/var/folders/tq/61030l6j09d46xywllr2rxrw0000gn/T/katse/ju26-issue-2129-mwgbjn9a/C2",
+   "codeHash": "c57ec69469f04b19f675bb66fb5bb66ce0425765",
+   "testHash": "7fe0c5652b36578caf12a3885597df15269303dab3a13ebe4f37cc9afd57bf63",
+   "contractHash": "4c95997b28eb3babe823c0c63622d250edf84e3d0f84748dcf314ba6f24a8950",
+   "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v24.22.1",
+    "sdk": "8.0.402",
+    "projects": [
+     "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+     "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+     "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj"
+    ],
+    "scope": "C# relevant tests, default build configuration",
+    "runnerHash": "cade68929f2978116e6cd8e67584c6b37a86ecc047d1496cbfcec839e44dc29a",
+    "dependencies": "083afd994c1c9a994cb2cd5aa0b6ad805a621457"
+   },
+   "commands": {
+    "build": [
+     [
+      "dotnet",
+      "build",
+      "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+      "-v",
+      "q",
+      "-nologo",
+      "-clp:NoSummary"
+     ],
+     [
+      "dotnet",
+      "build",
+      "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+      "-v",
+      "q",
+      "-nologo",
+      "-clp:NoSummary"
+     ],
+     [
+      "dotnet",
+      "build",
+      "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj",
+      "-v",
+      "q",
+      "-nologo",
+      "-clp:NoSummary"
+     ]
+    ],
+    "test": [
+     [
+      "dotnet",
+      "test",
+      "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+      "--no-build",
+      "-v",
+      "q",
+      "-nologo",
+      "--results-directory",
+      ".replica-trx",
+      "--logger",
+      "trx;LogFileName=MessagePack.SourceGenerator.Tests.trx"
+     ],
+     [
+      "dotnet",
+      "test",
+      "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+      "--no-build",
+      "-v",
+      "q",
+      "-nologo",
+      "--results-directory",
+      ".replica-trx",
+      "--logger",
+      "trx;LogFileName=MessagePack.SourceGenerator.ExecutionTests.trx"
+     ],
+     [
+      "dotnet",
+      "test",
+      "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj",
+      "--no-build",
+      "-v",
+      "q",
+      "-nologo",
+      "--results-directory",
+      ".replica-trx",
+      "--logger",
+      "trx;LogFileName=MessagePack.SourceGenerator.ExternalTypes.trx"
+     ]
+    ],
+    "full": true
+   },
+   "started": "2026-11-14T11:25:33.807Z",
+   "artifact": "evidence-98ee8d39c01871e832b3fdd9bc433ce4f573d845c5172aad26df4418b7dc2962.json",
+   "attacks": [],
+   "scope": "relevant-suite",
+   "status": "harness-incompatible",
+   "error": "harness-incompatible: invalid suite overlay",
+   "ms": 2
+  }
+ ],
+ "verdict": {
+  "status": "insufficient-evidence",
+  "label": "Evidencia insuficiente",
+  "confirmed": [],
+  "verified": [],
+  "pending": [
+   "Contract ambiguity unresolved: How property keys and MessagePack settings (such as Union) are specified for referenced-assembly types without a MessagePack dependency (e.g., DataMember, user-defined dummy attributes, or source-generated attributes).",
+   "A1-1-final: semantic reviewer disputes test validity",
+   "No contract behavior has executable support",
+   "E1: no executable support",
+   "Original relevant suite incomplete or failing",
+   "Final missions incomplete",
+   "Semantic review missing or unresolved"
+  ],
+  "findings": [
+   {
+    "attack": "A1-1-final",
+    "agent": "google/gemini-4-hydrogen",
+    "originCandidate": "C1, C2",
+    "expectations": [],
+    "sources": [],
+    "classification": "invalid-test",
+    "outcomes": [],
+    "evidence": [],
+    "reason": "Falló por límite de contexto: 35872 tokens de entrada estimados superan el límite de 16000."
+   }
+  ],
+  "support": [],
+  "score": {
+   "version": 1,
+   "value": 0,
+   "max": 10,
+   "label": "Confianza de revisión",
+   "heuristic": true,
+   "scope": "C# relevant tests, default build configuration",
+   "components": [
+    {
+     "id": "contract",
+     "label": "Cumplimiento del requisito",
+     "max": 4,
+     "earned": 0,
+     "expectations": [],
+     "evidence": [],
+     "reason": "0/2 expectativas respaldadas; ponderadas por criticidad."
+    },
+    {
+     "id": "regressions",
+     "label": "Preservación de comportamientos",
+     "max": 3,
+     "earned": 0,
+     "expectations": [],
+     "evidence": [],
+     "reason": "Suite pertinente del original pendiente o con fallos."
+    },
+    {
+     "id": "attacks",
+     "label": "Ataques válidos superados",
+     "max": 2,
+     "earned": 0,
+     "expectations": [],
+     "evidence": [],
+     "reason": "0 grupos de riesgo comprobados; objetivo 3. Repeticiones del mismo grupo no suman."
+    },
+    {
+     "id": "reproducibility",
+     "label": "Reproducibilidad",
+     "max": 1,
+     "earned": 0,
+     "expectations": [],
+     "evidence": [],
+     "reason": "Falta repetición independiente con la misma identidad de ejecución."
+    }
+   ],
+   "caps": [
+    {
+     "max": 5,
+     "reason": "Expectativas críticas sin evidencia suficiente."
+    },
+    {
+     "max": 7,
+     "reason": "Revisión incompleta, ambigua o inestable."
+    }
+   ],
+   "explanation": "Rúbrica de evidencia, no probabilidad de ausencia de errores. Más presupuesto puede revelar fallos y reducir la nota."
+  },
+  "auditWarnings": [
+   "Final candidate did not complete a passing relevant suite; this alone does not invalidate the original.",
+   "No candidate Entire checkpoint recovered.",
+   "Provider availability: Verda/Nemotron: missing VERDA_INFERENCE_KEY; any model substitution is recorded and reduces model-family diversity.",
+   "Provider availability: Entire: version check failed (exit -2); any model substitution is recorded and reduces model-family diversity."
+  ],
+  "residualRisks": [
+   "Tests cover declared behaviors, not all inputs.",
+   "Local Windows isolation is a working-copy boundary, not an OS security sandbox."
+  ],
+  "semantic": {
+   "explanation": "La auditoría muestra que no hay resultados de pruebas ejecutables porque todos los artefactos de evidencia tienen estado `harness-incompatible`: `evidence-88c3904f...` (original), `evidence-d375ee3c...` (C1) y `evidence-98ee8d39...` (C2). En consecuencia, no es posible distinguir fallos exclusivos de la versión original ni de los candidatos (C1, C2) para las expectativas E1 y E2. Además, el ataque `A1-1-final` resultó inválido antes de ejecutarse debido a un exceso en el límite de tokens de contexto (35872 sobre 16000). Persiste una ambigüedad material en los requisitos sobre cómo especificar claves de propiedades y configuraciones (como Union) para tipos en ensamblados referenciados que no dependen de MessagePack. Sin evidencia funcional válida, la corrección de C1 y C2 permanece indeterminada.",
+   "ambiguities": [
+    "Cómo se especifican las claves de propiedades y configuraciones de MessagePack (como Union) para tipos en ensamblados referenciados que no tienen dependencia con el paquete MessagePack (por ejemplo, mediante DataMember, atributos simulados o convención sin atributos)."
+   ],
+   "contradictions": [],
+   "artifactRefs": [
+    "88c3904fdb2d845b98ac6a25d614372c8ec03412ec52c17cec7c2886356a2bc5",
+    "d375ee3c1930b47cb3ae57604a05cd5d591260d965207ed07c5944c917231e0a",
+    "98ee8d39c01871e832b3fdd9bc433ce4f573d845c5172aad26df4418b7dc2962",
+    "80e4eb4a4ed5ffb50e9e8f29098003017706cf137cd47622067d6e554d7df6df"
+   ],
+   "invalidAttacks": [
+    {
+     "id": "A1-1-final",
+     "reason": "Falló por límite de contexto: 35872 tokens de entrada estimados superan el límite de 16000."
+    }
+   ]
+  }
+ },
+ "input": {
+  "proposed": "083afd994c1c9a994cb2cd5aa0b6ad805a621457",
+  "proposedRef": "refs/remotes/origin/ju26-issue-2129",
+  "target": "32258fdbee4bcd653c79f51b4376b5103c6f4d27",
+  "targetRef": "dependabot/nuget/develop/PolySharp-1.15.0",
+  "historicalBase": "32258fdbee4bcd653c79f51b4376b5103c6f4d27",
+  "requirement": {
+   "id": "MessagePack-CSharp/MessagePack-CSharp#2129",
+   "number": 2129,
+   "repo": "MessagePack-CSharp/MessagePack-CSharp",
+   "url": "https://github.com/MessagePack-CSharp/MessagePack-CSharp/issues/2129",
+   "title": "Feature Request: Allow generation of Formatter for a type in a referenced assembly",
+   "body": "## Is your feature request related to a problem? Please describe.\n\nGiven the following project structure:\n\n - Project A\n    - `ProjectA.MyType`\n\n - Project B\n    - References\n        - Project A\n    - Package References\n        - MessagePack\n    \nI need to have a source-generated `IMessagePackFormatter` for type `ProjectA.MyType` generated **inside Project B** instead of Project A, because the latter has no (and cannot have) reference to MessagePack nuget package.\n\n## Describe the solution you'd like\n\nAdd a `[GeneratedMessagePackFormatter]` attribute that will work for partial classes implementing `IMessagePackFormatter<T>`.\n\nFor example:\n\n```csharp\n[GeneratedMessagePackFormatter]\npartial class MyObjectFormatter: IMessagePackFormatter<MyObject>;\n```\n\nThat's it. The class does not even need to declare a body (no `{` and `}`), because the actual implementation is source-generated by `MessagePack.SourceGenerator.MessagePackGenerator` as usual.\n\nAs for the attribute-based property keys and other settings (such as Union), I can think of 3 alternatives:\n\n1 - Use `System.Runtime.Serialization.DataMember` and related attributes. This is too limited IMO, as it cannot have `Union` and other features.\n\n2 - Allow the generator and analyzers to work with user-defined versions of the MessagePack attributes. This would be similar to how you can declare dummy versions of BCL attributes that the C# compiler expects, such as [`[IsExternalInit]`](https://stackoverflow.com/a/67687186/643085) or `[ModuleInitializer]`. With this, I could simply copy and paste the attribute definitions for MessagePack attributes such as `[Key]` into my Project A, and have the source-generated formatter (as described above) pick them.\n\n3 - Source-generate the attributes themselves using [`IncrementalGeneratorInitializationContext.RegisterPostInitializationOutput`](https://github.com/dotnet/roslyn/blob/main/docs/features/incremental-generators.md#outputting-values) instead of them existing in the `MessagePack.Annotations` assembly. This would allow using the attributes without adding an additional runtime dependency. Only compile-time reference to the analyzer Nuget would be required.\n\n## Motivation\n\nProject A is really a library (Nuget package), and I really want to keep it minimal. It currently has zero dependencies and I would really like to keep it that way.\n\n\n",
+   "labels": [
+    "enhancement",
+    "source generation"
+   ],
+   "state": "open"
+  },
+  "integrationTree": "f2e8ab6c33c1422ecc806e43f98254c1bb954d32"
+ },
+ "environment": {
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "v24.22.1",
+  "sdk": "8.0.402",
+  "projects": [
+   "tests/MessagePack.SourceGenerator.Tests/MessagePack.SourceGenerator.Tests.csproj",
+   "tests/MessagePack.SourceGenerator.ExecutionTests/MessagePack.SourceGenerator.ExecutionTests.csproj",
+   "tests/MessagePack.SourceGenerator.ExternalTypes/MessagePack.SourceGenerator.ExternalTypes.csproj"
+  ],
+  "scope": "C# relevant tests, default build configuration",
+  "runnerHash": "cade68929f2978116e6cd8e67584c6b37a86ecc047d1496cbfcec839e44dc29a",
+  "dependencies": "083afd994c1c9a994cb2cd5aa0b6ad805a621457"
+ },
+ "finalMissions": [
+  {
+   "mission": "New variants of the original bug, not covered by previous attacks",
+   "attack": "A1-1-final",
+   "complete": false,
+   "roles": {
+    "attacker": "google/gemini-4-hydrogen",
+    "defender": "google/gemini-4-hydrogen"
+   },
+   "labels": {
+    "A": "C2",
+    "B": "original"
+   }
+  }
+ ],
+ "analysis": {
+  "symbols": [
+   {
+    "file": "src/MessagePack.SourceGenerator/Analyzers/MsgPack00xMessagePackAnalyzer.cs",
+    "start": 314,
+    "end": 341,
+    "name": "MessagePack.SourceGenerator.Analyzers.MsgPack00xMessagePackAnalyzer.SupportedDiagnostics",
+    "conditions": [],
+    "references": [],
+    "referenceCount": 0,
+    "binding": "partial-compilation"
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/CodeAnalysis/ObjectSerializationInfo.cs",
+    "start": 142,
+    "end": 169,
+    "name": "MessagePack.SourceGenerator.CodeAnalysis.ObjectSerializationInfo.Equals(MessagePack.SourceGenerator.CodeAnalysis.ObjectSerializationInfo?)",
+    "conditions": [],
+    "references": [],
+    "referenceCount": 0,
+    "binding": "partial-compilation"
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/GeneratorUtilities.cs",
+    "start": 16,
+    "end": 72,
+    "name": "MessagePack.SourceGenerator.GeneratorUtilities.GetAnalyzerOption(Microsoft.CodeAnalysis.IncrementalGeneratorInitializationContext)",
+    "conditions": [],
+    "references": [
+     {
+      "file": "src/MessagePack.SourceGenerator/CompositeResolverGenerator.cs",
+      "line": 22,
+      "verified": true
+     },
+     {
+      "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+      "line": 17,
+      "verified": true
+     }
+    ],
+    "referenceCount": 2,
+    "binding": "partial-compilation"
+   },
+   {
+    "file": "src/MessagePack.SourceGenerator/MessagePackGenerator.cs",
+    "start": 15,
+    "end": 115,
+    "name": "MessagePack.SourceGenerator.MessagePackGenerator.Initialize(Microsoft.CodeAnalysis.IncrementalGeneratorInitializationContext)",
+    "conditions": [],
+    "references": [],
+    "referenceCount": 0,
+    "binding": "partial-compilation"
+   }
+  ],
+  "parsedFiles": 321,
+  "limitation": "Bounded source compilation with runtime references; missing project dependencies and preprocessor configurations may leave references unresolved. Not whole-program analysis."
+ },
+ "providers": {
+  "models": {
+   "fast": "google/gemini-4-hydrogen",
+   "review": "google/gemini-4-carbon",
+   "diverse": "verda-nemotron/nemotron"
+  },
+  "opencode": "1.19.5",
+  "entire": null,
+  "tools": {
+   "opencode": true,
+   "entire": false
+  },
+  "available": {
+   "fast": true,
+   "review": true,
+   "diverse": false
+  },
+  "errors": [
+   "Verda/Nemotron: missing VERDA_INFERENCE_KEY",
+   "Entire: version check failed (exit -2)"
+  ],
+  "authenticated": false,
+  "preflight": {
+   "cached": false,
+   "checkedAt": "2026-11-14T11:24:56.360Z",
+   "attempts": {
+    "Google": 1
+   },
+   "partial": true
+  }
+ },
+ "debate": [
+  {
+   "candidate": "C1",
+   "model": "google/gemini-4-hydrogen",
+   "round": "proposals",
+   "strength": "C2 cleanly defines GeneratedMessagePackFormatterAttribute, its name constant, and the ForAttributeWithMetadataName provider without disturbing the existing resolver pipeline.",
+   "risk": "C2 never consumes generatedFormatterTypes in RegisterSourceOutput, so no formatter code is generated for [GeneratedMessagePackFormatter] partial classes.",
+   "expectation": "E1",
+   "scenario": "Apply [GeneratedMessagePackFormatter] to a partial class implementing IMessagePackFormatter<ExternalType> for a type in a referenced assembly and verify serialization/deserialization.",
+   "revision": "Keep C1's RegisterSourceOutput wiring so [GeneratedMessagePackFormatter] actually triggers code generation, rather than leaving the provider unused as in C2."
+  },
+  {
+   "candidate": "C2",
+   "model": "google/gemini-4-hydrogen",
+   "round": "proposals",
+   "strength": "C1 wires up RegisterSourceOutput for [GeneratedMessagePackFormatter] and extracts T from IMessagePackFormatter<T>, whereas C2 has no output registration.",
+   "risk": "C1 calls GenerateResolver instead of generating the partial class implementation for formatterType itself, leaving the user's partial class without Serialize/Deserialize.",
+   "expectation": "E1",
+   "scenario": "Apply [GeneratedMessagePackFormatter] to a partial class ExternalTypeFormatter : IMessagePackFormatter<ExternalType> for a type in a referenced assembly and verify compilation and serialization/deserialization.",
+   "revision": "Keep C2's attribute and provider, and add RegisterSourceOutput that extracts T from IMessagePackFormatter<T> and emits the formatter methods into the partial class rather than calling GenerateResolver."
+  },
+  {
+   "candidate": "C1",
+   "model": "google/gemini-4-hydrogen",
+   "round": "results",
+   "strength": "C2 defines GeneratedMessagePackFormatterAttribute, its constant, and the ForAttributeWithMetadataName provider without disturbing the existing resolver pipeline.",
+   "risk": "C2 never wires generatedFormatterTypes to RegisterSourceOutput, so no formatter code is generated for [GeneratedMessagePackFormatter] classes.",
+   "expectation": "E1",
+   "scenario": "Apply [GeneratedMessagePackFormatter] to a partial class implementing IMessagePackFormatter<ExternalType> for a type in a referenced assembly and verify serialization/deserialization.",
+   "revision": "Keep C1's RegisterSourceOutput wiring over C2's unwired provider, but verify whether GenerateResolver emits the partial formatter class itself rather than a separate resolver."
+  },
+  {
+   "candidate": "C2",
+   "model": "google/gemini-4-hydrogen",
+   "round": "results",
+   "strength": "C1 wires RegisterSourceOutput to extract T from IMessagePackFormatter<T> and invoke TypeCollector.Collect for the target type.",
+   "risk": "C1 calls GenerateResolver(model) rather than generating the Serialize/Deserialize implementation directly on the annotated partial class, which may not implement the formatter interface on the user's class.",
+   "expectation": "E1",
+   "scenario": "Apply [GeneratedMessagePackFormatter] to a partial class MyFormatter : IMessagePackFormatter<ExternalType> for a type in a referenced assembly and verify it compiles and round-trips ExternalType.",
+   "revision": "Add RegisterSourceOutput for generatedFormatterTypes in C2, but emit a partial class formatter implementation for formatterType rather than calling GenerateResolver."
+  }
+ ],
+ "binding": "6b468cc5b8ccdda0865ee913fc7b7b13dc79e395d0e39ba8775ca72a63cb450c",
+ "artifactManifest": {
+  "A1-1-final.json": "3d5e97e9d4d859b2c221c91885b7f9a7b5d59dd7ffd3ee5582deae00c82b480d",
+  "C1.patch": "8095c59721cf40b25f9dc1ba8e107390d67d613e9a6fd7b461cd4efc644836a9",
+  "C2.patch": "3cd313ef83fad4fe7a505e1069618f2ee2115b1903dd59e917c31b15ca51ab21",
+  "attack-A1-1-final-1794655533646-i7qi.json": "de2292b70cb2f5178afb6680770b0be003ab2e178c3ad2395fc8bb94e461e24b",
+  "build-C1-1794655510464-s65e-1.jsonl": "0799b19647867d358e44a38e279f773de5a436a3aee0f998068ce8486305878f",
+  "build-C1-1794655510464-s65e.json": "31686a2b5624d75ccfb788977d1d82e79ffc69f242aa12780974460ad195c757",
+  "build-C2-1794655510477-t68x-1.jsonl": "ea8b502657c20e5af2489cc1acc8a4faa001b9b3c6a67345248e320164e2d1bf",
+  "build-C2-1794655510477-t68x.json": "7e83ff9747b3c23e8df71b2c7261e309b51c95a49e8a4f5b10bad7b0f1503072",
+  "build-base.log": "602ec8155a9dad9d06849bbecbf939d4f4ac3fdf5568a3c621b20ef22f8c6daf",
+  "build-merged.log": "e7a5ada46fdd73f21b13dfe6b8d705c4d520eab5714106d25b41427218397ace",
+  "contract-1794655498622-81do-1.jsonl": "1e2701b34a2309c07337a34b68d4c84b540542c40049535ff14755b9da471bd0",
+  "contract-1794655498622-81do.json": "d5092da6ea26ced051bb047e631a5b25f49c1e2a1c714be13feeb3b48c209efa",
+  "contract.json": "5e0acbf92a0807d471e7708704af4b53b9b297dbefc647d3499035295fad7ca1",
+  "debate-proposals-C1-1794655527346-ymg3-1.jsonl": "a355518e4d68459ec0dcf23037d3e8e5dd29bd9548e16de9884461a5d2da6fd6",
+  "debate-proposals-C1-1794655527346-ymg3.json": "6c9d105b974e00982771fdc23c871621fc52ee6bd94d225b2a5c3ec6fd5868e2",
+  "debate-proposals-C2-1794655527348-qxcv-1.jsonl": "fe3b652d2dbc0e57cebcedeec0a64967bb9c8234273f8aa0073e50461d418549",
+  "debate-proposals-C2-1794655527348-qxcv.json": "b374efe55a756bd6d8c2f29c4ba9bfee9f8c87502b6d4f7f7b019adebc45381b",
+  "debate-results-C1-1794655533810-8rya-1.jsonl": "86d326668da4ba404a65995fb04d207f82363fad7adc5d920881451f6109d082",
+  "debate-results-C1-1794655533810-8rya.json": "da553b86235287b783be7380ee57af4d71ec87f7423cfd45bf36a3265a028a63",
+  "debate-results-C2-1794655533812-77q0-1.jsonl": "c13ecb74364363b489863686c64eb1d50c7e8187c48c88488e3087881d0de8b4",
+  "debate-results-C2-1794655533812-77q0.json": "997679d9bac3e54f249cbd7758821173ccdd4437b02c435cf872f43db520fe14",
+  "evidence-88c3904fdb2d845b98ac6a25d614372c8ec03412ec52c17cec7c2886356a2bc5.json": "4deccc653ef5fac2392636605cda84eb8ee839823bf7607bf5ad2bcfb54e4e59",
+  "evidence-98ee8d39c01871e832b3fdd9bc433ce4f573d845c5172aad26df4418b7dc2962.json": "1aab1280ff3a9612b424d8b8bcea63ced0ecfb673d5dae7cb9b2a195b153058e",
+  "evidence-d375ee3c1930b47cb3ae57604a05cd5d591260d965207ed07c5944c917231e0a.json": "13667c48a59d486b911c6e1da407baa6bd42a1abe29c7df45d3ca3e550e26908",
+  "files.json": "aea5eab02cc6bbbd8867808a0d701fe45630da88c31c42ab74846d6474a1d4c1",
+  "l1.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "pipeline.json": "72820dad36e3483ef7e0921ca3d5949184684bc4a1e6c9fe4cd7d46e21233b3c",
+  "red.log": "ab20aedefd512844d552e352ace5cd41fcb3378cd6a255da8f5a9ed245d3ddb0",
+  "requirement.json": "7c8a73c5e377fd0b6a2fb2d9cda87f1a9e740585beaa64b332083e046da2a606",
+  "roslyn-input.json": "948a647de0c52bb8cbf7d70a028478f0c2ceeedc2dd6edf2250fd5dbec84b6c1",
+  "roslyn.json": "b29cc0dd9c58dea462900697f029bbb77cb90eb6485722407fa71af187069880",
+  "semantic-judge-1794655540036-pzvo-1.jsonl": "f69bf92f25c1ad99b8e3382710f36a1389045afdb73bdf021c69ec502aa4acf0",
+  "semantic-judge-1794655540036-pzvo.json": "54e9fa44fa434ccd774da4e309c037bff586f47d7c3a05e47ecb0dfe5139cb8b",
+  "suite-merged.log": "f3f6518bf044570b2a110d9fa5f3b222d299107d6260499c609ca6f0fd675369"
+ }
+}
