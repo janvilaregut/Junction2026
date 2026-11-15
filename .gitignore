@@ -11,3 +11,6 @@ tools/**/obj/
 
 # Local git worktrees of other branches
 .claude/worktrees/
+
+# Local dev launch configs (machine-specific paths)
+.claude/launch.json
