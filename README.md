@@ -6,7 +6,7 @@
 Junction 2026 · Tieto challenge <i>Earned Trust in AI Code</i> · MLH <i>Best Use of Entire</i></p>
 
 <p align="center">
-<a href="submission/katse-demo.mp4"><b>▶ Demo video (2:44)</b></a> ·
+<a href="https://youtu.be/2JLW1lM3XFo"><b>▶ Demo video on YouTube (2:44)</b></a> ·
 <a href="submission/katse-pitch.pdf"><b>Slides (PDF)</b></a> ·
 <a href="CONCEPT_CARD.md"><b>Concept card</b></a> ·
 <a href="docs/EVIDENCE.md"><b>Evidence on Tieto #2283</b></a> ·
@@ -14,7 +14,18 @@ Junction 2026 · Tieto challenge <i>Earned Trust in AI Code</i> · MLH <i>Best U
 <a href="docs/LESSONS.md"><b>Lessons log</b></a>
 </p>
 
-<p align="center"><a href="submission/katse-demo.mp4"><img src="submission/cover.png" alt="Watch the Katse demo video" width="720"></a></p>
+<p align="center"><a href="https://youtu.be/2JLW1lM3XFo"><img src="submission/cover.png" alt="Watch the Katse demo video on YouTube" width="720"></a><br>
+<sub>Click to watch on YouTube · <a href="submission/katse-demo.mp4">download the MP4</a> · <a href="submission/katse-demo.srt">subtitles</a> · <a href="submission/katse-pitch.pdf">slides PDF</a></sub></p>
+
+## Submission
+
+| | Link |
+|---|---|
+| 🎬 **Demo video** (2:44, main submission) | **[YouTube](https://youtu.be/2JLW1lM3XFo)** · [MP4 in this repo](submission/katse-demo.mp4) · [subtitles (.srt)](submission/katse-demo.srt) |
+| 📑 **Presentation** (22 slides) | [Slides PDF](submission/katse-pitch.pdf) |
+| 🃏 **Concept card** | [CONCEPT_CARD.md](CONCEPT_CARD.md) |
+| 🔎 **Evidence, measurement, lessons, decisions** | [EVIDENCE](docs/EVIDENCE.md) · [MEASUREMENT](docs/MEASUREMENT.md) · [LESSONS](docs/LESSONS.md) · [DECISIONS](docs/DECISIONS.md) |
+| 💻 **Code** | this repository · [how to run it](docs/RUNNING.md) |
 
 ---
 
@@ -64,8 +75,8 @@ Science doesn't trust a paper because a reviewer read it twice. It trusts it whe
 | Deliverable | Where |
 |---|---|
 | **Concept card**: recommendation, principles, trade-offs, limits | [CONCEPT_CARD.md](CONCEPT_CARD.md) |
-| **Live walkthrough showing where the trust comes from** | [Demo video](submission/katse-demo.mp4) · [run it yourself](docs/RUNNING.md) · [real review reports](docs/evidence/) |
-| **Lessons log + demo video / presentation** | [docs/LESSONS.md](docs/LESSONS.md) · [video](submission/katse-demo.mp4) ([subtitles](submission/katse-demo.srt)) · [slides PDF](submission/katse-pitch.pdf) |
+| **Live walkthrough showing where the trust comes from** | [Demo video](https://youtu.be/2JLW1lM3XFo) · [run it yourself](docs/RUNNING.md) · [real review reports](docs/evidence/) |
+| **Lessons log + demo video / presentation** | [docs/LESSONS.md](docs/LESSONS.md) · [video on YouTube](https://youtu.be/2JLW1lM3XFo) ([MP4](submission/katse-demo.mp4), [subtitles](submission/katse-demo.srt)) · [slides PDF](submission/katse-pitch.pdf) |
 
 ### Judging criteria
 
@@ -140,7 +151,7 @@ Full guide (privacy, Entire, CLI, API, tests): [docs/RUNNING.md](docs/RUNNING.md
 | Path | What |
 |---|---|
 | [CONCEPT_CARD.md](CONCEPT_CARD.md) | The concept on one page |
-| [submission/](submission/) | Demo video, subtitles, slides PDF |
+| [submission/](submission/) | Demo video ([YouTube](https://youtu.be/2JLW1lM3XFo)), subtitles, slides PDF |
 | [docs/](docs/) | [Evidence](docs/EVIDENCE.md) · [Measurement](docs/MEASUREMENT.md) · [Lessons](docs/LESSONS.md) · [Decisions](docs/DECISIONS.md) · [Running](docs/RUNNING.md) · [raw review reports](docs/evidence/) · [research notes](docs/research/) |
 | [server/](server/) | Backend: [math/](server/math/) (no-AI layer), [pipeline/](server/pipeline/) (rebuild, attack, judge, evidence), [privacy.js](server/privacy.js), [ledger.js](server/ledger.js) (trust per area) |
 | [mvp/](mvp/) | Web UI: branch tree, dependency graph, review and sign |
